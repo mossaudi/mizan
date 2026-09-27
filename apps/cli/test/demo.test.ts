@@ -21,6 +21,7 @@ import { questionKey } from "@mizan/agent"
 import { longestRunFor, resolutionKey, verifyAnswer } from "@mizan/verify"
 import { renderReport, type SourceExcerpt } from "../src/render.ts"
 import { readDemoQuestionSet } from "../src/demo-questions.ts"
+import { preserveCommittedLedger, spawnCli } from "./committed-ledger.ts"
 
 /**
  * Best-effort removal of a temp directory that holds a SQLite file.
@@ -62,11 +63,14 @@ function cleanup(dir: string): void {
  *
  * ## The corpus-free section is the one that matters in CI
  *
- * `data/corpus.db` is 81 MB and gitignored, so a test that needs it is skipped on a clean
- * checkout — including CI. The section below therefore rebuilds a hermetic snapshot from the
- * red-team set's OWN anchor row, exactly as `test/eval.test.ts` does for its own sets, and proves
- * the money shot with no large file anywhere. The 81 MB section then re-proves it against the
- * real snapshot and the real CLI binary.
+ * `data/corpus.db` is a large gitignored build artefact, so a test that needs it is skipped on a
+ * clean checkout - including CI. (Its size is stated once, in `.gitignore`, because a hardcoded
+ * figure in a comment about a rebuildable artefact is a claim that goes stale on the next
+ * ingest; the fact that matters here is that it is not committed.) The section below therefore
+ * rebuilds a hermetic snapshot from the red-team set's OWN anchor row, exactly as
+ * `test/eval.test.ts` does for its own sets, and proves the money shot with no large file
+ * anywhere. The full-snapshot section then re-proves it against the real snapshot and the real
+ * CLI binary.
  *
  * ## Nothing here is mocked
  *
@@ -464,16 +468,11 @@ describe("the report shows the quote beside the record it was checked against", 
  * is part of the product. Skipped, loudly, when the gitignored snapshot is absent.
  */
 describe.skipIf(!existsSync(CORPUS))("every committed demo question replays to its declared verdict", () => {
-  const run = async (question: string) => {
-    const proc = Bun.spawn(["bun", "run", join(ROOT, "apps", "cli", "src", "main.ts"), question], {
-      cwd: ROOT,
-      stdout: "pipe",
-      stderr: "pipe",
-      env: { ...process.env, MIZAN_API_KEY: "" },
-    })
-    const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()])
-    return { code: await proc.exited, output: `${stdout}${stderr}` }
-  }
+  // Every run below appends to the committed run ledger. Restored by the shared guard, so this
+  // block cannot leave the tree dirty or make `verify:runs` report a chain the tests extended.
+  preserveCommittedLedger()
+
+  const run = (question: string) => spawnCli(question)
 
   const matchKind = (verdict: Verdict): "exact" | "none" => (verdict === "verified" ? "exact" : "none")
 

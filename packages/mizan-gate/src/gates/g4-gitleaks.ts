@@ -15,9 +15,23 @@
 
 export type GitleaksResult = { readonly ok: boolean; readonly detail: string }
 
-/** Where CI installs it, and what a local dev needs. Keep the two messages in one place. */
+/**
+ * Where CI installs it, and what a local dev needs. Keep the two messages in one place.
+ *
+ * The step name is quoted exactly as it appears in `.github/workflows/ci.yml`, because this
+ * message previously pointed at a step that did not exist: the `secrets` job used the
+ * gitleaks ACTION, which installs nothing on the runner's PATH, and the `gate` job — the only
+ * job that runs `bun run ci` and therefore the only job that runs this gate — had no gitleaks
+ * at all. A developer who followed the old message found nothing. The action now runs in its
+ * own named job (`secrets`) and the install step is named in the `gate` job.
+ */
 export const GITLEAKS_MISSING_MESSAGE =
-  "gitleaks is not installed, so G-4 did not run. Install it (see ci.yml, 'Install gitleaks') and re-run. A gate that does not run is not a gate."
+  "gitleaks is not installed, so G-4 did not run. Install it (see .github/workflows/ci.yml, " +
+  "'Install gitleaks (G-4 subprocess gate needs the binary, not the action)', which pins the version) " +
+  "and re-run. A gate that does not run is not a gate."
+
+/** The version CI installs, so a local developer reproduces the scan rather than approximating it. */
+export const GITLEAKS_VERSION = "8.24.3"
 
 export const GITLEAKS_ARGS = ["detect", "--source", ".", "--no-git", "--redact", "--exit-code", "1"] as const
 

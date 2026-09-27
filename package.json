@@ -20,12 +20,15 @@
     "build:eval": "bun run scripts/build-eval-set.ts",
     "make:transcript": "bun run apps/cli/scripts/make-transcript.ts",
     "ask": "bun run apps/cli/src/main.ts",
-    "verify:ledger": "bun run scripts/verify-ledger.ts"
+    "verify:ledger": "bun run scripts/verify-ledger.ts",
+    "verify:runs": "bun run scripts/verify-runs.ts",
+    "check:docs": "bun run scripts/check-docs-claims.ts"
   },
   "dependencies": {
     "@mizan/core": "workspace:*",
     "@mizan/corpus": "workspace:*",
-    "@mizan/gate": "workspace:*"
+    "@mizan/gate": "workspace:*",
+    "@mizan/provenance": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "1.1.14",

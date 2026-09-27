@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { decodeOrFail, decodeSync, isOk, normalizeForMatch, EvalSet as EvalSetSchema, type Claim, type CorpusRecord, type EvalAnchor, type EvalCase, type EvalSet, type Verdict, type VerdictReason } from "@mizan/core"
 import { buildSnapshot, openSnapshot, resolveCitations } from "@mizan/corpus"
+import { stripCommentsOnly } from "@mizan/gate"
 import { verifyAnswer } from "@mizan/verify"
 import type { Database } from "bun:sqlite"
 
@@ -36,11 +37,13 @@ import type { Database } from "bun:sqlite"
  *
  * ## Why the snapshot is hermetic
  *
- * `data/corpus.db` is 81 MB and gitignored, so a set that needed it would be unrunnable by a
- * judge and unrunnable in a fresh clone. Each set therefore ships the rows it quotes, and this
- * builds a snapshot from exactly those. The consequence is a real constraint the generator had to
- * respect: a citation can only resolve if the row it names is among the set's own anchors, which
- * is why the `ambiguous_collection` class quotes from every collection that numbers a record `1`.
+ * `data/corpus.db` is a large gitignored build artefact, so a set that needed it would be
+ * unrunnable by a judge and unrunnable in a fresh clone. (The size is stated once, in
+ * `.gitignore`; what matters here is that it is not committed.) Each set therefore ships the
+ * rows it quotes, and this builds a snapshot from exactly those. The consequence is a real
+ * constraint the generator had to respect: a citation can only resolve if the row it names is
+ * among the set's own anchors, which is why the `ambiguous_collection` class quotes from every
+ * collection that numbers a record `1`.
  */
 const ROOT = join(import.meta.dir, "..", "..", "..")
 const GOLDEN_PATH = join(ROOT, "data", "eval", "golden-normalization.json")
@@ -288,17 +291,75 @@ describe("the expectations are not self-fulfilling", () => {
   const generatorFiles = ["scripts/eval/plan.ts", "scripts/eval/build.ts", "scripts/eval/mutations.ts", "scripts/eval/anchors.ts", "scripts/build-eval-set.ts"]
 
   /**
-   * Anchored to the start of a line, because an import statement in this repository always is
-   * one, and these files DISCUSS `@mizan/verify` in prose - the plan explains at length why it
-   * must never import it. A naive substring search over the file therefore fails on its own
-   * documentation, which is the wrong reason to fail anything.
+   * Whether a generator file reaches into the verifier.
+   *
+   * ## Why this is not a substring search
+   *
+   * These files DISCUSS `@mizan/verify` in prose at length — `plan.ts` explains why it must never
+   * import it — so a naive `source.includes("@mizan/verify")` fails on its own documentation, which
+   * is the wrong reason to fail anything. Comments are therefore stripped first, using the gate
+   * package's own `stripCommentsOnly` rather than a second copy of it.
+   *
+   * ## Why the old anchored regex was a hole, not a guard
+   *
+   * The previous check was `/^import\b.*@mizan\/verify/m`, which required the specifier to sit on
+   * the SAME LINE as the word `import`. Two ordinary ways of importing the verifier therefore
+   * passed it:
+   *
+   * ```ts
+   * import {
+   *   verifyAnswer,
+   * } from "@mizan/verify"          // multi-line: `.` never crossed the newline
+   *
+   * export { verifyAnswer } from "@mizan/verify"   // not an `import` at all
+   * ```
+   *
+   * A guard whose failure mode is "the thing it forbids is written slightly differently" is not a
+   * guard. So the rule is stated against the module specifier itself — anything that resolves
+   * `@mizan/verify` as a module, by any syntax, in any number of lines — and it is proven below
+   * against each of those shapes.
    */
-  const importsTheVerifier = (source: string): boolean => /^import\b.*@mizan\/verify/m.test(source)
+  const importsTheVerifier = (source: string): boolean =>
+    /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)["']@mizan\/verify["']/.test(stripCommentsOnly(source))
 
   test("no generator file imports the verifier", () => {
     for (const relative of generatorFiles) {
       const source = readFileSync(join(ROOT, ...relative.split("/")), "utf8")
       expect({ file: relative, importsVerifier: importsTheVerifier(source) }).toEqual({ file: relative, importsVerifier: false })
+    }
+  })
+
+  // The planted cases. A guard that cannot fail is not a guard (AGENTS.md §14), and this one had
+  // already failed open once, so each shape the old regex missed is now asserted to be caught.
+  describe("the guard itself", () => {
+    const caught = [
+      ["single-line import", 'import { verifyAnswer } from "@mizan/verify"'],
+      ["multi-line import", 'import {\n  verifyAnswer,\n} from "@mizan/verify"'],
+      ["re-export", 'export { verifyAnswer } from "@mizan/verify"'],
+      ["star re-export", 'export * from "@mizan/verify"'],
+      ["dynamic import", 'const v = await import("@mizan/verify")'],
+      ["require", 'const v = require("@mizan/verify")'],
+      ["single quotes", "import { verifyAnswer } from '@mizan/verify'"],
+      ["indented inside a function", '  const v = await import("@mizan/verify")'],
+    ] as const
+
+    for (const [name, source] of caught) {
+      test(`catches a ${name}`, () => {
+        expect(importsTheVerifier(source)).toBe(true)
+      })
+    }
+
+    const allowed = [
+      ["prose in a block comment", "/** The plan explains why @mizan/verify must never be imported. */"],
+      ["prose in a line comment", "// never `import ... from \"@mizan/verify\"` here"],
+      ["a different package", 'import { verifyLedger } from "@mizan/corpus"'],
+      ["the word alone", 'const note = "mizan/verify"'],
+    ] as const
+
+    for (const [name, source] of allowed) {
+      test(`does not flag ${name}`, () => {
+        expect(importsTheVerifier(source)).toBe(false)
+      })
     }
   })
 

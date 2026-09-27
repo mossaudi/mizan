@@ -6,12 +6,14 @@ import { normalizeForMatch, type CorpusRecord } from "@mizan/core"
  *
  * ## Why the sets carry their own anchors
  *
- * `data/corpus.db` is 81 MB and gitignored, so a committed set that referenced record ids
- * would be unrunnable in CI and unrunnable by a judge — and "runnable in 60 seconds by
- * anyone" is the property the whole entry is sold on. So each set ships the handful of
- * corpus rows it needs, in full, with their licence and attribution read straight out of the
- * snapshot. The test then builds a hermetic snapshot from those rows and runs the REAL
- * resolver and the REAL verifier against it. Nothing is mocked, and nothing needs the network.
+ * `data/corpus.db` is a large gitignored build artefact, so a committed set that referenced
+ * record ids would be unrunnable in CI and unrunnable by a judge - and "runnable in 60 seconds
+ * by anyone" is the property the whole entry is sold on. (Its size is stated once, in
+ * `.gitignore`, rather than repeated in comments that a rebuild would falsify.) So each set
+ * ships the handful of corpus rows it needs, in full, with their licence and attribution read
+ * straight out of the snapshot. The test then builds a hermetic snapshot from those rows and runs
+ * the REAL resolver and the REAL verifier against it. Nothing is mocked, and nothing needs the
+ * network.
  *
  * `textHash` is the tie back to the shipped corpus: it is the sha256 of `textDisplay`, so a
  * re-ingest that changes a quoted row is detected rather than silently tolerated.

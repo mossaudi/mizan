@@ -1,7 +1,27 @@
 import { describe, expect, test } from "bun:test"
 import { matchesExactly, normalize, normalizeForMatch, normalizeForRender } from "../src/normalize/normalize.ts"
-import { ALEF_CANONICAL, YEH_CANONICAL } from "../src/normalize/fold-table.ts"
-import { FOLD_PIPELINE, FOLD_STAGE_NOTES } from "../src/normalize/fold-table.ts"
+import {
+  ALEF_CANONICAL,
+  ALEF_FORMS,
+  ARABIC_INDIC_DIGITS,
+  BIDI_CONTROL_MARKS,
+  COMBINING_MARKS,
+  EXTENDED_ARABIC_INDIC_DIGITS,
+  FOLD_PIPELINE,
+  FOLD_STAGE_NOTES,
+  HA_CANONICAL,
+  JOIN_CONTROLS,
+  TA_MARBUTA_FORMS,
+  TATWEEL,
+  WAW_CANONICAL,
+  WAW_WITH_HAMZA,
+  WHITESPACE_RUN,
+  YEH_CANONICAL,
+  YEH_FORMS,
+  YEH_WITH_HAMZA,
+  foldDigit,
+  type FoldStage,
+} from "../src/normalize/fold-table.ts"
 
 /** A real, fully diacriticized Qur'anic opening verse (Tanzil uthmani, verbatim). */
 const CORPUS_VERSE = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ"
@@ -138,6 +158,100 @@ describe("normalization: edge cases", () => {
     expect(FOLD_PIPELINE.length).toBe(8)
     for (const stage of FOLD_PIPELINE) {
       expect(FOLD_STAGE_NOTES[stage].length).toBeGreaterThan(10)
+    }
+  })
+})
+
+/**
+ * The published pipeline must be the real pipeline.
+ *
+ * ## The failure this test exists to prevent
+ *
+ * `FOLD_PIPELINE` claims in its own doc comment to be "the order `normalizeForMatch` applies it",
+ * and it is exported so the CLI and the registry can render a judge-facing description of the
+ * fold. The implementation did not follow it: digit folding was declared third and ran seventh,
+ * and whitespace collapsing ran twice because `normalizeForMatch` called `normalize()` first.
+ * The test above could not catch that, because it only counted the stages — a guard that cannot
+ * fail is not a guard (AGENTS.md section 14).
+ *
+ * The two orders happen to produce identical output, so no behavioural test would have found it
+ * either. The only way to catch it is to assert the relationship itself, which is what the first
+ * test below does by re-deriving the fold from the declaration and the stage table.
+ *
+ * The second test is the planted violation: a deliberately WRONG declared order must change the
+ * result of the re-derivation. Without it, the first test would pass just as well if the
+ * implementation ignored the declaration entirely, which is the bug it is written against.
+ */
+describe("normalization: the published pipeline IS the implemented pipeline", () => {
+  /** One stage, written out. Kept as an explicit ladder so a reader can check it against the table by eye. */
+  const applyStage = (stage: FoldStage, value: string): string => {
+    if (stage === "strip-bidi-controls") return value.replace(BIDI_CONTROL_MARKS, "")
+    if (stage === "nfkc") return value.normalize("NFKC")
+    if (stage === "fold-arabic-indic-digits") {
+      return value.replace(ARABIC_INDIC_DIGITS, foldDigit).replace(EXTENDED_ARABIC_INDIC_DIGITS, foldDigit)
+    }
+    if (stage === "strip-join-controls") return value.replace(JOIN_CONTROLS, "")
+    if (stage === "strip-tatweel") return value.replace(TATWEEL, "")
+    if (stage === "strip-combining-marks") return value.replace(COMBINING_MARKS, "")
+    if (stage === "fold-letter-forms") {
+      return value
+        .replace(ALEF_FORMS, ALEF_CANONICAL)
+        .replace(YEH_WITH_HAMZA, YEH_CANONICAL)
+        .replace(WAW_WITH_HAMZA, WAW_CANONICAL)
+        .replace(YEH_FORMS, YEH_CANONICAL)
+        .replace(TA_MARBUTA_FORMS, HA_CANONICAL)
+    }
+    return value.replace(WHITESPACE_RUN, " ").trim()
+  }
+
+  /** Rebuild the fold from the declaration, in the declared order. */
+  const manualFold = (order: readonly FoldStage[], input: string): string =>
+    order.reduce((value, stage) => applyStage(stage, value), input)
+
+  /**
+   * One victim of every stage: bidi, NFKC (full-width letter), Arabic-Indic digits, ZWNJ,
+   * tatweel, tashkeel, an alef variant, doubled whitespace.
+   */
+  const SAMPLE = `\u202E\u064A\u064E\u0646\u0651\u0633 \u0651\u0645\u064E\u0623\u064B\u064F\u0627\u0629\u064B\u2019 \u200C\u0643\u0640\u0644\u0645\u0627\u060C Ａ\u0661\u0662\u0660  \u0645\u0631\u062D\u0628\u0627`
+
+  test("the implementation equals a fold derived from the declared order", () => {
+    expect(normalizeForMatch(SAMPLE)).toBe(manualFold(FOLD_PIPELINE, SAMPLE))
+  })
+
+  test("a fold that drifts from the declaration does NOT reproduce the result — so the test above can fail", () => {
+    // The planted violation. An implementation that quietly forgets the digit stage — exactly
+    // the shape of the bug that shipped, where the chain in `normalizeForMatch` and the array in
+    // `fold-table.ts` were edited independently — must disagree with the derived fold. If this
+    // ever passed, the test above would be asserting nothing.
+    const droppedDigits = manualFold(
+      FOLD_PIPELINE.filter((stage) => stage !== "fold-arabic-indic-digits"),
+      SAMPLE,
+    )
+    expect(droppedDigits).not.toBe(manualFold(FOLD_PIPELINE, SAMPLE))
+    expect(normalizeForMatch(SAMPLE)).toContain("120")
+  })
+
+  test("every declared stage is load-bearing: dropping any one changes its own sample", () => {
+    // Guards the opposite failure - a stage that is declared, implemented, and never matters,
+    // which would make the published pipeline a list of reassuring placeholders.
+    //
+    // The NFKC sample is a FULL-WIDTH letter, not an NBSP: JavaScript's `\s` already matches
+    // U+00A0, so an NBSP sample would be "handled" by the whitespace stage and the NFKC stage
+    // would look redundant when it is not.
+    const samples: Readonly<Record<FoldStage, string>> = {
+      "strip-bidi-controls": "a\u202Eb",
+      nfkc: "a\uFF21b",
+      "fold-arabic-indic-digits": "\u0661",
+      "strip-join-controls": "a\u200Cb",
+      "strip-tatweel": "a\u0640b",
+      "strip-combining-marks": "a\u064Eb",
+      "fold-letter-forms": "\u0623",
+      "collapse-whitespace": "a  b",
+    }
+    for (const stage of FOLD_PIPELINE) {
+      const without = FOLD_PIPELINE.filter((candidate) => candidate !== stage)
+      const sample = samples[stage]
+      expect(manualFold(without, sample)).not.toBe(manualFold(FOLD_PIPELINE, sample))
     }
   })
 })

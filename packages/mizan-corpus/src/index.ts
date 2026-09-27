@@ -47,6 +47,20 @@ export {
 
 export { resolveCitations, type ResolveProblem } from "./resolve.ts"
 
+/**
+ * The query-path attestation check. Exported next to `readSnapshotMeta` rather than from
+ * `ingest.ts` because this is the second reader of the attestation and the two must not drift:
+ * `compareAttestations` decides whether a FRESH ingest matches the committed file, and
+ * `attestSnapshot` decides whether an ALREADY-BUILT snapshot matches it. Different question,
+ * same file, one decoder.
+ */
+export {
+  attestSnapshot,
+  describeAttestationProblem,
+  type AttestationProblem,
+  type SnapshotIdentity,
+} from "./attest.ts"
+
 export { quarantineReason, partitionQuarantined, type QuarantinePartition, type QuarantineReason, type QuarantinedRecord } from "./quarantine.ts"
 
 export {

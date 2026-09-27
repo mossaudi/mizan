@@ -8,6 +8,7 @@ import { hadithSearch, quranSearch } from "@mizan/retrieval"
 import { openSnapshot, readSnapshotMeta, resolveCitations } from "@mizan/corpus"
 import { runSpine, transcriptProvider, type RetrievedContext } from "@mizan/agent"
 import { verifyAnswer } from "@mizan/verify"
+import { preserveCommittedLedger, spawnCli } from "./committed-ledger.ts"
 
 /**
  * The demo must work, not just the unit tests.
@@ -164,16 +165,11 @@ describe("the committed demo replays against the committed snapshot", () => {
  * tests spawn the real binary, which is the only way to observe the contract as a caller sees it.
  */
 describe("the CLI's exit code tells a caller whether it got an answer", () => {
-  const run = async (question: string): Promise<{ readonly code: number; readonly output: string }> => {
-    const proc = Bun.spawn(["bun", "run", join(ROOT, "apps", "cli", "src", "main.ts"), question], {
-      cwd: ROOT,
-      stdout: "pipe",
-      stderr: "pipe",
-      env: { ...process.env, MIZAN_API_KEY: "" },
-    })
-    const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()])
-    return { code: await proc.exited, output: `${stdout}${stderr}` }
-  }
+  // Spawning the binary appends to the committed run ledger; the shared guard restores it and
+  // exposes what was appended, which is what the trace assertions below read.
+  const { appendedTrace } = preserveCommittedLedger()
+
+  const run = (question: string): Promise<{ readonly code: number; readonly output: string }> => spawnCli(question)
 
   test.skipIf(!CORPUS_PRESENT)("a question the transcript does not cover exits non-zero and says model unavailable", async () => {
     // No transcript entry for this hash, so the honest answer is that there is no model. Exiting
@@ -191,6 +187,66 @@ describe("the CLI's exit code tells a caller whether it got an answer", () => {
     expect(output).toContain("VERIFIED")
     // The replay label is the honesty guarantee, and it is on screen, not just in the trace.
     expect(output).toContain("PRECOMPUTED")
+  }, 60_000)
+
+  /**
+   * The trace records what actually happened, not a plausible-looking summary.
+   *
+   * This is the assertion that the F4 numbers are real. The previous trace hard-coded its tool
+   * calls — one row per query reading `tool: "quranSearch+hadithSearch"`, `resultCount: 3`,
+   * `ranking: "fused"`, `elapsedMs: 0` — so a system that measured nothing still produced a trace
+   * that looked healthy. A committed run ledger full of those rows documents a system that did not
+   * run. Read here, while the append is still on disk and before `afterAll` restores the ledger.
+   *
+   * Note the field is `toolsCalled`, not `toolCalls`: the retrieval side calls its array
+   * `calls` and the composition root's local too, and the trace schema has always said
+   * `toolsCalled`. Asserting the wrong name would have made this test pass vacuously, which is
+   * the exact failure it exists to catch.
+   */
+  test.skipIf(!CORPUS_PRESENT)("the trace records real tool calls, rankings and timings", async () => {
+    const { code } = await run(QUESTION)
+    expect(code).toBe(0)
+
+    const trace = await appendedTrace()
+    expect(trace).not.toBeNull()
+    if (trace === null) return
+    const record = trace as {
+      readonly toolsCalled?: readonly {
+        readonly tool: string
+        readonly resultCount: number
+        readonly ranking: string
+        readonly elapsedMs: number
+      }[]
+      readonly timings?: { readonly retrievalMs: number; readonly generationMs: number; readonly verificationMs: number; readonly totalMs: number }
+    }
+
+    // One row per real call, not a concatenation. A single row whose tool name contains a `+` is
+    // the old fabricated shape and is specifically what this rejects.
+    const calls = record.toolsCalled ?? []
+    const tools = calls.map((call) => call.tool).sort()
+    expect(tools).toEqual(["hadithSearch", "quranSearch"])
+    for (const call of calls) {
+      expect(call.tool).not.toContain("+")
+      // A measured call takes measurable time. A hard-coded 0 is the defect.
+      expect(call.elapsedMs).toBeGreaterThan(0)
+      // Only two values are honest here: "fused" (several rankers contributed) or "unavailable"
+      // (one did). A third shape would be a silent downgrade presented as full fidelity.
+      expect(["fused", "unavailable"]).toContain(call.ranking)
+    }
+
+    // The Qur'an question retrieves Qur'an.
+    const quran = calls.find((call) => call.tool === "quranSearch")
+    expect(quran?.resultCount).toBeGreaterThan(0)
+
+    const timings = record.timings
+    expect(timings).toBeDefined()
+    if (timings === undefined) return
+    // The strong one: retrievalMs is the SUM of the per-call measurements, so a trace cannot
+    // report a total that disagrees with its own rows. Fabricated numbers are internally
+    // consistent too, but only if the fabricator also adds them up — and this cross-check is
+    // what fails first when someone hard-codes a total and leaves the rows real.
+    expect(timings.retrievalMs).toBe(calls.reduce((sum, call) => sum + call.elapsedMs, 0))
+    expect(timings.totalMs).toBeGreaterThanOrEqual(timings.retrievalMs)
   }, 60_000)
 })
 

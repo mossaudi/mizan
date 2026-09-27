@@ -40,11 +40,57 @@ jobs:
       - name: Install dependencies (frozen lockfile)
         run: bun install --frozen-lockfile
 
+      # G-4 runs gitleaks as a SUBPROCESS (`bun run ci` -> runGitleaks), not as an action, so
+      # the binary has to be on PATH before `bun run ci` or the gate fails closed on every run
+      # and reports a red build for a reason that is purely environmental. The `secrets` job
+      # below uses the action and scans git HISTORY; this step installs the binary so the
+      # working-TREE scan actually executes here. Both are needed, and neither covers the other.
+      - name: Install gitleaks (G-4 subprocess gate needs the binary, not the action)
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          GITLEAKS_VERSION: "8.24.3"
+        run: |
+          set -euo pipefail
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
+          gitleaks version
+          # Pin the version the gate will actually use, rather than trusting whatever the
+          # runner image happens to ship. An unpinned scan tool is an unpinned finding.
+          test "$(gitleaks version)" = "${GITLEAKS_VERSION}"
+
+      - name: Install gitleaks (G-4 subprocess gate needs the binary, not the action)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          GITLEAKS_VERSION: "8.24.3"
+        run: |
+          $ErrorActionPreference = "Stop"
+          $zip = Join-Path $env:RUNNER_TEMP "gitleaks.zip"
+          $unpack = Join-Path $env:RUNNER_TEMP "gitleaks"
+          Invoke-WebRequest -Uri "https://github.com/gitleaks/gitleaks/releases/download/v$($env:GITLEAKS_VERSION)/gitleaks_$($env:GITLEAKS_VERSION)_windows_x64.zip" -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $unpack -Force
+          Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $unpack "gitleaks.exe")
+          gitleaks version
+          if ((gitleaks version) -ne $env:GITLEAKS_VERSION) { throw "gitleaks version is $(gitleaks version), expected $env:GITLEAKS_VERSION" }
+
       - name: Assert the corpus is reproducible and licence-attested
         # Fails closed on a hash or record-count drift. Skips cleanly when the corpus
         # has not been ingested yet, because the DB is gitignored by design and the
         # attestation + committed registry are what CI audits.
         run: bun run ingest:check
+
+      - name: Assert the docs only claim what the code and the registry support
+        # The disclosure drift class: a file path, an env var or a licence class that the
+        # documentation asserts and the repository does not contain. See
+        # packages/mizan-gate/src/docs-claims.ts for the four rules.
+        run: bun run check:docs
+
+      - name: Assert the run chain is intact (the badge's own audit trail)
+        # `verify:ledger` checks the CORPUS chain. This checks the RUN chain - the 274 entries
+        # recording whether each run happened the way its trace says. Nothing invoked this audit
+        # before, so the chain that backs the central claim had no command a judge could run.
+        run: bun run verify:runs
 
       - name: Typecheck, tests and structural gates (G-1..G-6)
         run: bun run ci
@@ -54,7 +100,7 @@ jobs:
         run: bun run ci -- --report-only
 
   secrets:
-    name: gitleaks (G-4)
+    name: gitleaks over git history (G-4's second half)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -62,9 +108,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      # A planted secret fails this job. `.env*` is gitignored, and no credential is
-      # present in the golden or red-team fixtures.
-      - name: Detect leaked secrets
+      # Scans git HISTORY, which the G-4 subprocess gate cannot: it runs `detect --no-git`
+      # over the working tree. A key that was committed and then removed is invisible to the
+      # tree scan and obvious to this one, so both halves are required and neither is a
+      # substitute for the other. A planted secret fails this job. `.env*` is gitignored, and
+      # no credential is present in the golden or red-team fixtures.
+      - name: Detect leaked secrets in commit history
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

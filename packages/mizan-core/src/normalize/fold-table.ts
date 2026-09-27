@@ -139,22 +139,46 @@ export const WHITESPACE_RUN = /\s+/gu
  * The pipeline, in the order `normalizeForMatch` applies it. Each stage is a single
  * linear pass; there is no backtracking expression anywhere in this package.
  *
- *   1. strip bidi controls      — security (R12), and it MUST precede NFKC: U+202E
- *                                  has combining class 0, so stripping it after NFKC
- *                                  can expose an out-of-order combining sequence and
- *                                  break idempotency
- *   2. NFKC                     — compatibility composition (NBSP -> space, ligatures, full-width forms)
- *   3. fold Arabic-Indic digits — number identity
- *   4. strip join controls      — models add/drop ZWJ/ZWNJ
- *   5. strip tatweel            — invisible elongation
- *   6. strip combining marks    — tashkeel; annotation marks (Cf) survive
- *   7. fold letter forms        — alef / yeh / waw / ta-marbuta
- *   8. collapse whitespace      — and trim
+ * This array is not documentation of the pipeline. It IS the pipeline:
+ * `normalizeForMatch` reduces over it, and the stage table it indexes is typed
+ * `Record<FoldStage, ...>`, so a stage that is declared but not implemented, or
+ * implemented but not declared, is a compile error. See `MATCH_STAGES` in
+ * `normalize.ts` for the divergence this replaced.
  *
- * The order is fixed because the result must be idempotent in every stage. Digits are
- * folded before whitespace so that a number broken across a line is still one number;
- * marks are stripped before letter folding so that a letter carrying a hamza is seen
- * in its base form.
+ *   1. strip-bidi-controls   - security (R12), and it MUST precede NFKC: U+202E
+ *                              has combining class 0, so stripping it after NFKC
+ *                              can expose an out-of-order combining sequence and
+ *                              break idempotency
+ *   2. nfkc                  - compatibility composition (NBSP -> space, ligatures, full-width forms)
+ *   3. fold-arabic-indic-digits - number identity
+ *   4. strip-join-controls   - models add/drop ZWJ/ZWNJ
+ *   5. strip-tatweel         - invisible elongation
+ *   6. strip-combining-marks - tashkeel; annotation marks (Cf) survive
+ *   7. fold-letter-forms     - alef / yeh / waw / ta-marbuta
+ *   8. collapse-whitespace   - and trim
+ *
+ * ## Which of those positions are load-bearing, and which are not
+ *
+ * Two are, and both are stated with their reason above:
+ *
+ *  - **bidi before NFKC.** U+202E is a *starter* (combining class 0), so leaving it in place
+ *    lets NFKC see two separate combining sequences and lets the strip that follows expose an
+ *    out-of-canonical-order pair. Reversing these two breaks idempotency. The property test in
+ *    `normalize.test.ts` asserts the reversed case, so this is verified rather than asserted.
+ *
+ *  - **marks before letter folding.** A letter carrying a hamza is seen in its base form once
+ *    the mark is gone, so folding the letter form first would have to handle a base+hamza pair
+ *    as a unit. Folding forms first is not incorrect - U+0624 and U+0626 are listed in the
+ *    table for exactly that reason - but it makes each fold responsible for marks it should not
+ *    have to know about.
+ *
+ * Digit folding at position 3 is **not** load-bearing. The two digit blocks are disjoint from
+ * every other stage's characters, so this stage commutes with all seven and the result is
+ * identical wherever it sits. An earlier version of this comment claimed it had to precede
+ * whitespace "so that a number broken across a line is still one number", which was never true:
+ * whitespace collapsing inserts a space, so a number split across a line becomes two tokens
+ * under either order. The position is kept where it is because it reads better beside NFKC, not
+ * because the fold would fail elsewhere.
  */
 export const FOLD_PIPELINE = [
   "strip-bidi-controls",

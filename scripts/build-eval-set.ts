@@ -86,8 +86,15 @@ const main = (): number => {
   const db = new Database(CORPUS_PATH, { readonly: true })
   const foldedCorpus = loadFoldedCorpus(db)
   const index = indexCorpus(db)
-  // Built once and reused for both the cases and the anchor list. Building twice would open two
-  // more read-only handles on an 81 MB file to recompute a list the first pass already had.
+  // Each of the two is built once and reused by both eval sets, rather than rebuilt per set.
+  //
+  // The previous version of this comment justified that with "an 81 MB file". The database is
+  // not 81 MB — it is about 80 — and more importantly the number described a *build artefact*,
+  // so it was wrong the next time anyone ran `bun run ingest` and it was never load-bearing
+  // information for a reader deciding whether the work is shared. A volatile figure belongs in
+  // one place that describes the artefact itself (`.gitignore`), not in a comment explaining an
+  // allocation decision. Same defect class as the six false paths `bun run check:docs` now
+  // fails the build over: a specific, checkable-looking claim that nothing keeps true.
   const builtGolden = buildGolden(db)
   const builtRedTeam = buildRedTeam(db)
   db.close()

@@ -328,6 +328,114 @@ describe("appendRunTrace", () => {
     const audited = auditRunLedger(await readFile(path, "utf8"))
     expect(audited.ok && audited.value.traces).toHaveLength(3)
   })
+
+  test("a batch of n produces ONE chain, so the whole ledger verifies", async () => {
+    // The regression this guards: the batch path used to re-read and re-audit the file per entry,
+    // which is quadratic, and a cursor bug would show up as a fork rather than as a slow run.
+    const path = await tempLedger()
+    const results = await appendRunTraces(path, Array.from({ length: 12 }, (_, i) => draft({ runId: `batch-${i}` })))
+    expect(results.filter((result) => result.ok)).toHaveLength(12)
+    expect(results.map((result) => (result.ok ? result.index : -1))).toEqual(Array.from({ length: 12 }, (_, i) => i))
+
+    const audited = auditRunLedger(await readFile(path, "utf8"))
+    expect(audited.ok).toBe(true)
+    if (!audited.ok) return
+    expect(audited.value.traces).toHaveLength(12)
+    // Every prevHash links to the entry before it, not merely to a valid-looking hash.
+    for (const [index, trace] of audited.value.traces.entries()) {
+      const expectedPrev = index === 0 ? GENESIS_PREV_HASH : audited.value.traces[index - 1]!.entryHash
+      expect(trace.prevHash).toBe(expectedPrev)
+    }
+  })
+
+  test("a batch onto an existing ledger continues its indices, it does not restart at 0", async () => {
+    // The index comes from a COUNT carried in the cursor rather than from an array the cursor
+    // used to hold. On an empty file both spellings give 0, so this is the only case that can
+    // tell them apart: a cursor that forgot to read the existing length would report indices
+    // 0,1,2 for what are really entries 2,3,4 — and "which run?" is the number a judge cites.
+    const path = await tempLedger()
+    const first = await appendRunTrace(path, draft({ runId: "solo-0" }))
+    expect(first.ok && first.index).toBe(0)
+    const second = await appendRunTrace(path, draft({ runId: "solo-1" }))
+    expect(second.ok && second.index).toBe(1)
+
+    const batch = await appendRunTraces(path, [draft({ runId: "more-2" }), draft({ runId: "more-3" })])
+    expect(batch.map((result) => (result.ok ? result.index : -1))).toEqual([2, 3])
+
+    const audited = auditRunLedger(await readFile(path, "utf8"))
+    expect(audited.ok && audited.value.traces.map((t) => t.runId)).toEqual(["solo-0", "solo-1", "more-2", "more-3"])
+  })
+})
+
+/**
+ * The post-write check verifies the TAIL, not the whole file. That is the performance fix, and it
+ * is only legitimate if the properties the old full re-audit provided are still provided.
+ *
+ * Each test below is a property that a naive "just read the last line" implementation loses, and
+ * that the real implementation has to earn back some other way. If any of them fails, the
+ * optimisation has silently dropped a guarantee and the fix is wrong — not merely slow.
+ */
+describe("the tail verification keeps the guarantees a full re-audit provided", () => {
+  test("a concurrent append between the audit and the write is detected as a fork", async () => {
+    // The hard case. Our own entry legitimately chains from the head we audited, so comparing it
+    // to our own expected head proves nothing. The evidence of a fork is the entry BEFORE ours: if
+    // it is not the head we chained from, somebody else wrote in between.
+    const path = await tempLedger()
+    const first = await appendRunTrace(path, draft({ runId: "run-a" }))
+    expect(first.ok).toBe(true)
+    if (!first.ok) return
+    const headAfterFirst = first.entryHash
+
+    // Simulate the interleaving directly: take the bytes we audited, then have another writer
+    // append an entry chained from the same head before ours lands.
+    const beforeConcurrent = await readFile(path, "utf8")
+    const intruder = sealTrace(draft({ runId: "run-intruder" }), headAfterFirst)
+    const ourEntry = sealTrace(draft({ runId: "run-ours" }), headAfterFirst)
+    // Both entries claim the same prevHash: the file is now a fork.
+    await writeFile(path, `${beforeConcurrent}${serialiseEntry(intruder)}${serialiseEntry(ourEntry)}`, "utf8")
+
+    // The file is not intact, so the append must refuse rather than chain onto a fork.
+    const outcome = await appendRunTrace(path, draft({ runId: "run-after-fork" }))
+    expect(outcome.ok).toBe(false)
+    if (outcome.ok) return
+    expect(outcome.reason).toBe("ledger_broken")
+  })
+
+  test("an entry whose prevHash is not the audited head is refused", async () => {
+    // Same property, reached through the tail check rather than the prefix audit: the file is
+    // otherwise intact, but the last line we are about to sit behind is not the head we read.
+    const path = await tempLedger()
+    const entries = sealed(2)
+    // Chain entry 1 onto GENESIS rather than onto entry 0. `readRunChain` still parses it, and
+    // the prefix audit is what must catch it.
+    const forked = [entries[0]!, sealTrace(draft({ runId: "run-forked" }), GENESIS_PREV_HASH)]
+    await writeChain(path, forked)
+
+    const outcome = await appendRunTrace(path, draft({ runId: "run-after-fork" }))
+    expect(outcome.ok).toBe(false)
+    if (outcome.ok) return
+    expect(outcome.reason).toBe("ledger_broken")
+    expect(outcome.detail).toContain("entry 1")
+  })
+
+  test("a truncated ledger during the write is refused, not read at a shifted offset", async () => {
+    // Byte offsets are only meaningful against the file we audited. If the file shrank, every
+    // offset we hold is wrong, so the implementation must refuse rather than seek.
+    const path = await tempLedger()
+    await appendRunTrace(path, draft({ runId: "run-a" }))
+    const raw = await readFile(path, "utf8")
+    await writeFile(path, raw.slice(0, 20), "utf8")
+
+    const outcome = await appendRunTrace(path, draft({ runId: "run-b" }))
+    expect(outcome.ok).toBe(false)
+    if (outcome.ok) return
+    // The pre-append audit catches this first, as a torn tail — a truncation to a non-newline
+    // offset is exactly that. Either refusal is a correct answer; what matters is that the run
+    // is not recorded against offsets that no longer mean anything.
+    expect(["ledger_broken", "torn_tail", "verify_failed"]).toContain(outcome.reason)
+    // And nothing was appended onto the truncated file.
+    expect(await readFile(path, "utf8")).toBe(raw.slice(0, 20))
+  })
 })
 
 describe("what the ledger may contain", () => {

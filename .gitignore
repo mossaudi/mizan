@@ -6,13 +6,24 @@ node_modules/
 # from the root; `git rm`'d. If one reappears, it is a bug, not a deliverable.
 packages/*/bun.lock
 
-# secrets — nothing under this pattern may ever be committed (gate G-4 / gitleaks)
+# secrets — nothing under these patterns may ever be committed (gate G-4 / gitleaks)
 .env
 .env.*
 !.env.example
 *.pem
 *.key
-!.github/*.pem
+#
+# There is deliberately NO `!.github/*.pem` exception. One was here, and it silently undid the
+# two rules above it for the entire directory a judge or an agent is most likely to add a file to:
+#
+#   git check-ignore --no-index -v .github/evil.pem
+#   .gitignore:15:!.github/*.pem
+#
+# A private key committed under `.github/` is still a committed private key, and it is worse than
+# one committed elsewhere, because that is where a workflow file or a CI helper gets added. The
+# negated pattern is also invisible: it reads as a special case with a reason, and the reason is
+# in the diff history rather than in the file. So the exception is gone, and the two commands
+# that prove the remaining patterns work are recorded here instead.
 
 # corpus snapshot: large and reproducible from pinned URLs + attestation.json
 data/corpus.db
@@ -25,9 +36,19 @@ data/raw/
 # generated per-row registry (large; the committed sources.json is the deliverable)
 data/registry/records.jsonl
 
-# provenance ledger: appended by the first run, then committed as evidence
-data/ledger/*.tmp
-data/ledger/*.bak
+# provenance ledgers: `data/ledger.jsonl` (corpus ingest) and `data/runs.jsonl` (runs) are
+# append-only and are committed as evidence.
+#
+# There were `data/ledger/*.tmp` and `data/ledger/*.bak` rules here and they were fiction:
+# `data/ledger/` has never existed — the ledgers are single files directly under `data/` — and
+# nothing in this codebase writes a `.tmp` or `.bak` sibling beside either one. An append-only
+# writer has no temp-file-and-rename step, so there is no transient artefact to ignore, and the
+# SQLite sidecars that genuinely are transient are listed above with the database.
+#
+# Recorded rather than silently deleted, because the pattern here is the actual defect: a rule
+# that names nothing real reads as coverage. It is not coverage. It is a claim, and the same way
+# of writing put six false file paths in DISCLOSURE.md — which is what `bun run check:docs` now
+# fails the build over.
 
 # ============================================================
 # PUBLISHED — apps/, data/ and scripts/ are tracked.

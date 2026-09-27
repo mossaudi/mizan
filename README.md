@@ -7,6 +7,7 @@ local corpus and shows its work**. Every quotation is labelled `VERIFIED`, `UNVE
 `REJECTED`, and that label is computed — not asserted, not scored, not asked of a model.
 
 ```
+$ bun run ingest                              # once, on a fresh clone: builds the local snapshot
 $ bun run ask "What does the Qur'an say about the oneness of God?"
 
 ────────────────────────────────────────────────────────────────

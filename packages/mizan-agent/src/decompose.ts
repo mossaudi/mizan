@@ -21,7 +21,27 @@ import { MAX_TOTAL_CONTEXT_CHARS, sanitizeContexts } from "./sanitize.ts"
  * `tool_call_cap_reached` rather than being invisible.
  */
 
-/** The architectural cap on decomposition. Three collections: quran, bukhari, muslim. */
+/**
+ * The cap on how many queries one decomposition may return.
+ *
+ * ## Why 4, and not one per collection
+ *
+ * An earlier version of this comment said "Three collections: quran, bukhari, muslim". Both the
+ * count and the names were wrong, and the names were wrong in the way that matters: **there is
+ * no `bukhari` and no `muslim` collection in this corpus.** The six collections actually ingested
+ * are `quran`, `abudawud`, `tirmidhi`, `nasai`, `ibnmajah` and `malik`, so a comment naming Ṣaḥīḥayn
+ * described a capability a judge could not find, and one that would have implied the two most
+ * famous hadith collections were searched when they are not.
+ *
+ * The cap is therefore not derived from the collection count at all, and must not be read as
+ * "cover every collection": 4 is a budget on provider calls, because the point of the cap is to
+ * bound retrieval work, and a decomposition that fans out to all six collections is a worse
+ * product than one that asks four good questions. What a query does reach is decided by
+ * `live.ts`, which searches quran and hadith in parallel.
+ *
+ * The honest version of a collection list is the one the corpus can be asked for, which is what
+ * `bun run ingest:check` reports.
+ */
 export const MAX_DECOMPOSITION_QUERIES = 4
 
 export type Decomposition = {
