@@ -17,6 +17,8 @@
     "test": "bun run scripts/root-test-refuses.ts",
     "ingest": "bun run scripts/ingest.ts",
     "ingest:check": "bun run scripts/ingest.ts --check",
+    "build:eval": "bun run scripts/build-eval-set.ts",
+    "make:transcript": "bun run apps/cli/scripts/make-transcript.ts",
     "ask": "bun run apps/cli/src/main.ts",
     "verify:ledger": "bun run scripts/verify-ledger.ts"
   },

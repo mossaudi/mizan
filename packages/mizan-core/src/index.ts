@@ -32,6 +32,8 @@ export { BIDI_CONTROL_MARKS, COMBINING_MARKS, FOLD_PIPELINE, FOLD_STAGE_NOTES, t
 
 export { decodeOrFail, decodeSync, describeDecodeFailure, type Decodable, type DecodeFailure } from "./schema/decode.ts"
 export { Answer, Citation, Claim, emptyClaim } from "./schema/claim.ts"
+export { DEMO_QUESTION_SET_VERSION, DemoExpectation, DemoQuestion, DemoQuestionSet } from "./schema/demo.ts"
+export { EvalAnchor, EvalCase, EvalSet, KnownDivergence } from "./schema/eval.ts"
 export { ResolvedCitation, unresolved } from "./schema/resolved.ts"
 export { CorpusRecord, CorpusRecordMeta, GradeBasis, toRecordMeta } from "./schema/record.ts"
 export {

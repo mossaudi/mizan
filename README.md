@@ -1,0 +1,281 @@
+# mizan (ميزان)
+
+**Per-claim citation verification for Qur'an and hadith answers.**
+
+`mizan` answers a question about the Qur'an or hadith, then **checks its own citations against a
+local corpus and shows its work**. Every quotation is labelled `VERIFIED`, `UNVERIFIABLE` or
+`REJECTED`, and that label is computed — not asserted, not scored, not asked of a model.
+
+```
+$ bun run ask "What does the Qur'an say about the oneness of God?"
+
+────────────────────────────────────────────────────────────────
+sources       3 from the local snapshot
+model         transcript-v1
+transcript    PRECOMPUTED (deterministic replay)
+snapshot      7b3b66fbca7fb9df…
+────────────────────────────────────────────────────────────────
+The Qur'an states the oneness of God directly and without qualification. Surah al-Ikhlas opens
+by commanding the Prophet to say that He is one, and the surah then denies any likeness to Him.
+
+[VERIFIED] ikhlas-1 — exact_containment (match: exact)
+    quoted:  قُلْ هُوَ ٱللَّهُ أَحَدٌ
+    source:  quran 6222 — https://tanzil.net/pub/download/index.php?quranType=uthmani&outType=txt&agree=true
+             بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ قُلْ هُوَ ٱللَّهُ أَحَدٌ
+    run:     14 of 14 folded characters shared — display only, never a verdict
+```
+
+The label on that line is the product. A system that *looks* verified but is not is the single
+most likely way to lose trust in an Islamic-content tool, so the engineering effort here went into
+the negative space: proving that `VERIFIED` cannot be reached except by strict containment.
+
+The three indented lines are the other half of it. A badge on its own asserts a disagreement and
+shows none of the evidence, so the quote that was checked, the record it was checked against, and
+the record's own URL all reach the screen beside it. The `run:` line is a display-only diagnostic
+that `packages/mizan-verify` cannot see — gate **G-2** enforces that separation over the verifier's
+import closure, so the number printed there provably had no hand in the badge printed above it.
+Ask it a question whose citation is a fabrication and the same three lines appear under a
+`REJECTED` badge, with the invented quote and the genuine text side by side.
+
+---
+
+## The one idea
+
+> A claim may be `VERIFIED` only if the quoted span, after deterministic normalisation, is
+> **literally contained** in the specific corpus record the answer cited. Nothing else.
+
+There is no similarity score, no embedding, no edit distance, no LLM judge, no fuzzy fallback.
+`packages/mizan-verify` declares exactly one dependency (`@mizan/core`), does no I/O, reads no
+clock, and gate **G-1** fails CI if that stops being true.
+
+The reason is a measurement, not a preference. A feasibility spike found that a fuzzy or
+embedding-similarity verifier scores an **invented but plausible** hadith as a high match — the
+fabrication-acceptance hole (CWE-345) that every retrieval-augmented generator is one threshold
+away from. So the fallback everyone reaches for is precisely the one that accepts invented
+religious text. See ADR-03.
+
+---
+
+## Quick start
+
+Requires [Bun](https://bun.sh) `1.3.14`.
+
+```bash
+bun install --frozen-lockfile
+bun run ingest          # fetch sources, build the snapshot and the registry (~80 MB, gitignored)
+bun run ask "your question"
+bun run ci              # typecheck + tests + the six structural gates
+```
+
+`bun run ask` replays a committed transcript and says so on every line. It never presents a
+precomputed answer as a live generation.
+
+### Try the verifier directly
+
+```bash
+# A real span of a real record: verified.
+# An invented span cited to that same record: rejected.
+# A number that does not exist: unverifiable, because you cannot prove a negative.
+bun test --cwd apps/cli
+```
+
+---
+
+## The eval sets
+
+Two committed, self-contained sets in `data/eval/`. They ship the corpus rows they quote, so
+they run in about a second on a clean checkout with no corpus and no network.
+
+| Set | Cases | Bar | What it measures |
+| --- | --- | --- | --- |
+| `golden-normalization.json` | 200 | **100%** (architecture floor: 99%) | Four renderings of a correct quotation that must all verify, then the ways a text stops being a quotation |
+| `redteam-fabricated.json` | 40 | **exactly zero** `VERIFIED` | Fabrications of real spans: one word changed, two words changed, letters transposed, a digit changed, a word inserted |
+
+Run them with `bun test --cwd apps/cli` (see `test/eval.test.ts`). Regenerate with
+`bun run build:eval` after an ingest that changes the quoted rows.
+
+**The expectations are hand-adjudicated, not observed.** `scripts/eval/plan.ts` declares every
+expected verdict as a literal derived from the documented behaviour of the fold table. The
+generator is forbidden from importing `@mizan/verify`, and a test asserts that it still is not.
+A set whose expectations were recorded by running the code under test is a regression test of the
+code against itself and would prove nothing.
+
+**The red-team bar is zero, not a percentage.** Every case in it is a fabrication, so one
+`VERIFIED` is a false positive on invented religious text. There is no accuracy figure to trade
+against it.
+
+Three properties make the sets harder to fool than they look:
+
+- **Disjoint spans.** Two cases never share a span, so 200 cases are 200 texts rather than one
+  long record chopped up.
+- **Global absence.** Every case labelled `REJECTED` is checked to be absent from the *entire*
+  27,234-row corpus, not merely from the record it cites. A fabrication that happened to be a real
+  quotation elsewhere would be a fixture asserting the verifier is wrong when it is right.
+- **No pre-folded text.** Anchors ship `textDisplay` and a `textHash`, and the test re-derives
+  `textMatch` with the real normalizer. A fixture cannot make a fabrication verify itself by
+  editing a folded string, and editing the source text is caught by the hash.
+
+### Known divergence: paraphrase → `REJECTED`, not `UNVERIFIABLE`
+
+**This is a real, unresolved conflict between the specification and the implementation, recorded
+rather than hidden.** The user story asks that a faithful paraphrase be `UNVERIFIABLE` and "never
+rejected, because a paraphrase is not a lie". The implemented six-step procedure cannot honour
+that: step 5 routes a *resolved* identifier whose record lacks the quote to `REJECTED`, and
+telling a paraphrase apart from a fabrication would require exactly the similarity measurement
+ADR-03 forbids. The two requirements cannot both hold.
+
+The mechanism was kept, and the conflict is published: `knownDivergence` in both artefacts, a
+stamp on all 26 affected cases, and a test that fails if the stamp is removed. **The team lead has
+to decide**, because it changes the product's most safety-sensitive label.
+
+---
+
+## The corpus
+
+27,234 records. No Bukhari, no Muslim — recorded as absent rather than quietly substituted.
+
+| Collection | Records | Licence class |
+| --- | --- | --- |
+| Qur'an (Tanzil, Uthmani) | 6,236 | no-derivatives |
+| Sunan an-Nasa'i | 5,672 | content-only |
+| Sunan Abi Dawud | 5,272 | content-only |
+| Sunan Ibn Majah | 4,336 | content-only |
+| Jami' at-Tirmidhi | 3,889 | content-only |
+| Muwatta' (Malik) | 1,829 | content-only |
+
+Every quote in the eval sets is reproduced under its own collection's licence with its
+attribution intact, in `data/registry/sources.json` and per-anchor in the artefacts. Qur'an text
+is stored verbatim and never rewritten, because the terms require it and because rewriting a sacred
+text to suit a normaliser would be wrong on its own terms.
+
+**15,026 of the 36,024 rows the hadith source shipped are quarantined, not served.** They carry
+no grade, and the rule is that a grade is never ours: we store exactly what the dataset asserts,
+or `null`, and we never default, infer or upgrade one. That costs us 41.7% of the hadith source.
+We took the cost.
+
+---
+
+## Provenance
+
+- `attestation.json` — content hash, per-source SHA-256 digests, record counts, the
+  hash-chained ledger head, and the quarantine count.
+- `data/ledger.jsonl` — a hash chain. A write failure marks a run untrusted; a mismatch is a loud
+  error, never a warning.
+- `data/registry/sources.json` — every source with its publisher, licence, licence URL and
+  attribution. A source whose licence could not be established is recorded as **disabled with a
+  reason**, not quietly used.
+- `data/runs.jsonl` — run traces carrying `questionHash`, never question text. No PII, no corpus
+  text, no secrets.
+
+Two candidate sources are recorded and **excluded**, with reasons:
+
+- **Open Hadith Data** — no explicit licence could be established from the repository. It is
+  recorded as the upstream of the quranlab collections so the question is not re-derived from
+  scratch. No adapter is written for a source we may not ship.
+- **Hadith API (mirror)** — supplies the numbering origin for the Kutub al-Sittah but is not a
+  citable edition, and states no per-row terms.
+
+---
+
+## Architecture
+
+```
+apps/cli              composition root: the only place the parts are wired together
+packages/
+  mizan-core          contracts, Result, the Arabic fold table, the decode seam
+  mizan-corpus        ingest, snapshot, citation resolution, quarantine, audit
+  mizan-retrieval     FTS5 lexical rankers over the folded column
+  mizan-agent         claim decomposition, transcript replay, the 10s budget
+  mizan-verify        THE SIX-STEP PROCEDURE — offline, total, clock-free
+  mizan-provenance    ledger, attestation, run traces
+  mizan-gate          the six structural gates
+```
+
+### The six-step procedure
+
+Per claim, in order. Each step is a fail-closed early return; the happy path is the last line.
+
+1. **The quote.** Empty or diacritics-only → `UNVERIFIABLE (empty_quote)`. Only a *quoted span* is
+   falsifiable — never the model's prose, which is its opinion of the source.
+2. **A citation.** None → `UNVERIFIABLE (no_citation)`. Zero evidence blocks approval.
+3. **The cap.** More than three citations → capped. A cap that is not the reason does not become
+   the reason recorded in the trace.
+4. **Resolution.** No candidate records → `UNVERIFIABLE (identifier_unresolved)`, or
+   `collection_ambiguous` when the number exists in several collections and the answer named none.
+   You may only accuse a citation of misquotation if the thing it points at demonstrably exists.
+5. **Containment.** Strict normalised substring containment of the folded quote in the folded
+   cited record → `VERIFIED`, with evidence. This is the only route to `VERIFIED` in the
+   repository, and gate **G-6** fails CI if a second one appears.
+6. **Coercion.** A `VERIFIED` carrying no evidence is coerced *down* to `UNVERIFIABLE`, and the
+   evidence is cleared so nothing downstream can render a confident badge with no provenance.
+
+### The fold
+
+One table, in `packages/mizan-core/src/normalize/fold-table.ts`, applied once at ingest. Stages
+cover alef and hamza forms, the wasla, ta-marbuta, diacritics, tatweel, digit forms (Arabic-Indic
+and Eastern Arabic fold to ASCII), punctuation and whitespace. It never rewrites, adds or removes
+a **letter** — which is exactly why a fabrication cannot be folded into a match.
+
+`textMatch` is a matching key, not a text. It is never displayed. Every user surface renders
+`textDisplay`; only the verifier compares `textMatch`.
+
+### The gates
+
+The differentiator is not the verifier's code, it is a set of machine-checked invariants. Every
+gate has a self-test with a planted violation that must fail.
+
+| Gate | Enforces |
+| --- | --- |
+| **G-1** | `mizan-verify` depends only on `@mizan/core`; no similarity, embedding, edit distance, network, clock or randomness; containment is its only match authority |
+| **G-2** | no raw-HTML sinks; verdict construction is isolated from rendering |
+| **G-3** | no dynamic eval, obfuscation, anti-analysis or donor-code workarounds |
+| **G-4** | `gitleaks` finds no secrets — including the deliberately planted `AKIA…EXAMPLE` in the injection fixture, so the check is proven rather than lucky |
+| **G-5** | every enabled source carries publisher, licence, licence URL and attribution, and an artefact digest |
+| **G-6** | exactly one `VERIFIED` construction site, one match-strength owner, no computed percentage, no ad-hoc match strength, and evidence iff `VERIFIED` |
+
+---
+
+## Security posture
+
+Mapped to OWASP, in the places that matter here.
+
+- **A01 Broken access control** — corpus text is untrusted input. Retrieval is fenced,
+  length-capped and marked data-only before entering any prompt. The prompt is a hint that improves
+  output quality, never a control; only the verifier is authoritative.
+- **A02/A06** — no secrets in code or history; the corpus is content, not a credential store.
+  Dependencies are pinned and the lockfile is frozen in CI.
+- **A03 / A10 injection** — the 10 `injection_appended` cases append a real English prompt
+  injection to a genuine Arabic hadith span. The text before the comma is real, so the case cannot
+  be waved away as "obviously not from the corpus". It is rejected, and G-4 proves the secret
+  scanner tolerates the fixture it contains.
+- **A04 Insecure design** — the design refuses `VERIFIED` by default. Zero evidence blocks
+  approval; a timeout yields `UNVERIFIABLE`; an attestation mismatch yields a loud error and no
+  verdict.
+- **A09** — structured logging, hashes not content, no question text in any trace.
+
+Every failure mode has one honest surface. `model unavailable`, `no sources found`,
+`unverifiable`, `semanticRanking: "unavailable"`. Never a canned answer, a guess, a cached
+verdict, or a silent downgrade presented as full fidelity.
+
+---
+
+## Not done, and not claimed
+
+Stated plainly, because an over-claim in this domain is a correctness problem rather than a
+marketing one.
+
+- **Registration status and Track 4 selection are unconfirmed.** The engineering work does not
+  depend on them; the submission does.
+- **The official guide, participant guide, judging criteria and scientific appendix have not been
+  read by a human.** Nothing here should be read as compliance with them.
+- **The paraphrase divergence above is unresolved** and needs a decision.
+- **There is no live model provider.** `bun run ask` replays a committed transcript and labels
+  every line as a precomputed replay. A provider is a seam, not an integration.
+- **The golden set asserts 100% against itself, not against a human-labelled corpus.** The
+  expectations are hand-derived from the fold table's documented behaviour. A judge who disagrees
+  with a rationale in `plan.ts` should treat the disagreement as a finding.
+
+## Licence
+
+Apache-2.0 for the code. Corpus text is **not** covered by it: see `data/registry/sources.json` for
+per-source terms, and each eval anchor for its own attribution.

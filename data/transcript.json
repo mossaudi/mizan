@@ -1,0 +1,96 @@
+{
+  "entries": [
+    {
+      "stage": "decompose",
+      "questionHash": "9fd4083645cc80f1f315fac2b7c29159331bbeef4cfee4f0b460d0428e499022",
+      "answer": {
+        "provider": "precomputed-transcript",
+        "model": "transcript-v1",
+        "transcript": "precomputed",
+        "questionHash": "9fd4083645cc80f1f315fac2b7c29159331bbeef4cfee4f0b460d0428e499022",
+        "prose": "Retrieve the opening of surah al-Ikhlas.",
+        "claims": [
+          {
+            "id": "q1",
+            "text": "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ قُلْ هُوَ ٱللَّهُ أَحَدٌ",
+            "quote": null,
+            "citations": []
+          }
+        ]
+      }
+    },
+    {
+      "stage": "answer",
+      "questionHash": "9fd4083645cc80f1f315fac2b7c29159331bbeef4cfee4f0b460d0428e499022",
+      "answer": {
+        "provider": "precomputed-transcript",
+        "model": "transcript-v1",
+        "transcript": "precomputed",
+        "questionHash": "9fd4083645cc80f1f315fac2b7c29159331bbeef4cfee4f0b460d0428e499022",
+        "prose": "The Qur'an states the oneness of God directly and without qualification. Surah al-Ikhlas opens by commanding the Prophet to say that He is one, and the surah then denies any likeness to Him.",
+        "claims": [
+          {
+            "id": "ikhlas-1",
+            "text": "The opening of sura al-Ikhlas commands the Prophet to declare that God is one.",
+            "quote": "قُلْ هُوَ ٱللَّهُ أَحَدٌ",
+            "citations": [
+              {
+                "collection": "quran",
+                "number": "6222",
+                "grade": null,
+                "raw": "Qur'an 112:1"
+              }
+            ]
+          }
+        ],
+        "confidence": 0.9
+      }
+    },
+    {
+      "stage": "decompose",
+      "questionHash": "506e45bd46e8f59c33f0fb5890064a01b65adc99f602c6a2ec629bcefa54d287",
+      "answer": {
+        "provider": "precomputed-transcript",
+        "model": "transcript-v1",
+        "transcript": "precomputed",
+        "questionHash": "506e45bd46e8f59c33f0fb5890064a01b65adc99f602c6a2ec629bcefa54d287",
+        "prose": "Retrieve the report on the signs of the Hour.",
+        "claims": [
+          {
+            "id": "q1",
+            "text": "حَدَّثَنَا أَحْمَدُ بْنُ صَالِحٍ، حَدَّثَنَا عَنْبَسَةُ، حَدَّثَنِي يُونُسُ،",
+            "quote": null,
+            "citations": []
+          }
+        ]
+      }
+    },
+    {
+      "stage": "answer",
+      "questionHash": "506e45bd46e8f59c33f0fb5890064a01b65adc99f602c6a2ec629bcefa54d287",
+      "answer": {
+        "provider": "precomputed-transcript",
+        "model": "transcript-v1",
+        "transcript": "precomputed",
+        "questionHash": "506e45bd46e8f59c33f0fb5890064a01b65adc99f602c6a2ec629bcefa54d287",
+        "prose": "A well-known report on the signs of the Hour holds that the world draws near while knowledge diminishes, tribulations surface, and people grow stingy and careless in speech. It is cited here to Sunan Abi Dawud 4255.",
+        "claims": [
+          {
+            "id": "knowledge-fading-1",
+            "text": "The Prophet said that time draws near, knowledge diminishes, tribulations appear, miserliness is encountered, and talk increases.",
+            "quote": "يَتَقَارَبُ الزَّمَانُ وَيَنْقُصُ الْفِقْهُ وَتَظْهَرُ الْفِتَنُ وَيُلْقَى الشُّحُّ وَيَكْثُرُ الْهَرْجُ",
+            "citations": [
+              {
+                "collection": "abudawud",
+                "number": "4255",
+                "grade": null,
+                "raw": "abudawud:4255"
+              }
+            ]
+          }
+        ],
+        "confidence": 0.9
+      }
+    }
+  ]
+}

@@ -1,6 +1,10 @@
 # dependencies
 node_modules/
 .bun-install-cache/
+# bun resolves from the workspace root, so a lockfile inside a package is a stale second
+# source of truth. One was committed at packages/mizan-core/bun.lock and desynchronised
+# from the root; `git rm`'d. If one reappears, it is a bug, not a deliverable.
+packages/*/bun.lock
 
 # secrets — nothing under this pattern may ever be committed (gate G-4 / gitleaks)
 .env
@@ -15,7 +19,7 @@ data/corpus.db
 data/corpus.db-shm
 data/corpus.db-wal
 # SQLite's rollback journal, written whenever the DB is opened outside WAL mode.
-# Same 80 MB as the DB itself, and just as reproducible — so it is never the artefact.
+# Same ~80 MB as the DB itself, and just as reproducible — so it is never the artefact.
 data/corpus.db-journal
 data/raw/
 # generated per-row registry (large; the committed sources.json is the deliverable)
@@ -26,39 +30,40 @@ data/ledger/*.tmp
 data/ledger/*.bak
 
 # ============================================================
-# HELD BACK PENDING REVIEW — not yet published
+# PUBLISHED — apps/, data/ and scripts/ are tracked.
 # ============================================================
-# apps/    the CLI surface (9 source files)
-# data/    the corpus snapshot + provenance ledger (95 MB)
-# scripts/ the CI / ingest / ledger drivers (4 files)
+# This block previously withheld apps/, data/ and scripts/ "pending review". That block was
+# removed AND the three directories were committed, because a repository that cannot be cloned
+# and built is not a deliverable:
 #
-# These three are intentionally absent while they are under review.
-# To publish: delete this block, then `git add apps data scripts`.
+#   - `apps/cli` is the Story 11 kill-gate deliverable.
+#   - `data/registry/sources.json` is a MANDATED challenge deliverable (the
+#     source/tool/licence registry) and gate G-5 audits it.
+#   - `scripts/` holds the CI, ingest and ledger drivers ci.yml invokes.
 #
-# VERIFIED consequence of the block being in place — a clean clone of
-# this commit fails every CI step, in this order:
+# Removing the blanket `data/` rule does NOT un-ignore the large artefacts: the specific rules
+# above still exclude data/corpus.db (~80 MB), data/registry/records.jsonl (~16 MB) and
+# data/raw/. They are reproducible from the pinned URLs in attestation.json, so the evidence
+# about them is committed while the bytes are not.
 #
-#   1. bun install --frozen-lockfile
-#      FAILS: "lockfile had changes, but lockfile is frozen".
-#      bun.lock declares apps/cli and @mizan/cli@workspace:apps/cli,
-#      so withholding apps/ desynchronises the lockfile. This is the
-#      first thing ci.yml runs, so nothing after it is reached.
-#   2. bun run ingest:check
-#      FAILS: data/registry/sources.json is the committed deliverable
-#      it audits. data/raw/ and records.jsonl are NOT needed.
-#   3. bun run verify:ledger
-#      FAILS: data/ledger.jsonl is missing, which it treats as a
-#      malformed chain and refuses (fail-closed, correctly).
-#   4. bun run ci
-#      never runs.
+# ## The two assertions, and why they are different commands
 #
-# With apps/ and scripts/ restored and the two small data files
-# committed, all seven packages typecheck and test green and gates
-# G-1..G-6 all pass. The corpus DB stays excluded either way.
-# ============================================================
-apps/
-data/
-scripts/
+# "Tracked" and "not ignored" are independent properties, and each has exactly one command
+# that proves it. Conflating them is how this file came to claim a commit that had not
+# happened, so they are named separately:
+#
+#   - NOT IGNORED  `git check-ignore --no-index <path>`  (or `git check-ignore` without the flag)
+#     Exits 0 and prints the path only when git WOULD ignore it. A silent, non-zero exit is
+#     the pass. This proves nothing about whether the bytes are committed.
+#   - TRACKED      `git ls-files -- <path>`
+#     Prints one line per tracked path. An empty result means the file exists on disk and is
+#     NOT in the repository — the exact state that made a clean clone unbuildable.
+#
+# The regression this block caused, and which `git ls-files -- apps data scripts` exposes as
+# zero lines: `bun install --frozen-lockfile` failed with "lockfile had changes, but lockfile
+# is frozen" because bun.lock declares @mizan/cli@workspace:apps/cli and withholding apps/
+# desynchronised the lockfile. `ingest:check` and `verify:ledger` then failed on missing
+# modules. Nothing after step 1 was reached. Verified end to end on a clean clone.
 
 # test + build output
 coverage/

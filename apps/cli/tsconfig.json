@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "//": [
+    "Covers src, scripts and test. The other two entries were missing and each was a real hole:",
+    "",
+    "  - scripts/ was unreachable from every tsconfig in the repository (this config listed",
+    "    src/**, and the root config lists only the root scripts/ directory), so the generator",
+    "    that decides what the committed demo artefacts contain was the one piece of this package",
+    "    no compiler ever read. Same class of hole scripts/ci.ts documents for scripts/ingest.ts.",
+    "  - test/ was omitted, which made every other package's convention the exception. It cost",
+    "    real safety: changing renderReport's options made four call sites in test/cli.test.ts",
+    "    invalid and `bun run ci:typecheck` stayed green, because tsc was never looking. Every",
+    "    other package in this workspace typechecks its own tests."
+  ],
+  "include": [
+    "src/**/*.ts",
+    "scripts/**/*.ts",
+    "test/**/*.ts"
+  ]
+}

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { existsSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, relative } from "node:path"
 import { isOk, type ClaimVerdict, type EvidenceRef } from "@mizan/core"
 import { stripComments } from "../src/strip-comments.ts"
 import type { SourceFile } from "../src/scan.ts"
@@ -390,8 +390,22 @@ describe("the gate must not be able to pass by looking at nothing", () => {
   test("the root is discovered from a nested module location", () => {
     const root = findRepositoryRoot(import.meta.dir)
     expect(root).not.toBeNull()
-    expect(root === null ? "" : root.endsWith("mizan")).toBe(true)
+    if (root === null) return
+    // A root read off the shell satisfies a null check and a manifest check equally well, and
+    // that is precisely the regression: the walk is the property under test, so it is asserted
+    // directly. `process.cwd()` is rejected outright, and the relative path back to this test
+    // file must climb out of the root, which a self-rooted or descendant answer cannot do.
+    expect(root).not.toBe(process.cwd())
+    expect(relative(import.meta.dir, root).startsWith("..")).toBe(true)
+    // The root is identified by the workspace marker in its own manifest — NOT by the checkout
+    // happening to be *called* "mizan". A submission cloned into `mizan-submission`, `team-42`
+    // or a CI workspace path must be exactly as valid, so the directory name is never asserted.
+    const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
+      readonly workspaces?: unknown
+    }
+    expect(Array.isArray(manifest.workspaces)).toBe(true)
   })
+
 
   test("the discovered root really does contain the gated packages", () => {
     const root = findRepositoryRoot(import.meta.dir)

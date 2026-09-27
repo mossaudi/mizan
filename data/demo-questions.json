@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "set": "demo-questions",
+  "purpose": "The committed default surface for a two-minute demonstration: one question that verifies and one whose citation is a fabrication, so both badges can be seen with no API key and no network.",
+  "generatedBy": "apps/cli/scripts/make-transcript.ts",
+  "regenerateWith": "bun run make:transcript",
+  "determinism": "A replay, not a generation. Every claim, quote and citation here is committed, so the run is identical on every machine and no model sits in its trust path.",
+  "syntheticNotice": "The questions are invented strings with no user behind them, and they are the only question text this repository commits under data/: data/transcript.json and every run trace carry a SHA-256 of the question and never the question (AGENTS.md section 13). The fabricated quote is published synthetic test data copied from data/eval/redteam-fabricated.json. It is not hadith and it asserts nothing about anyone's religion.",
+  "questions": [
+    {
+      "id": "ikhlas",
+      "question": "What does the Qur'an say about the oneness of God?",
+      "demonstrates": "a faithful quotation of a cited verse, reaching a computed VERIFIED with the source shown beside it",
+      "query": "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ قُلْ هُوَ ٱللَّهُ أَحَدٌ",
+      "expectations": [
+        {
+          "claimId": "ikhlas-1",
+          "expectedVerdict": "verified",
+          "expectedReason": "exact_containment",
+          "recordId": "quran:6222",
+          "mutation": "verbatim",
+          "sourceCaseId": null
+        }
+      ]
+    },
+    {
+      "id": "fabricated-hadith",
+      "question": "What does the hadith say about the end of the world and knowledge diminishing?",
+      "demonstrates": "a fabricated hadith cited to a real, well-graded record, rejected with the fabricated quote and the genuine source shown side by side",
+      "query": "حَدَّثَنَا أَحْمَدُ بْنُ صَالِحٍ، حَدَّثَنَا عَنْبَسَةُ، حَدَّثَنِي يُونُسُ،",
+      "expectations": [
+        {
+          "claimId": "knowledge-fading-1",
+          "expectedVerdict": "rejected",
+          "expectedReason": "quote_absent_at_cited_id",
+          "recordId": "abudawud:4255",
+          "mutation": "one_word_changed",
+          "sourceCaseId": "redteam-005"
+        }
+      ]
+    }
+  ]
+}

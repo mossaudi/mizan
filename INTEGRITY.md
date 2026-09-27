@@ -67,9 +67,37 @@ it is also wrong, so we did not do it.
 ## 6. No real user data, no accounts, no telemetry
 
 There is no authentication in this product and we did not add any. There are no users, so
-there is no user data. The committed question set is synthetic. Traces carry a SHA-256 of
-the question, never the question. Nothing is sent anywhere except the model request the
-operator configured, and the corpus fetch, both allowlisted.
+there is no user data — and no user question text is committed anywhere. Nothing is sent
+anywhere except the model request the operator configured, and the corpus fetch, both
+allowlisted.
+
+Three committed artefacts are worth being precise about, because "we log hashes, not content"
+is only a claim once someone can check which file holds what.
+
+**`data/demo-questions.json`** is the only file under `data/` that contains question text. It
+holds the two questions the committed demo asks, verbatim, so that
+`bun run ask --list-questions` works on a clean checkout with no provider key and no network.
+It is safe to commit because we wrote both questions ourselves, and the set carries a
+required `syntheticNotice` field that says so — and that also states the fabricated quote is
+borrowed from `data/eval/redteam-fabricated.json` rather than invented for the demo. A test
+asserts the notice still says both things, so it cannot be quietly emptied.
+
+**`data/transcript.json`** contains no question text. Every entry stores `questionHash` and
+never the question, because a trace is the artefact most likely to be read by someone
+debugging and the least likely to be read with a schema. A test reads the file as raw text
+and asserts that no committed question appears anywhere in it, so the guarantee survives a
+careless future field.
+
+The two are bound to each other by hash rather than by convention: the transcript test
+re-derives `questionKey` from each question's own text and requires the matching `decompose`
+and `answer` entries, so a question edited behind the demo's back produces a hash that
+matches nothing and fails the test.
+
+**`data/eval/*.json`** contains no question text either. Each case is a quote, the citation
+that quote is checked against, the verdict both are declared to produce, and the corpus row
+the quote was derived from. A case without its anchor text is not a test, it is a claim about
+a test. The Arabic in these files is corpus text, already committed, already licensed, and
+already the subject of section 4.
 
 ## 7. No fixture-driven "verified"
 
