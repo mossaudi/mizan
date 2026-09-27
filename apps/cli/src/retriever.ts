@@ -3,7 +3,7 @@ import { isOk, sha256Hex } from "@mizan/core"
 import { hadithSearch, quranSearch } from "@mizan/retrieval"
 import type { RetrievedContext } from "@mizan/agent"
 import { citationLabel } from "./render.ts"
-import type { ToolCall } from "./trace-build.ts"
+import { sumElapsed, type ToolCall } from "./trace-build.ts"
 
 /**
  * The agent's `Retriever` port, plus what retrieval actually cost.
@@ -118,11 +118,16 @@ export const makeRetriever = (db: Database): InstrumentedRetriever => {
   //
   // The getter keeps the public shape (`readonly totalMs: number`) and reads the live array at the
   // moment the composition root asks, which is after `retrieve` has returned.
+  //
+  // It also delegates the sum to `sumElapsed`, which is the one place the trace's definition of
+  // `retrievalMs` is written down. The reduce used to be spelled out here as well, so two
+  // modules each had a definition of the same number and neither imported the other — AGENTS.md
+  // §17, one source of truth per fact, violated by a three-line function.
   return {
     retrieve,
     calls,
     get totalMs(): number {
-      return calls.reduce((total, call) => total + call.elapsedMs, 0)
+      return sumElapsed(calls)
     },
   }
 }

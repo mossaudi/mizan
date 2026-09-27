@@ -1,4 +1,5 @@
 import { readdir, readFile } from "node:fs/promises"
+import { readdirSync, readFileSync } from "node:fs"
 import { join, relative, sep } from "node:path"
 import { stripComments, stripCommentsOnly } from "./strip-comments.ts"
 
@@ -35,6 +36,9 @@ export const repoPath = (from: string, to: string): string => relative(from, to)
 
 const isCode = (name: string): boolean => CODE_EXTENSIONS.some((extension) => name.endsWith(extension))
 
+/** Byte-identical output order, so a gate's log is a precondition rather than a coincidence. */
+const byPath = (a: SourceFile, b: SourceFile): number => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)
+
 /**
  * Walk `root` and return every TypeScript source file, sorted so a gate's output order is
  * stable. Sorted collection is a precondition for a byte-identical CI log.
@@ -60,8 +64,32 @@ export const collectSourceFiles = async (root: string): Promise<readonly SourceF
     }
   }
   await walk(root)
-  found.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+  found.sort(byPath)
   return found
+}
+
+/**
+ * The synchronous twin of `collectSourceFiles`, for a caller that cannot await.
+ *
+ * `runDocsClaimChecks` is synchronous — it is called from a CLI script, a test, and nothing that
+ * has a reason to be async — and it needs the whole product source tree to decide whether the
+ * repository opens a socket to a model API. The recursion shape is the only thing duplicated
+ * here: the async version parallelises a directory's entries, which a synchronous walk cannot,
+ * and the three decisions that make the walk correct (`SKIP_DIRECTORIES`, `isCode`, `repoPath`)
+ * are the same module constants in both.
+ */
+export const collectSourceFilesSync = (root: string): readonly SourceFile[] => {
+  const found: SourceFile[] = []
+  const walk = (directory: string): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (SKIP_DIRECTORIES.has(entry.name)) continue
+      const full = join(directory, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (isCode(entry.name)) found.push({ path: repoPath(root, full), text: readFileSync(full, "utf8") })
+    }
+  }
+  walk(root)
+  return found.sort(byPath)
 }
 
 /** Keep only files under a repo-relative prefix, e.g. `packages/mizan-verify/`. */

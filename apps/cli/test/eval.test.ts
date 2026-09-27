@@ -181,6 +181,22 @@ describe("the eval sets are self-consistent", () => {
   })
 
   /**
+   * The other half of that claim, and the part that makes it a breadth claim rather than a count.
+   *
+   * `anchorCount === anchors.length` only proves the header is internally honest. An anchor that no
+   * case quotes is shipped, counted, and then never exercised — so "the 200 golden cases draw on 56
+   * records" would still be true while the sets actually exercise fewer subjects than they say. This
+   * is the arithmetic `bun run check:docs` rule R6 compares a document against, so it is what has to
+   * hold for the document to be telling the truth.
+   */
+  test("every shipped anchor is actually cited, so 'draws on N records' stays true", () => {
+    const goldenCited = new Set(golden.cases.map((entry) => entry.anchorId))
+    expect(goldenCited.size).toBe(golden.anchorCount)
+    const redTeamCited = new Set(redTeam.cases.map((entry) => entry.anchorId))
+    expect(redTeamCited.size).toBe(redTeam.anchorCount)
+  })
+
+  /**
    * Tamper detection. A committed fixture is edited by hand more often than anyone intends, and
    * an edited `textDisplay` would quietly make every case drawn from that row wrong.
    */

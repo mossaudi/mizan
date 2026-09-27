@@ -1,6 +1,6 @@
 import { afterAll, beforeAll } from "bun:test"
 import { existsSync } from "node:fs"
-import { readFile, writeFile } from "node:fs/promises"
+import { readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 /**
@@ -62,7 +62,15 @@ export const preserveCommittedLedger = (): LedgerGuard => {
   })
 
   afterAll(async () => {
-    if (before === null) return
+    if (before === null) {
+      // The ledger was not there to begin with, so anything present now was written by the runs
+      // this block spawned and removing it leaves the tree exactly as we found it. Returning early
+      // here — which is what this used to do — is the one failure mode this module's own header
+      // lists as reason 1: a `bun test` that leaves the working tree dirty. It was unreachable
+      // only because the ledger is committed, which is not a property worth relying on.
+      if (existsSync(LEDGER)) await rm(LEDGER, { force: true })
+      return
+    }
     await writeFile(LEDGER, before, "utf8")
   })
 

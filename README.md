@@ -68,8 +68,8 @@ bun run ask "your question"
 bun run ci              # typecheck + tests + the six structural gates
 ```
 
-`bun run ask` replays a committed transcript and says so on every line. It never presents a
-precomputed answer as a live generation.
+With no API key configured — the state of a fresh checkout — `bun run ask` replays a committed
+transcript and says so on every line. It never presents a precomputed answer as a live generation.
 
 ### Try the verifier directly
 
@@ -107,8 +107,16 @@ against it.
 
 Three properties make the sets harder to fool than they look:
 
-- **Disjoint spans.** Two cases never share a span, so 200 cases are 200 texts rather than one
-  long record chopped up.
+- **Breadth, stated exactly.** The 200 golden cases draw on 56 records, not 200 texts, and
+  the 40 red-team cases draw on 30 records. Neither set is a sample of independent texts, and the
+  golden set quotes some of its records more than once on purpose: the three normalization classes
+  quote the *same* spans three ways — exact, undiacriticized, tatweel-spaced — so a fold too weak to
+  strip combining marks is caught on a text the exact class already verified, not only on text
+  shaped to defeat it. Two classes lean on a small pool for a measured reason: only two records
+  in the corpus yield a clean digit span, which is why the digit classes are 4 and 4.
+  `scripts/eval/plan.ts` is the authority on class sizes. `bun run check:docs` checks the two
+  record counts above against `data/eval/*.json`; the class sizes and the digit-span fact are
+  stated here from `digitFacts` and `classCounts` in the same files, and are not gated.
 - **Global absence.** Every case labelled `REJECTED` is checked to be absent from the *entire*
   27,234-row corpus, not merely from the record it cites. A fabrication that happened to be a real
   quotation elsewhere would be a fixture asserting the verifier is wrong when it is right.
@@ -270,8 +278,13 @@ marketing one.
 - **The official guide, participant guide, judging criteria and scientific appendix have not been
   read by a human.** Nothing here should be read as compliance with them.
 - **The paraphrase divergence above is unresolved** and needs a decision.
-- **There is no live model provider.** `bun run ask` replays a committed transcript and labels
-  every line as a precomputed replay. A provider is a seam, not an integration.
+- **Nothing judged here was produced by a live model.** Every expected verdict is hand-adjudicated
+  in `scripts/eval/plan.ts`, and a test fails if the generator ever imports the verifier. A default
+  checkout ships no API key, so `bun run ask` replays the committed transcript and labels every line
+  a precomputed replay. A hosted provider does ship, and `hosted` is the default mode: with
+  `MIZAN_LLM_API_KEY` set, `apps/cli/src/provider-config.ts` POSTs the question and the fenced
+  context to an allowlisted `api.openai.com` over HTTPS, refusing redirects. `DISCLOSURE.md` §4 is
+  the full disclosure.
 - **The golden set asserts 100% against itself, not against a human-labelled corpus.** The
   expectations are hand-derived from the fold table's documented behaviour. A judge who disagrees
   with a rationale in `plan.ts` should treat the disagreement as a finding.

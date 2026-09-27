@@ -7,7 +7,7 @@
  * guard (AGENTS.md section 14).
  */
 
-export { collectSourceFiles, formatFindings, findMatchingLines, repoPath, underPrefix, withoutGateSelf, GATE_SELF_PREFIX, CODE_EXTENSIONS, type Finding, type GateId, type ScanMode, type SourceFile } from "./scan.ts"
+export { collectSourceFiles, collectSourceFilesSync, formatFindings, findMatchingLines, repoPath, underPrefix, withoutGateSelf, GATE_SELF_PREFIX, CODE_EXTENSIONS, type Finding, type GateId, type ScanMode, type SourceFile } from "./scan.ts"
 export { stripComments, stripCommentsOnly } from "./strip-comments.ts"
 export { tokenPattern, type TokenPatternOptions } from "./token-pattern.ts"
 export { gateNoSimilarity, checkDependencyIsolation, checkNoSimilarity, checkNoAmbientAuthority, checkContainmentOnly, SIMILARITY_TOKENS, AMBIENT_AUTHORITY_TOKENS, INCLUDES_ALLOWLIST, VERIFY_PREFIX } from "./gates/g1-no-similarity.ts"
@@ -24,7 +24,10 @@ export {
   type DocsClaim,
   type DocsRule,
 } from "./docs-claims.ts"
-export { runDocsClaimChecks, AUDITED_DOCUMENTS, ENV_EXAMPLE, PROVIDER_SOURCE, REGISTRY, type DocsCheckResult } from "./docs-check.ts"
+export { runDocsClaimChecks, AUDITED_DOCUMENTS, REQUIRED_DOCUMENTS, ATTESTATION, ENV_EXAMPLE, GOLDEN_EVAL, PROVIDER_SOURCE, REDTEAM_EVAL, REGISTRY, type DocsCheckResult } from "./docs-check.ts"
+export { checkSnapshotArithmetic } from "./docs-snapshot.ts"
+export { checkEvalBreadth, type StatedSet } from "./docs-artifacts.ts"
+export { checkLiveProviderClaim } from "./docs-egress.ts"
 export { checkLicenceFields, REGISTRY_PATH } from "./gates/g5-licence-fields.ts"
 export { gateNoFalseVerified, assertNoFalseVerified, checkOneConstructionSite, checkOneSchemaSite, checkNoComputedPercent, checkNoAdHocMatchStrength, VERDICT_CONSTRUCTION_SITES, PERCENT_OWNERS } from "./gates/g6-no-false-verified.ts"
 export { runGates, summariseOutcomes, type GateOutcome, type RunGatesOptions } from "./run-gates.ts"

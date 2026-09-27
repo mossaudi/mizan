@@ -20,9 +20,9 @@
  *
  * Because the same drift recurs. The provider variable names had already been renamed once and
  * the documentation had not followed. There is no natural moment at which a human re-reads a
- * disclosure against a directory listing, and no test that would fail. So the four rules below
- * make the drift impossible to commit rather than merely unlikely, and each one is a pure
- * function over file contents so it can be tested by planting a violation.
+ * disclosure against a directory listing, and no test that would fail. So the rules below make the
+ * drift impossible to commit rather than merely unlikely, and each one is a pure function over file
+ * contents so it can be tested by planting a violation.
  *
  * This is deliberately NOT a seventh gate. G-1..G-6 have published numbers, an acceptance
  * criterion each, and a `runGates` entry. Renumbering or adding to that list would change
@@ -31,11 +31,13 @@
  *
  * ## What it does and does not check
  *
- * It checks the four mechanical classes: file paths, environment variables, registry claims, and
- * documented commands. It cannot check whether a *prose* sentence is true — no gate can, and a
- * gate that claimed to would be the over-claiming AGENTS.md section 12 warns about. A judgement
- * call like "a locally hosted model underperforms" stays a human's call; "this file exists" does
- * not.
+ * It checks the mechanical classes: file paths, environment variables, registry claims, documented
+ * commands, the snapshot arithmetic in `docs-snapshot.ts`, and the claims a document makes about the
+ * repository's own artefacts in `docs-artifacts.ts`. It cannot check whether a *prose* sentence is
+ * true — no gate can, and a gate that claimed to would be the over-claiming AGENTS.md section 12
+ * warns about. A judgement call like "a locally hosted model underperforms" stays a human's call;
+ * "this file exists", "this number is the number in `attestation.json`" and "no two cases share a
+ * span" do not.
  */
 
 /** The rules, in the order they are reported. The name is what a failing build prints. */
@@ -47,6 +49,10 @@ export type DocsRule =
   | "disabled-source-without-reason"
   | "enabled-source-not-disclosed"
   | "unknown-script"
+  | "snapshot-count-mismatch"
+  | "eval-breadth-overstated"
+  | "eval-artefact-unreadable"
+  | "live-provider-denied"
 
 export type DocsClaim = {
   readonly rule: DocsRule

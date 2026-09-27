@@ -17,7 +17,7 @@ import { runSpine, transcriptProvider } from "@mizan/agent"
 import { appendRunTrace } from "@mizan/provenance"
 import { citationLabel, renderReport, type SourceExcerpt, type SourceTable } from "./render.ts"
 import { makeRetriever } from "./retriever.ts"
-import { buildDraft, buildTimings, sumElapsed } from "./trace-build.ts"
+import { buildDraft, buildTimings } from "./trace-build.ts"
 import { describeDemoQuestions, readDemoQuestionSet } from "./demo-questions.ts"
 import { resolveProvider } from "./provider-config.ts"
 
