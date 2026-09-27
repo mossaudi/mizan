@@ -14,6 +14,9 @@ node_modules/
 data/corpus.db
 data/corpus.db-shm
 data/corpus.db-wal
+# SQLite's rollback journal, written whenever the DB is opened outside WAL mode.
+# Same 80 MB as the DB itself, and just as reproducible — so it is never the artefact.
+data/corpus.db-journal
 data/raw/
 # generated per-row registry (large; the committed sources.json is the deliverable)
 data/registry/records.jsonl
@@ -25,15 +28,33 @@ data/ledger/*.bak
 # ============================================================
 # HELD BACK PENDING REVIEW — not yet published
 # ============================================================
-# apps/    the CLI surface
-# data/    the 95 MB corpus snapshot + provenance ledger
-# scripts/ the CI / ingest / ledger drivers
+# apps/    the CLI surface (9 source files)
+# data/    the corpus snapshot + provenance ledger (95 MB)
+# scripts/ the CI / ingest / ledger drivers (4 files)
 #
-# These three are intentionally absent from the initial commit.
-# They are pending review; once approved, delete this block and
-# `git add apps data scripts` to publish them.
-# NOTE: while this block is in place, `bun run ci` and the CI
-# workflow cannot run from a fresh clone (they invoke scripts/).
+# These three are intentionally absent while they are under review.
+# To publish: delete this block, then `git add apps data scripts`.
+#
+# VERIFIED consequence of the block being in place — a clean clone of
+# this commit fails every CI step, in this order:
+#
+#   1. bun install --frozen-lockfile
+#      FAILS: "lockfile had changes, but lockfile is frozen".
+#      bun.lock declares apps/cli and @mizan/cli@workspace:apps/cli,
+#      so withholding apps/ desynchronises the lockfile. This is the
+#      first thing ci.yml runs, so nothing after it is reached.
+#   2. bun run ingest:check
+#      FAILS: data/registry/sources.json is the committed deliverable
+#      it audits. data/raw/ and records.jsonl are NOT needed.
+#   3. bun run verify:ledger
+#      FAILS: data/ledger.jsonl is missing, which it treats as a
+#      malformed chain and refuses (fail-closed, correctly).
+#   4. bun run ci
+#      never runs.
+#
+# With apps/ and scripts/ restored and the two small data files
+# committed, all seven packages typecheck and test green and gates
+# G-1..G-6 all pass. The corpus DB stays excluded either way.
 # ============================================================
 apps/
 data/
@@ -41,9 +62,27 @@ scripts/
 
 # test + build output
 coverage/
+dist/
+out/
 *.tsbuildinfo
 *.log
+
+# OS cruft. desktop.ini and ehthumbs.db are here because CI runs
+# windows-latest and a Windows clone would otherwise commit them.
 .DS_Store
 Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# editors. The whole directory is ignored, but these are the files
+# that escape when the directory is not in a fresh clone.
 .idea/
 .vscode/
+*.swp
+*.swo
+*~
+*.orig
+*.rej
+
+# agent/editor local state written into the project directory
+.opencode/
