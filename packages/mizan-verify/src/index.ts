@@ -1,0 +1,19 @@
+/**
+ * `@mizan/verify` — the differentiator.
+ *
+ * One dependency: `@mizan/core`. No provider, no vector store, no embedding, no
+ * edit-distance, no fuzzy matching, no network, no clock, no randomness, no locale.
+ * Every route to a `verified` verdict terminates in `steps/containment.ts`.
+ *
+ * `src/diagnostics/` holds the display-only longest-run diagnostic. It is exported so
+ * the report can render it, and gate **G-1** fails the build if `verify.ts` imports it.
+ * That separation is the point: a judge should see how close a `rejected` quote came,
+ * and no code path should be able to convert that number into a verdict.
+ */
+
+export { containsQuote, foldQuote, type ContainmentResult } from "./steps/containment.ts"
+export { capCitations, resolutionKey, MAX_CITATIONS_PER_CLAIM, type CappedCitations } from "./steps/citations.ts"
+export type { ResolvedCitation } from "@mizan/core"
+export { coerceClaimVerdict, coerceFailClosed, evidenceIsConsistent, type CoerceInput } from "./steps/coerce.ts"
+export { verifyAnswer, type VerifyInput } from "./verify.ts"
+export { longestRunFor, type LongestRun } from "./diagnostics/longest-run.ts"

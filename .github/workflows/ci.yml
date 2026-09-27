@@ -1,0 +1,89 @@
+name: ci
+
+# The gate IS the deliverable in this project: a differentiator nobody can falsify is
+# not a differentiator. Every job below is a machine-checked invariant, and every gate
+# has a self-test with a planted violation that must fail (AGENTS.md section 14).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: gates + typecheck + tests
+    # Path separators, FTS5 collation and case handling are the two places this repo
+    # has historically differed between platforms, so both are exercised (Story 6
+    # edge case: "CI running on Windows vs Linux path separators").
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Assert the corpus is reproducible and licence-attested
+        # Fails closed on a hash or record-count drift. Skips cleanly when the corpus
+        # has not been ingested yet, because the DB is gitignored by design and the
+        # attestation + committed registry are what CI audits.
+        run: bun run ingest:check
+
+      - name: Typecheck, tests and structural gates (G-1..G-6)
+        run: bun run ci
+
+      - name: Print the typecheck/test/gate summary
+        if: always()
+        run: bun run ci -- --report-only
+
+  secrets:
+    name: gitleaks (G-4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # A planted secret fails this job. `.env*` is gitignored, and no credential is
+      # present in the golden or red-team fixtures.
+      - name: Detect leaked secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  ledger:
+    name: provenance chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # A judge runs exactly this. It must exit 0 on an intact chain and name the
+      # exact broken entry index otherwise (R11).
+      - name: Verify the append-only hash chain
+        run: bun run verify:ledger

@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "//": [
+    "Covers the repository-root entrypoints in scripts/ and nothing else.",
+    "These four files are what a developer and CI actually invoke, and they import the",
+    "workspace packages by name. Until this file existed, `bun run ingest` could carry a",
+    "wrong-package import past every package typecheck and every structural gate, because no",
+    "tsconfig reached scripts/ at all - the CI runner that gates the repository was itself",
+    "ungated. `include` is deliberately narrow: the packages have their own configs, and",
+    "widening this to '.' would silently typecheck the whole repository a second time under",
+    "different settings."
+  ],
+  "include": ["scripts/**/*.ts"]
+}

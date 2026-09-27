@@ -1,0 +1,15 @@
+# Reproducibility is the product claim (AGENTS.md rule 17: one source of truth
+# per fact, canonical-JSON key order, digest rules). Line endings are a fact
+# about the bytes, so they are pinned rather than left to each contributor's
+# core.autocrlf. A Windows clone must hash identically to a Linux clone.
+* text=auto eol=lf
+
+# Never rewrite these; they are byte-significant by construction.
+bun.lock -text
+data/** -text
+*.db -text
+*.db-shm -text
+*.db-wal -text
+*.png -text
+*.jpg -text
+*.woff2 -text

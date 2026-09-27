@@ -1,0 +1,52 @@
+import { Schema } from "effect"
+
+/**
+ * `Answer` and `Claim` — the model-facing contract, decoded at the trust boundary.
+ *
+ * ADR-05 is load-bearing here: `text` is the model's *prose* (its interpretation) and
+ * `quote` is the *quoted span* (the falsifiable artefact). The verdict is computed on
+ * `quote` and never on `text`, because verifying prose means verifying the model's
+ * opinion of the source, which is circular.
+ *
+ * `citations` is capped at 3 by the verifier (ADR D5). The cap is applied at
+ * verification time, not here, so that a model emitting six citations produces a
+ * documented `citation_cap_exceeded` rather than a silently truncated claim.
+ */
+
+export const Citation = Schema.Struct({
+  /** Required. Resolution is collection-scoped by design: a hadith number that exists in several collections must not produce a false `rejected`. */
+  collection: Schema.String,
+  number: Schema.NullOr(Schema.String),
+  /** Whatever the model claimed the grade was. NEVER used for the verdict, and never rendered as our ruling. */
+  grade: Schema.NullOr(Schema.String),
+  /** The citation exactly as the model wrote it, for the citation chip. */
+  raw: Schema.String,
+})
+export type Citation = Schema.Schema.Type<typeof Citation>
+
+export const Claim = Schema.Struct({
+  id: Schema.String,
+  text: Schema.String,
+  quote: Schema.NullOr(Schema.String),
+  citations: Schema.Array(Citation),
+})
+export type Claim = Schema.Schema.Type<typeof Claim>
+
+export const Answer = Schema.Struct({
+  /** SHA-256 of the normalized question. The question text itself is never stored or traced. */
+  questionHash: Schema.String,
+  prose: Schema.String,
+  claims: Schema.Array(Claim),
+  /** Optional and deliberately so: a MISSING confidence must block at the gate, never default high. */
+  confidence: Schema.optional(Schema.Number),
+  provider: Schema.String,
+  model: Schema.String,
+  /** `"live"` or `"precomputed (deterministic)"` — a transcript must never be mistakable for a live generation. */
+  transcript: Schema.String,
+})
+export type Answer = Schema.Schema.Type<typeof Answer>
+
+/** A claim with no quote and no citation: the shape a bare assertion takes. */
+export const emptyClaim = (id: string, text: string): Claim => ({ id, text, quote: null, citations: [] })
+
+export * as ClaimSchema from "./claim.ts"

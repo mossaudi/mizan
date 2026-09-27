@@ -1,0 +1,419 @@
+import { describe, expect, test } from "bun:test"
+import { existsSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { isOk, type ClaimVerdict, type EvidenceRef } from "@mizan/core"
+import { stripComments } from "../src/strip-comments.ts"
+import type { SourceFile } from "../src/scan.ts"
+import {
+  checkContainmentOnly,
+  checkDependencyIsolation,
+  checkNoAdHocMatchStrength,
+  checkNoAmbientAuthority,
+  checkNoAntiAnalysis,
+  checkNoComputedPercent,
+  checkNoDonorWorkaround,
+  checkNoDynamicEval,
+  checkNoObfuscation,
+  checkNoRawHtml,
+  checkNoSimilarity,
+  checkOneConstructionSite,
+  checkOneSchemaSite,
+  checkVerdictIsolation,
+  checkLicenceFields,
+  assertNoFalseVerified,
+  findRepositoryRoot,
+  findRoot,
+  requireRepositoryRoot,
+  VERIFY_PREFIX,
+} from "../src/index.ts"
+
+/**
+ * The self-tests. Every rule is checked twice: once with a CLEAN fixture that must produce
+ * no findings, and once with a PLANTED VIOLATION that must be caught, by rule id.
+ *
+ * This is the whole reason the gates are pure functions of a file list. A gate that reads
+ * the working tree can only be tested by breaking the working tree, so in practice it never
+ * gets tested, and an untested gate is a gate nobody knows still works. AGENTS.md section 14:
+ * a guard that cannot fail is not a guard — and neither is one that cannot be shown to fail.
+ */
+
+const file = (path: string, text: string): SourceFile => ({ path, text })
+const verifyFile = (text: string): SourceFile => file(`${VERIFY_PREFIX}src/example.ts`, text)
+const rules = (findings: readonly { readonly rule: string }[]): readonly string[] => findings.map((finding) => finding.rule)
+
+/** A line that must survive every gate: the shape real mizan-verify code has. */
+const CLEAN_VERIFY_SOURCE = `import { normalizeForMatch, type CorpusRecord } from "@mizan/core"
+import { containsQuote } from "./steps/containment.ts"
+
+export const isContained = (quote: string, record: CorpusRecord): boolean => {
+  if (normalizeForMatch(quote).length === 0) return false
+  return record.textMatch.includes(normalizeForMatch(quote))
+}
+`
+
+describe("comment stripping", () => {
+  test("removes line and block comments and string bodies without moving line numbers", () => {
+    const source = ['const a = 1 // innerHTML', "/* similarity", "   threshold */", 'const b = "innerHTML"'].join("\n")
+    const stripped = stripComments(source)
+    expect(stripped.split("\n").length).toBe(4)
+    expect(stripped).not.toContain("innerHTML")
+    expect(stripped).not.toContain("similarity")
+    expect(stripped).toContain("const a = 1")
+  })
+
+  test("keeps template literals inert and preserves newlines inside them", () => {
+    const stripped = stripComments("const t = `line one\nline two // not a comment`\nconst x = 1")
+    expect(stripped.split("\n").length).toBe(3)
+    expect(stripped).not.toContain("not a comment")
+  })
+})
+
+describe("G-1 dependency isolation", () => {
+  test("clean: core and relative imports pass", () => {
+    expect(rules(checkDependencyIsolation([verifyFile(CLEAN_VERIFY_SOURCE)]))).toEqual([])
+  })
+
+  test("planted: an effect import is caught", () => {
+    const findings = checkDependencyIsolation([verifyFile('import { Schema } from "effect"\n')])
+    expect(rules(findings)).toEqual(["G-1.1 dependency-isolation"])
+    expect(findings[0]?.line).toBe(1)
+  })
+
+  test("planted: a second workspace package is caught", () => {
+    expect(rules(checkDependencyIsolation([verifyFile('import { x } from "@mizan/retrieval"\n')]))).toHaveLength(1)
+  })
+})
+
+describe("G-1 no similarity", () => {
+  test("clean: the real shape of verifier code passes", () => {
+    expect(rules(checkNoSimilarity([verifyFile(CLEAN_VERIFY_SOURCE)]))).toEqual([])
+  })
+
+  test("planted: a fuzzy score is caught, including a compound name", () => {
+    expect(rules(checkNoSimilarity([verifyFile("const s = fuzzyScore(a, b)\n")]))).toEqual(["G-1.2 no-similarity"])
+  })
+
+  test("planted: an embedding client is caught", () => {
+    expect(rules(checkNoSimilarity([verifyFile("const client = new EmbeddingClient()\n")]))).toHaveLength(1)
+  })
+
+  test("planted: a similarity threshold is caught", () => {
+    expect(rules(checkNoSimilarity([verifyFile("if (similarity >= 0.85) return true\n")]))).toHaveLength(1)
+  })
+
+  test("a mention inside a comment is not a violation: the gate is not noisy", () => {
+    expect(rules(checkNoSimilarity([verifyFile("// no similarity here, on purpose\n")]))).toEqual([])
+  })
+})
+
+describe("G-1 no ambient authority", () => {
+  test("clean: a total function passes", () => {
+    expect(rules(checkNoAmbientAuthority([verifyFile(CLEAN_VERIFY_SOURCE)]))).toEqual([])
+  })
+
+  test("planted: Date.now is caught", () => {
+    expect(rules(checkNoAmbientAuthority([verifyFile("const t = Date.now()\n")]))).toHaveLength(1)
+  })
+
+  test("planted: Math.random is caught", () => {
+    expect(rules(checkNoAmbientAuthority([verifyFile("const n = Math.random()\n")]))).toHaveLength(1)
+  })
+
+  test("planted: fetch is caught", () => {
+    expect(rules(checkNoAmbientAuthority([verifyFile("const r = await fetch(url)\n")]))).toHaveLength(1)
+  })
+
+  test("planted: process.env is caught", () => {
+    expect(rules(checkNoAmbientAuthority([verifyFile("const k = process.env.API_KEY\n")]))).toHaveLength(1)
+  })
+})
+
+describe("G-1 containment only", () => {
+  test("clean: includes is allowed in containment.ts", () => {
+    expect(rules(checkContainmentOnly([file(`${VERIFY_PREFIX}src/steps/containment.ts`, CLEAN_VERIFY_SOURCE)]))).toEqual([])
+  })
+
+  test("clean: includes is allowed in the display-only diagnostic", () => {
+    expect(rules(checkContainmentOnly([file(`${VERIFY_PREFIX}src/diagnostics/longest-run.ts`, CLEAN_VERIFY_SOURCE)]))).toEqual([])
+  })
+
+  test("planted: a second match site is caught", () => {
+    const findings = checkContainmentOnly([file(`${VERIFY_PREFIX}src/steps/citations.ts`, "const ok = folded.includes(quote)\n")])
+    expect(rules(findings)).toEqual(["G-1.4 containment-only"])
+    expect(findings[0]?.path).toBe(`${VERIFY_PREFIX}src/steps/citations.ts`)
+  })
+})
+
+describe("G-2 no raw HTML", () => {
+  test("clean: a text node passes", () => {
+    expect(rules(checkNoRawHtml([file("apps/web/src/quote.ts", "node.textContent = record.textDisplay\n")]))).toEqual([])
+  })
+
+  test("planted: innerHTML is caught", () => {
+    expect(rules(checkNoRawHtml([file("apps/web/src/quote.ts", "node.innerHTML = record.textDisplay\n")]))).toEqual(["G-2.1 no-raw-html"])
+  })
+
+  test("planted: dangerouslySetInnerHTML is caught", () => {
+    expect(rules(checkNoRawHtml([file("apps/web/src/q.tsx", "return <div dangerouslySetInnerHTML={{ __html: t }} />\n")]))).toHaveLength(1)
+  })
+})
+
+describe("G-2 verdict isolation", () => {
+  test("clean: verify.ts does not import diagnostics", () => {
+    expect(rules(checkVerdictIsolation([file("packages/mizan-verify/src/verify.ts", CLEAN_VERIFY_SOURCE)]))).toEqual([])
+  })
+
+  test("planted: verify.ts importing the diagnostic is caught", () => {
+    const findings = checkVerdictIsolation([file("packages/mizan-verify/src/verify.ts", 'import { longestRunFor } from "./diagnostics/longest-run.ts"\n')])
+    expect(rules(findings)).toEqual(["G-2.2 verdict-isolation"])
+  })
+})
+
+describe("G-3 no evasion", () => {
+  test("clean: ordinary code passes all four rules", () => {
+    const clean = file("apps/cli/src/main.ts", "const parsed = JSON.parse(text)\nconst encoded = new TextEncoder().encode(text)\n")
+    expect(rules(checkNoDynamicEval([clean]))).toEqual([])
+    expect(rules(checkNoObfuscation([clean]))).toEqual([])
+    expect(rules(checkNoAntiAnalysis([clean]))).toEqual([])
+    expect(rules(checkNoDonorWorkaround([clean]))).toEqual([])
+  })
+
+  test("planted: eval is caught", () => {
+    expect(rules(checkNoDynamicEval([file("src/x.ts", "const r = eval(payload)\n")]))).toEqual(["G-3.1 no-dynamic-eval"])
+  })
+
+  test("planted: atob is caught", () => {
+    expect(rules(checkNoObfuscation([file("src/x.ts", "const s = atob(blob)\n")]))).toEqual(["G-3.2 no-obfuscation"])
+  })
+
+  test("planted: a debugger statement is caught", () => {
+    expect(rules(checkNoAntiAnalysis([file("src/x.ts", "debugger\n")]))).toHaveLength(1)
+  })
+
+  test("planted: the removed donor module name is caught", () => {
+    const findings = checkNoDonorWorkaround([
+      file("packages/mizan-agent/src/hooks.ts", 'import { rotateWan } from "@opencode/office/network-recovery"\n'),
+    ])
+    expect(rules(findings)).toEqual(["G-3.4 no-donor-workaround"])
+  })
+
+  test("the gate package itself is out of scope for token-list rules", () => {
+    const gateSource = file("packages/mizan-gate/src/gates/g3-no-evasion.ts", 'export const DONOR_TOKENS = ["rotateWan"]\n')
+    expect(rules(checkNoDonorWorkaround([gateSource]))).toEqual([])
+  })
+})
+
+describe("G-5 licence fields", () => {
+  const goodSource = {
+    source: "tanzil/quran-uthmani",
+    title: "Tanzil Uthmani",
+    publisher: "Tanzil",
+    url: "https://example.invalid/quran.txt",
+    license: "Tanzil Terms — no derivatives",
+    licenceClass: "no-derivatives",
+    licenseUrl: "https://example.invalid/terms",
+    attribution: "Qur'an text: Tanzil",
+    sha256: "a".repeat(64),
+    records: 6236,
+    enabled: true,
+    exclusionReason: null,
+    gradeApplicable: false,
+    gradeBasis: "none",
+    // `notes` is required by SourceDescriptor. A permissive default keeps this fixture about
+    // licence rules; the corpus package has its own test asserting the exclusion note is kept.
+    notes: null,
+  }
+  const registry = (sources: readonly unknown[]) => ({ schemaVersion: "1", generatedBy: "test", sources })
+
+  test("clean: a complete registry passes", () => {
+    expect(checkLicenceFields(registry([goodSource]))).toEqual([])
+  })
+
+  test("planted: an empty licence is caught", () => {
+    const findings = checkLicenceFields(registry([{ ...goodSource, license: "   " }]))
+    expect(rules(findings)).toEqual(["G-5.2 required-field-empty"])
+    expect(findings[0]?.excerpt).toContain("license is empty")
+  })
+
+  test("planted: an empty attribution is caught", () => {
+    expect(rules(checkLicenceFields(registry([{ ...goodSource, attribution: "" }])))).toEqual(["G-5.2 required-field-empty"])
+  })
+
+  test("planted: an unconfirmed licence on an enabled source is caught", () => {
+    const findings = checkLicenceFields(registry([{ ...goodSource, licenceClass: "unconfirmed" }]))
+    expect(rules(findings)).toEqual(["G-5.4 unconfirmed-licence-enabled"])
+  })
+
+  test("an unconfirmed licence on a DISABLED source passes, with a stated reason", () => {
+    const excluded = { ...goodSource, licenceClass: "unconfirmed", enabled: false, exclusionReason: "licence terms unconfirmed at ingest" }
+    expect(checkLicenceFields(registry([excluded]))).toEqual([])
+  })
+
+  test("planted: a disabled source with no reason is caught", () => {
+    const findings = checkLicenceFields(registry([{ ...goodSource, enabled: false, exclusionReason: null }]))
+    expect(rules(findings)).toEqual(["G-5.5 undeclared-exclusion"])
+  })
+
+  test("planted: a malformed sha256 is caught", () => {
+    expect(rules(checkLicenceFields(registry([{ ...goodSource, sha256: "abc" }])))).toEqual(["G-5.3 sha256-malformed"])
+  })
+
+  test("planted: a missing sha256 on an ENABLED source is caught, not excused", () => {
+    // The exemption below is for sources we never fetched. An enabled row IS a row we
+    // ingested, so an absent or malformed digest there is a real finding.
+    //
+    // An empty digest trips BOTH rules, and that is correct rather than noisy: G-5.2 says the
+    // field is missing, G-5.3 says what is there is not a digest. The two rules are
+    // independent, and asserting the pair keeps them that way.
+    expect(rules(checkLicenceFields(registry([{ ...goodSource, sha256: "" }])))).toEqual([
+      "G-5.2 required-field-empty",
+      "G-5.3 sha256-malformed",
+    ])
+    expect(rules(checkLicenceFields(registry([{ ...goodSource, sha256: "not-a-digest" }])))).toEqual(["G-5.3 sha256-malformed"])
+  })
+
+  test("a DISABLED source with no digest passes — we never downloaded it", () => {
+    // `open-hadith-data` is in the registry precisely because its licence could not be
+    // confirmed. Its disabled row is the record of that decision; demanding a digest of an
+    // artefact that was never fetched would force either a fabricated hash or deleting the
+    // evidence that the source was considered.
+    const excluded = { ...goodSource, enabled: false, exclusionReason: "licence unconfirmed", sha256: "" }
+    expect(checkLicenceFields(registry([excluded]))).toEqual([])
+  })
+
+  test("the exemption is on the DIGEST only — a disabled source still owes every licence field", () => {
+    // If the exemption ever widened past sha256, this is the test that would notice.
+    const excluded = { ...goodSource, enabled: false, exclusionReason: "licence unconfirmed", sha256: "", attribution: "" }
+    expect(rules(checkLicenceFields(registry([excluded])))).toEqual(["G-5.2 required-field-empty"])
+  })
+
+  test("planted: a registry that does not match the schema is caught", () => {
+    expect(rules(checkLicenceFields({ sources: [{ source: "x" }] }))).toEqual(["G-5.1 registry-decode"])
+  })
+})
+
+describe("G-6 no false verified", () => {
+  test("clean: a verified verdict is allowed only in the construction site", () => {
+    const allowed = file("packages/mizan-verify/src/verify.ts", 'const v = { verdict: "verified", reason: "exact_containment" }\n')
+    expect(rules(checkOneConstructionSite([allowed]))).toEqual([])
+  })
+
+  test("planted: a verified verdict constructed elsewhere is caught", () => {
+    const findings = checkOneConstructionSite([file("apps/cli/src/render.ts", 'const badge = { verdict: "verified" }\n')])
+    expect(rules(findings)).toEqual(["G-6.1 one-construction-site"])
+  })
+
+  test("a COMPARISON of the verdict is not a violation", () => {
+    expect(rules(checkOneConstructionSite([file("packages/mizan-verify/src/steps/coerce.ts", 'if (v.verdict === "verified") return x\n')]))).toEqual([])
+  })
+
+  test("planted: a second schema site for the literal is caught", () => {
+    expect(rules(checkOneSchemaSite([file("apps/cli/src/bad.ts", 'Schema.Literal("verified")\n')]))).toEqual(["G-6.2 one-schema-site"])
+  })
+
+  test("planted: a computed percent is caught", () => {
+    expect(rules(checkNoComputedPercent([file("apps/cli/src/score.ts", "percent: score * 100,\n")]))).toEqual(["G-6.3 no-computed-percent"])
+  })
+
+  test("planted: an ad-hoc match strength is caught", () => {
+    const findings = checkNoAdHocMatchStrength([file("apps/cli/src/bad.ts", "matchStrength: computeScore(a, b),\n")])
+    expect(rules(findings)).toEqual(["G-6.4 no-ad-hoc-match-strength"])
+  })
+})
+
+describe("G-6 dynamic invariant", () => {
+  const evidence: EvidenceRef = {
+    recordId: "bukhari:1",
+    collection: "bukhari",
+    number: "1",
+    sourceUrl: "https://example.invalid/1",
+    license: "CC BY-SA 4.0",
+    attribution: "Sunnah.com",
+    grade: null,
+    gradeSource: "quranlab/hadith",
+    gradeBasis: "collection",
+    matchedChars: 20,
+    quoteChars: 20,
+  }
+
+  const honest: ClaimVerdict = {
+    claimId: "c1",
+    verdict: "verified",
+    reason: "exact_containment",
+    matchStrength: { kind: "exact", percent: 100 },
+    evidence,
+  }
+
+  test("clean: a correctly evidenced verified passes", () => {
+    expect(assertNoFalseVerified([honest])).toEqual([])
+  })
+
+  test("planted: verified without evidence is reported", () => {
+    expect(assertNoFalseVerified([{ ...honest, evidence: null }])).toEqual(["c1: verified with no evidence"])
+  })
+
+  test("planted: verified with a fuzzy match strength is reported", () => {
+    const forged = { ...honest, matchStrength: { kind: "none" } } as unknown as ClaimVerdict
+    expect(assertNoFalseVerified([forged])).toEqual(["c1: verified with match strength none"])
+  })
+
+  test("planted: verified at 97 percent is reported", () => {
+    const forged = { ...honest, matchStrength: { kind: "exact", percent: 97 } } as unknown as ClaimVerdict
+    expect(assertNoFalseVerified([forged])).toEqual(["c1: verified at percent 97"])
+  })
+
+  test("planted: a partial match presented as verified is reported", () => {
+    const partial: ClaimVerdict = { ...honest, evidence: { ...evidence, matchedChars: 12 } }
+    expect(assertNoFalseVerified([partial])).toEqual(["c1: verified with a partial match (12/20)"])
+  })
+
+  test("planted: a rejected verdict carrying evidence is reported", () => {
+    const odd = { ...honest, verdict: "rejected" as const, reason: "quote_absent_at_cited_id" as const }
+    expect(assertNoFalseVerified([odd])).toEqual(["c1: non-verified verdict carries evidence"])
+  })
+})
+
+describe("the gate must not be able to pass by looking at nothing", () => {
+  /**
+   * The regression this pins.
+   *
+   * The CLI once took its root from `process.cwd()`. Invoked from `packages/mizan-gate` it
+   * therefore scanned only that package, which the scan excludes — zero files inspected, five
+   * PASS lines, exit 0. Anyone reading the CI log would have concluded the invariants held.
+   *
+   * Three things are asserted here, and all three matter:
+   *   1. the root is found by walking UP from a nested module, not from the shell;
+   *   2. a directory that merely has a manifest is refused rather than accepted;
+   *   3. the real workspace root is one that actually contains the packages the gates read.
+   */
+  test("the root is discovered from a nested module location", () => {
+    const root = findRepositoryRoot(import.meta.dir)
+    expect(root).not.toBeNull()
+    expect(root === null ? "" : root.endsWith("mizan")).toBe(true)
+  })
+
+  test("the discovered root really does contain the gated packages", () => {
+    const root = findRepositoryRoot(import.meta.dir)
+    if (root === null) throw new Error("no root")
+    for (const subtree of ["packages/mizan-verify/src/verify.ts", "packages/mizan-core/src/index.ts"]) {
+      expect(existsSync(join(root, subtree))).toBe(true)
+    }
+  })
+
+  test("a directory with a manifest but no workspace is REFUSED, not accepted", () => {
+    const failure = requireRepositoryRoot(join(tmpdir(), "definitely-not-mizan-anywhere"))
+    expect(isOk(failure)).toBe(false)
+    if (isOk(failure)) return
+    expect(failure.error.length).toBeGreaterThan(20)
+  })
+
+  test("a caller-supplied root still wins, for a fixture tree", () => {
+    const found = findRoot(import.meta.dir, () => true)
+    expect(found).toBe(import.meta.dir)
+  })
+
+  test("findRoot terminates at the filesystem root instead of looping", () => {
+    expect(findRoot(import.meta.dir, () => false)).toBeNull()
+  })
+})

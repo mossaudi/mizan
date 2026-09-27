@@ -1,0 +1,58 @@
+mizan (ميزان)
+Copyright 2026 The mizan authors
+
+This product includes software developed by the mizan authors.
+
+--------------------------------------------------------------------------------
+NON-AFFILIATION NOTICE
+--------------------------------------------------------------------------------
+
+mizan is an independent work. It is NOT affiliated with, endorsed by, sponsored by,
+or derived from:
+
+  * anomalyco/opencode or any fork of it, including the "opencode-office" project.
+    mizan carries ZERO lines of code from that project. Four *contract shapes* were
+    studied (claim -> evidence -> verdict; confidence -> escalate; source/licence
+    registry; honest capability disclosure) and every line here was written from
+    scratch. Engineering conventions such as "no else", "const over let" and
+    "tests are not run from the repository root" are conventions rather than
+    copyrightable expression.
+
+  * lazarus_platform or any of its 42 crates. It was evaluated and excluded; it
+    contains no RAG, no vector store, no corpus, no citation layer and no Arabic
+    or RTL support, and none of its code or content appears here.
+
+  * Tanzil.net, the Tanzil project, QuranLab, Sunnah.com, HadeethEnc.com,
+    fawazahmed0, or mhashim6. These are *data sources*, not authors of this
+    software. The Arabic matn they publish is in the public domain and is
+    reproduced verbatim under the terms recorded per source in
+    `data/registry/sources.json` and in `attestation.json`. Attribution is rendered
+    in-product next to every citation. See `DISCLOSURE.md` for the full inventory.
+
+  * The Islamic AI Challenge, its organisers, MCIT, SDAIA or any partner. This is an
+    independent competition entry. The name of the event is used only to identify
+    the submission.
+
+--------------------------------------------------------------------------------
+THIRD-PARTY SOFTWARE
+--------------------------------------------------------------------------------
+
+This repository depends on the following third-party software. Licences are
+enumerated per dependency in `data/registry/sources.json` under
+`tools[].license`, and are re-checked by gate G-5.
+
+  effect 4.0.0-beta.83  -  MIT  -  Schema decoding at untrusted boundaries only
+  typescript 5.6.3       -  Apache-2.0  -  typecheck only, no runtime dependency
+  @types/bun 1.1.14      -  MIT  -  type declarations only
+
+mizan has no other runtime dependency. In particular it ships no vector database,
+no embedding model, no fuzzy-matching library and no web framework: the verifier is
+deliberately dependency-free so that gate G-1 can prove it cannot reach a similarity
+computation.
+
+--------------------------------------------------------------------------------
+SCOPE OF THE SUBMITTED WORK
+--------------------------------------------------------------------------------
+
+Only the work performed between 4 and 6 October 2026 is submitted. See
+`DISCLOSURE.md` and `INTEGRITY.md`.

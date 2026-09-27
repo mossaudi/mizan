@@ -1,0 +1,49 @@
+# dependencies
+node_modules/
+.bun-install-cache/
+
+# secrets — nothing under this pattern may ever be committed (gate G-4 / gitleaks)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+!.github/*.pem
+
+# corpus snapshot: large and reproducible from pinned URLs + attestation.json
+data/corpus.db
+data/corpus.db-shm
+data/corpus.db-wal
+data/raw/
+# generated per-row registry (large; the committed sources.json is the deliverable)
+data/registry/records.jsonl
+
+# provenance ledger: appended by the first run, then committed as evidence
+data/ledger/*.tmp
+data/ledger/*.bak
+
+# ============================================================
+# HELD BACK PENDING REVIEW — not yet published
+# ============================================================
+# apps/    the CLI surface
+# data/    the 95 MB corpus snapshot + provenance ledger
+# scripts/ the CI / ingest / ledger drivers
+#
+# These three are intentionally absent from the initial commit.
+# They are pending review; once approved, delete this block and
+# `git add apps data scripts` to publish them.
+# NOTE: while this block is in place, `bun run ci` and the CI
+# workflow cannot run from a fresh clone (they invoke scripts/).
+# ============================================================
+apps/
+data/
+scripts/
+
+# test + build output
+coverage/
+*.tsbuildinfo
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

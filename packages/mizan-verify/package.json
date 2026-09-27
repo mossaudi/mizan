@@ -1,0 +1,24 @@
+{
+  "name": "@mizan/verify",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "THE DIFFERENTIATOR. Deterministic per-claim citation verdicts by strict normalized containment. No provider, no vector, no similarity, no network, no clock.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@mizan/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "1.1.14",
+    "typescript": "5.6.3"
+  }
+}
