@@ -9,16 +9,21 @@ import { requireRepositoryRoot } from "@mizan/gate"
  *
  * ## The gap this closes
  *
- * `verify:ledger` checks `data/ledger.jsonl`: the 22-entry chain that records where the CORPUS
- * came from. There is a second chain in this repository, `data/runs.jsonl` - 274 entries
- * recording whether each RUN happened the way its trace says it did - and nothing in the
- * repository ever verified it. `auditRunLedger` was written, exported, unit-tested against
+ * `verify:ledger` checks `data/ledger.jsonl`: the short corpus chain that records where the
+ * CORPUS came from. There is a second chain in this repository, `data/runs.jsonl` — one entry
+ * per run, recording whether each RUN happened the way its trace says it did — and nothing in
+ * the repository ever verified it. `auditRunLedger` was written, exported, unit-tested against
  * planted corruption, and then never called by anything a person can run. A gate that no
  * command invokes is a gate nobody is holding, and the run chain is the one that backs the
  * product's central claim: that the `verified` badge you saw was computed and recorded.
  *
  * So the same `auditRunLedger` that the tests exercise is now reachable by a judge and by CI,
  * with the same contract: exit 0 when intact, otherwise name the exact entry index.
+ *
+ * Both chains are long or short depending on how much the repository has been run, so neither
+ * length is written down here. Each of the two commands prints its own entry count; a number
+ * frozen into a comment is a number that will be wrong the first time somebody runs the demo,
+ * and a stale count in the file explaining the verifier is worse than no count at all.
  *
  * ## What is verified, and what is not
  *
@@ -35,7 +40,7 @@ import { requireRepositoryRoot } from "@mizan/gate"
  * Same reasoning as `verify:ledger`: a verification command with flags invites `--skip`.
  */
 
-/** How many entries to print. The chain is 274 long; a wall of it helps nobody. */
+/** How many entries to print. The chain is long; a wall of it helps nobody. */
 const SHOWN = 5
 
 const label = (trace: RunTrace, index: number): string =>

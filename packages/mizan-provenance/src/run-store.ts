@@ -61,6 +61,12 @@ import { auditRunLedger, describeProblem, headOf, readRunChain, serialiseEntry }
  * recorded onto a chain that has forked. Dropping a safety property to make a benchmark faster
  * is not a trade this repository is allowed to make; replacing it with a cheaper equivalent is.
  *
+ * The bound is 64 KB, which an entry can exceed: a model that repeats one five-thousand-character
+ * citation five hundred times produces a multi-megabyte line. Such a run is refused, because the
+ * chain genuinely cannot be confirmed — and the refusal names the oversized entry rather than a
+ * concurrent writer, because no other writer exists and an operator sent after one wastes the
+ * hour they should be spending on the real cause.
+ *
  * Net effect: one O(file) audit per `appendRunTraces` call regardless of batch size, and
  * O(entry) per entry. A batch of n is O(n) again.
  */
@@ -156,27 +162,56 @@ const problemToFailure = (problem: Parameters<typeof describeProblem>[0]): Appen
 const MAX_LOOKBACK_BYTES = 64 * 1024
 
 /**
- * The last complete line ending at `endOffset`, or null when there is none.
+ * The line ending at `endOffset`, and which of the several kinds of "not there" applies otherwise.
  *
- * Bounded by `MAX_LOOKBACK_BYTES` on purpose: a caller that cannot find a newline in a 64 KB
- * window is looking at a file with a single entry longer than that, and returning null there
- * degrades to the genesis head, which the caller's own check then rejects. Unbounded backwards
- * scanning would reintroduce the O(file) cost this whole design exists to remove.
+ * The union exists because every way of failing used to collapse into one `null`, and the two that
+ * actually happen deserve opposite sentences:
+ *
+ * - `entry_too_long` — the file is fine and the entry immediately before our append is simply
+ *   longer than the window. Reachable in production, not a synthetic shape: a model that repeats
+ *   one five-thousand-character citation five hundred times writes a multi-megabyte entry. The run
+ *   is still refused, because we genuinely cannot confirm the chain, but nothing forked and no
+ *   other writer exists. Reporting it as a concurrent append sends an operator hunting a process
+ *   that was never there.
+ * - `no_line` — the byte before our append is not the end of a line at all (a blank line, which
+ *   `readRunChain` skips and so a ledger audit accepts). The chain cannot be confirmed, and the
+ *   honest words are "could not read", not "someone else wrote".
+ * - `at_genesis` — the offset is 0, so there is no previous entry and nothing to check.
+ *
+ * @returns `line` for the entry to chain from, or why there is not one to chain from.
  */
-const readLineBefore = async (handle: FileHandle, endOffset: number): Promise<string | null> => {
+type LineBefore =
+  | { readonly kind: "line"; readonly line: string }
+  | { readonly kind: "at_genesis" }
+  | { readonly kind: "entry_too_long" }
+  | { readonly kind: "no_line" }
+
+const readLineBefore = async (handle: FileHandle, endOffset: number): Promise<LineBefore> => {
   const floor = Math.max(0, endOffset - MAX_LOOKBACK_BYTES)
   const span = endOffset - floor
-  if (span <= 0) return null
+  if (span <= 0) return { kind: "at_genesis" }
   const buffer = new Uint8Array(span)
   const { bytesRead } = await handle.read(buffer, 0, span, floor)
   const window = new TextDecoder().decode(buffer.subarray(0, bytesRead))
   const lines = window.split("\n")
-  // The final element is "" when the file ended on a newline, and the partial previous line
-  // otherwise; in both cases the entry we want is the one before it.
-  if (lines.length < 2) return null
+  // `serialiseEntry` writes one line per entry with its newlines escaped, so a newline in the
+  // window is a line boundary and nothing else. The candidate line — the one before the final
+  // element — is therefore complete exactly when the window holds at least two boundaries: the
+  // one that ends it, and the one that starts it.
+  const boundaries = lines.length - 1
+  // Zero boundaries: the entry we want is longer than the whole window.
+  if (boundaries === 0) return { kind: "entry_too_long" }
+  // Exactly one boundary, and the window does not begin at offset 0: the single line in the window
+  // is the *tail* of a longer entry, and reading it as a whole entry is how a 64 KB window turns
+  // a one-megabyte entry into a phantom concurrent writer. Its `entryHash` cannot match the head
+  // we audited, so without this check an oversized entry is reported as a forked chain — a process
+  // that does not exist, sent after an operator who then has an hour to waste.
+  if (boundaries === 1 && floor > 0) return { kind: "entry_too_long" }
+  // The final element is "" when the file ended on a newline, and the partial next line otherwise;
+  // in both cases the entry we want is the one before it.
   const previous = lines[lines.length - 2] ?? ""
-  if (previous.trim().length === 0) return null
-  return previous
+  if (previous.trim().length === 0) return { kind: "no_line" }
+  return { kind: "line", line: previous }
 }
 
 /**
@@ -199,7 +234,7 @@ const confirmWrite = async (input: {
   const expectedBytes = cursor.bytes + Buffer.byteLength(appended, "utf8")
 
   let landed: string
-  let previousLine: string | null
+  let previous: LineBefore
   let afterBytes: number
   try {
     const handle = await open(path, "r")
@@ -214,7 +249,7 @@ const confirmWrite = async (input: {
       const buffer = new Uint8Array(afterBytes - cursor.bytes)
       const { bytesRead } = await handle.read(buffer, 0, buffer.length, cursor.bytes)
       landed = new TextDecoder().decode(buffer.subarray(0, bytesRead))
-      previousLine = await readLineBefore(handle, cursor.bytes)
+      previous = await readLineBefore(handle, cursor.bytes)
     } finally {
       await handle.close()
     }
@@ -228,9 +263,16 @@ const confirmWrite = async (input: {
   if (landed !== appended) {
     return writeFailure("verify_failed", `${path}: the bytes at the append offset are not the bytes that were written. The run is UNTRUSTED.`)
   }
-  if (cursor.bytes > 0 && previousLine === null) {
+  if (cursor.bytes > 0 && previous.kind === "entry_too_long") {
+    // A refusal, and the right one: we cannot read the entry we must chain from, so we cannot
+    // confirm the chain. What the message must not do is invent the cause. Nothing else wrote.
+    return writeFailure("verify_failed", `${path}: the entry preceding the append exceeds the ${MAX_LOOKBACK_BYTES / 1024} KB lookup window, so the chain cannot be confirmed. No other writer is involved. The run is UNTRUSTED.`)
+  }
+  if (cursor.bytes > 0 && previous.kind !== "line") {
     return writeFailure("verify_failed", `${path}: could not read the entry preceding the append, so the chain cannot be confirmed. The run is UNTRUSTED.`)
   }
+
+  const previousLine = previous.kind === "line" ? previous.line : null
 
   // Somebody else appended between our audit and our write: the entry before ours is not the head
   // we chained from, so the file has forked and this run would be recorded onto a chain that no

@@ -85,10 +85,22 @@ an entire event is a rounding error against the prize.
 
 If the hosted provider is unreachable, mizan prints **"model unavailable"**. It never falls
 back to a canned answer and never silently substitutes a mock — that refusal is the honest
-state, and AGENTS.md §16 makes it mandatory. One honest detail about the fallback: a
-`scripted` transcript is used only when `MIZAN_PROVIDER=scripted` was **asked for**. A
-hosted run whose provider fails records the failure in the trace and exits degraded; it does
-not read the transcript behind the operator's back.
+state, and AGENTS.md §16 makes it mandatory. The transcript is read in exactly **two**
+situations, and in both the answer is labelled `PRECOMPUTED` on stdout and `precomputed` in
+the trace, so a replay can never be read as live inference:
+
+1. `MIZAN_PROVIDER=scripted` was asked for.
+2. `MIZAN_PROVIDER=hosted` (the default) with **no `MIZAN_LLM_API_KEY` configured**.
+   `.env.example` documents this and `apps/cli/src/provider-config.ts` implements it by
+   resolving a keyless hosted run to the same scripted provider. A default checkout ships no
+   key, so *this* is what an unconfigured run does — it is a labelled replay, not a claim of
+   inference.
+
+The third case is the one mizan refuses. A hosted run whose key **is** configured and whose
+provider then **fails** records the failure in the trace and exits non-zero (degraded, or
+untrusted if the failure also cost it the ledger append). It does not quietly replay the
+transcript behind the operator's back. A key that exists plus an outage means something is
+wrong, and answering from a recording would hide exactly that.
 
 ## 5. Grades are attributed, never asserted
 
@@ -98,32 +110,44 @@ carries no grade, mizan stores `null` and says so. **mizan never infers, default
 upgrades or asserts a grade of its own** (ADR-06). The in-product wording is "grade per
 <dataset>, as provided by <source>".
 
-This is deliberate and it is a correction to the literal form of the requirement, which
-would have quarantined two entire collections: Qur'anic verses have no ṣaḥīḥ/ḍa'īf grade
-because the concept does not apply to them, and the ungraded Arabic matn of Musnad
-Aḥmad and al-Darīmī is published ungraded by its source on purpose. mizan quarantines
-**inconsistency**, never absence. See `AGENTS.md` §15 and the `gradeApplicable` /
-`gradeBasis` model in `packages/mizan-core/src/schema/record.ts`, applied by
-`packages/mizan-corpus/src/quarantine.ts`.
+This is deliberate, and it is a correction to the literal form of the requirement. Applied
+literally, "quarantine every record whose grade is not ṣaḥīḥ" would have quarantined all 6236
+Tanzil verses, because a Qur'anic verse has no ṣaḥīḥ/ḍa'īf grade at all — the concept does
+not apply to it. mizan quarantines **inconsistency**, never absence: a record is quarantined
+when a grade **is required** (`gradeApplicable: true`) and the dataset **asserted none**. The
+6236 verses are therefore served, and every ungraded hadith row in this build is quarantined
+rather than served wearing a grade mizan made up. See `AGENTS.md` §15 and the
+`gradeApplicable` / `gradeBasis` model in `packages/mizan-core/src/schema/record.ts`, applied
+by `packages/mizan-corpus/src/quarantine.ts`.
 
 ### The quarantine arithmetic, exactly
 
-The requirement is to quarantine every record whose grade is not ṣaḥīḥ. Taken literally on this
-corpus that is 15026 of 42260 records — a number a judge is entitled to check:
+All three numbers below are in `attestation.json`, and `bun run check:docs` fails the build
+if this table stops stating them.
 
 | | Records |
 | --- | --- |
 | Enabled in the registry (6236 Qur'an + 36024 hadith) | 42260 |
-| In the attested snapshot (`attestation.json`, `recordCount`) | 27234 |
-| **Quarantined, because `gradeApplicable: false`** | **15026** |
-| Served, all of which carry the dataset's own grade | 27234 |
+| **Quarantined: `gradeApplicable: true` and the dataset asserts no grade** | **15026** |
+| Served — 6236 Qur'anic verses (`gradeApplicable: false`, no grade expected) + 20998 hadith | 27234 |
 
 Two of those three numbers are the whole honesty question, so they are worth stating plainly.
-**The 15026 quarantined records are not corrupt and not rejected on religious grounds.** They
-are the 6236 Qur'anic verses, where ṣaḥīḥ/ḍa'īf does not apply, plus 8790 hadith records
-whose source dataset asserts no grade at all. Neither group is a weak ṣaḥīḥ, and hiding them
-inside a verified set would be the misleading outcome. mizan quarantines them, says why, and
-lets a reader disagree with the rule.
+**The 15026 quarantined records are not corrupt and not rejected on religious grounds, and all
+15026 of them are hadith.** Every one is a row whose source dataset asserts no grade at all.
+`quarantineReason` returns `null` — that is, *served* — when `gradeApplicable` is `false`, so
+the 6236 Qur'anic verses are served, precisely because ṣaḥīḥ/ḍa'īf does not apply to them and
+the `gradeApplicable` model exists to spare them for that reason. The other 20998 served rows
+are hadith carrying exactly the grade their own dataset gave them, whatever it was.
+36024 − 20998 = 15026.
+
+The literal rule would in fact go further than "quarantine everything ungraded". Of the 20998
+graded hadith rows, only **7867** are ṣaḥīḥ at every level of the dataset's own grading chain
+— that is, every `/`-separated segment of the stored `grade` begins with `Sahih` — and the
+other 13131 carry at least one ḥasan, ḍa'īf or mawḍūʿ level. So "the grade must be ṣaḥīḥ", read
+strictly, quarantines 42260 − 7867 = **34393** of 42260 records and serves 19%. mizan
+quarantines the 15026 rows where the dataset said nothing, and serves the graded ones with
+their source's own words attached — a decision a reader is entitled to disagree with, which is
+what the table is for.
 
 ## 6. What a judge can check in 60 seconds
 
@@ -131,13 +155,30 @@ lets a reader disagree with the rule.
 bun install
 bun run ingest          # rebuild the corpus from pinned URLs (or see "already present")
 bun run verify:ledger   # verify the corpus hash chain, names the exact broken index
-bun run verify:runs     # verify the run ledger: every trace, seal and verdict, byte for byte
-bun run check:docs      # assert every path/command/env-var claim in DISCLOSURE.md is real
+bun run verify:runs     # verify the run chain: every trace unaltered, links and digests intact
+bun run check:docs      # assert every path/command/env-var/count claim in this document is real
 bun run ci              # typecheck + per-package tests + gates G-1..G-6
 ```
 
 No credentials are needed for any of the above, and none of them touch the network except
-`bun run ingest`'s fetch step. Two of them exist specifically to make claims falsifiable:
-`verify:runs` re-derives every badge from its stored trace, and `check:docs` fails the build
-when this document says something the repository does not contain — which is how the six
-false claims above were found.
+`bun run ingest`'s fetch step. Two of them exist specifically to make claims falsifiable.
+`verify:runs` proves the run history was not altered, removed or reordered; it does **not**
+re-derive past verdicts, which would need the snapshot of that moment. `check:docs` fails
+the build when this document says something the repository does not contain — which is how
+the false claims in §4 and §5 above were found.
+
+### Exit codes
+
+`bun run ask` is the one command whose exit code a script is expected to branch on, and the
+four values are kept distinct on purpose:
+
+| Code | Meaning |
+| --- | --- |
+| 0 | Answered, and the run is recorded and therefore auditable. |
+| 1 | Degraded: the run said something honest and failed — `model unavailable`, or no sources. |
+| 2 | Usage, or a missing prerequisite: no question given, or no corpus at `data/corpus.db`. |
+| 3 | UNTRUSTED — **no verdict**: the snapshot did not attest, or a full report was produced and could not be recorded. |
+
+Exit 3 is separate from exit 1 because they are not the same kind of bad. A degraded run told
+the truth; an untrusted run produced output that cannot be audited afterwards, which is the
+state AGENTS.md §16 singles out. Treat exit 3 as *do not rely on anything this run produced*.

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { appendFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { GENESIS_PREV_HASH, TRACE_SCHEMA_VERSION, sealTrace, type RunTrace, type RunTraceDraft } from "@mizan/core"
@@ -435,6 +435,54 @@ describe("the tail verification keeps the guarantees a full re-audit provided", 
     expect(["ledger_broken", "torn_tail", "verify_failed"]).toContain(outcome.reason)
     // And nothing was appended onto the truncated file.
     expect(await readFile(path, "utf8")).toBe(raw.slice(0, 20))
+  })
+
+  test("an entry longer than the lookup window is refused as too long, not blamed on a writer", async () => {
+    // The reachable production shape, not a synthetic one: a model that repeats one
+    // five-thousand-character citation five hundred times writes a multi-megabyte entry, and the
+    // 64 KB backwards window cannot reach its start. The refusal is correct — we cannot confirm
+    // the chain — but the message must not invent a concurrent writer that was never there.
+    const path = await tempLedger()
+    const oversized = draft({
+      runId: "run-oversized",
+      toolsCalled: Array.from({ length: 700 }, (_, index) => ({
+        tool: "quranSearch",
+        queryHash: String(index).padStart(64, "0"),
+        resultCount: 3,
+        ranking: "fused" as const,
+        elapsedMs: 1,
+      })),
+    })
+    const first = await appendRunTrace(path, oversized)
+    expect(first.ok).toBe(true)
+    // The window really is exceeded, or this test is proving nothing.
+    expect((await readFile(path, "utf8")).length).toBeGreaterThan(64 * 1024)
+
+    const outcome = await appendRunTrace(path, draft({ runId: "run-after-oversized" }))
+    expect(outcome.ok).toBe(false)
+    if (outcome.ok) return
+    expect(outcome.reason).toBe("verify_failed")
+    expect(outcome.detail).toContain("lookup window")
+    expect(outcome.detail).toContain("UNTRUSTED")
+    expect(outcome.detail).not.toContain("another writer")
+  })
+
+  test("a blank line before the append is refused as unreadable, not as a fork", async () => {
+    // The second way of failing to read the line before our own, and the other one that used to
+    // collapse into the same `null`. `readRunChain` skips blank lines, so a ledger carrying one
+    // passes its audit and reaches this check — and a message blaming a concurrent writer would
+    // again be naming a process that does not exist.
+    const path = await tempLedger()
+    const first = await appendRunTrace(path, draft({ runId: "run-a" }))
+    expect(first.ok).toBe(true)
+    await appendFile(path, "\n", "utf8")
+
+    const outcome = await appendRunTrace(path, draft({ runId: "run-b" }))
+    expect(outcome.ok).toBe(false)
+    if (outcome.ok) return
+    expect(outcome.reason).toBe("verify_failed")
+    expect(outcome.detail).toContain("could not read the entry preceding the append")
+    expect(outcome.detail).not.toContain("another writer")
   })
 })
 
