@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import type { DocsClaim } from "../src/docs-claims.ts"
-import { runDocsClaimChecks } from "../src/docs-check.ts"
+import { checkedPaths, runDocsClaimChecks } from "../src/docs-check.ts"
 import { CORPUS_SURFACE_EXTENSIONS, CORPUS_SURFACE_ROOTS, checkCorpusAbsenceUnstated } from "../src/docs-corpus.ts"
 import { groupFigure } from "../src/docs-value.ts"
 
@@ -161,7 +161,7 @@ describe("the runner reads the surfaces a judge reads", () => {
     const result = runDocsClaimChecks(ROOT)
     expect(rules(result.claims).filter((rule) => rule === "corpus-absence-unstated")).toEqual([])
     for (const surface of ["README.md", "docs/specs/adr/ADR-C4.md", "submission/make_deck.py", "submission/make_deck_ar.py"]) {
-      expect(result.checked).toContain(surface)
+      expect(checkedPaths(result)).toContain(surface)
     }
   })
 })

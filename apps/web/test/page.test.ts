@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
 import { badgeFor, isErr, isOk, transcriptLabel, VERDICT_BADGE, type TranscriptKind, type Verdict } from "@mizan/core"
-import { decodeFixture, encodeText, renderPage, type PageFixture } from "../src/page.ts"
+import { decodeFixture, encodeText, renderPage, PageExample, type PageFixture } from "../src/page.ts"
 
 /**
  * Story 3's acceptance criteria, and the provenance that makes the page believable.
@@ -61,14 +61,77 @@ describe("the three badge lines come from the shared verdict map", () => {
 describe("corpus and model text cannot inject markup", () => {
   const PAYLOAD = `<script>alert(1)</script><img src=x onerror=alert(1)>"quoted" & <b>bold</b>`
 
-  test("a planted payload is encoded into characters, never into tags", () => {
-    const planted = loadFixture()
-    const page = renderPage({ ...planted, examples: [{ ...planted.examples[0]!, quote: PAYLOAD, recordText: PAYLOAD }] })
+  /**
+   * The fixture fields `exampleBlock` interpolates, each paired with how the page reads it.
+   *
+   * ## Why the list and not two fields
+   *
+   * A test that plants a payload in `quote` and `recordText` proves the encoder works on two of the
+   * seven strings a reader can see. The other five reach the same template through a different
+   * expression — `question` and `prose` alone, `sourceLabel` alone, and `claimId` and `reason`
+   * concatenated together in one interpolation — and a concatenated interpolation is exactly where
+   * an encoder call gets dropped during an edit, because deleting it looks like a tidy-up. So every
+   * interpolated field is planted, and the assertion is that *no* tag survives anywhere in the
+   * document rather than that the expected characters appear somewhere in it.
+   *
+   * `verdict` is absent by construction: it is a member of a three-value union decoded at the
+   * boundary, so a payload cannot reach it without the decode failing first, which the AC4 block
+   * proves.
+   */
+  const UNTRUSTED_FIELDS: ("claimId" | "reason" | "question" | "prose" | "quote" | "sourceLabel" | "recordText")[] = [
+    "claimId",
+    "reason",
+    "question",
+    "prose",
+    "quote",
+    "sourceLabel",
+    "recordText",
+  ]
+
+  /**
+   * The tags an attacker reaches for and the page never legitimately emits.
+   *
+   * `style` and `div` are absent on purpose: the page ships its own stylesheet, so asserting they
+   * are absent would either fail on correct output or force a narrowing that hides a real tag.
+   */
+  const INJECTABLE_TAGS = ["<script", "<img", "<svg", "<iframe", "<object", "<embed", "<b>", "<a ", "<a>"] as const
+
+  test("the fixture's every untrusted field reaches the document, and no field is left unplanted", () => {
+    // Completeness, from the schema rather than from a hand-typed list: a new `PageExample` field
+    // appears here as an unplanted field and fails, so it cannot reach the document untested. The
+    // one excluded is `verdict`, which the union makes unreplantable.
+    const unplantable = new Set<string>(["verdict"])
+    const derived = Object.keys(PageExample.fields).filter((field) => !unplantable.has(field))
+    expect(derived.sort()).toEqual([...UNTRUSTED_FIELDS].sort())
+    // And the renderer really reads each one, so "the field exists" is not mistaken for "the field
+    // is displayed". Matched on the bare name: `claimId` and `reason` are interpolated together
+    // inside one template literal, so requiring the exact `encodeText(example.claimId` spelling
+    // would fail on correct code and pass on a field that is rendered but unencoded.
+    const source = readText(join(PACKAGE_DIR, "src", "page.ts"))
+    for (const field of derived) expect(source).toContain(`example.${field}`)
+  })
+
+  test.each(UNTRUSTED_FIELDS)("a payload planted in %s is encoded into characters, never into tags", (field) => {
+    const base = loadFixture()
+    const page = renderPage({ ...base, examples: [{ ...base.examples[0]!, [field]: PAYLOAD }] })
     expect(page).toContain("&lt;script&gt;alert(1)&lt;/script&gt;")
     expect(page).toContain("&lt;img src=x onerror=alert(1)&gt;")
     expect(page).toContain("&quot;quoted&quot; &amp; &lt;b&gt;bold&lt;/b&gt;")
-    expect(page).not.toContain("<script>")
-    expect(page).not.toContain("<img")
+    // The whole-document check, because "the payload is encoded" and "the payload did not become
+    // markup somewhere else" are different claims and only the second is the security property.
+    for (const tag of INJECTABLE_TAGS) expect(page).not.toContain(tag)
+  })
+
+  test("a payload in every field at once still yields no injectable tag anywhere in the document", () => {
+    const base = loadFixture()
+    const poisoned = Object.fromEntries(UNTRUSTED_FIELDS.map((field) => [field, PAYLOAD]))
+    const page = renderPage({ ...base, examples: [{ ...base.examples[0]!, ...poisoned }] })
+    for (const tag of INJECTABLE_TAGS) expect(page).not.toContain(tag)
+    // The page's own markup is still there, so the loop above is not passing because the document
+    // is empty or because the example was dropped.
+    expect(page).toContain("<h1>mizan</h1>")
+    expect(page).toContain('<article class="example">')
+    expect(page).toContain("&lt;script&gt;")
   })
 
   test("the encoder is total over the five characters that matter", () => {

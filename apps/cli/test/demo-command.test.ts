@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { cpSync, mkdirSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { decodeOrFail, decodeSync, DemoAnchor, DemoAnchorSet, isOk, normalizeForMatch, sha256Hex } from "@mizan/core"
+import { decodeOrFail, decodeSync, DemoAnchor, DemoAnchorSet, isOk, normalizeForMatch, sha256Hex, transcriptLabel } from "@mizan/core"
 import { attestAllAnchors, attestDemoAnchor, buildDemoCorpus, describeDemoCorpusFailure, DEMO_ANCHORS_RELATIVE, readDemoAnchorSet } from "../src/demo-corpus.ts"
 import { readDemoQuestionSet } from "../src/demo-questions.ts"
 import { EXIT_DEGRADED, EXIT_OK, EXIT_UNTRUSTED, EXIT_USAGE } from "../src/exit-codes.ts"
@@ -265,8 +265,20 @@ describe("bun run demo", () => {
   test("it says on screen that the transcript is a replay and that it wrote no ledger entry", async () => {
     const dir = isolatedRoot()
     const { output } = await runDemoCommand(dir)
-    expect(output).toContain("PRECOMPUTED")
+    // The shared label verbatim, not the word: the demo banner and the report header must print the
+    // identical string, or a judge is shown two answers to "which mode is this?" on one screen.
+    // The source-level half — that the banner derives it rather than typing it — is in demo.test.ts.
+    expect(output).toContain(transcriptLabel("precomputed"))
     expect(output).toContain("appends nothing to data/runs.jsonl")
+  })
+
+  test("the demo banner states that the verdicts were computed, not replayed", async () => {
+    // The scope clause, from the other end. A `PRECOMPUTED` label with no scope reads as a
+    // disclaimer covering the badges as well, which is a false retraction: the answers are
+    // replayed, every badge under them is computed by the verifier on this run.
+    const dir = isolatedRoot()
+    const { output } = await runDemoCommand(dir)
+    expect(output).toContain("verdicts computed live")
   })
 
   test("it prints the corpus fingerprint in full, so a reader can check it", async () => {

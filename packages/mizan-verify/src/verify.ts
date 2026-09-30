@@ -247,6 +247,10 @@ const anchoredOutcome = (claim: Claim, records: readonly CorpusRecord[], deadlin
   if (folded === null) return null
   const subject = lowestId(records)
   if (subject === null) return null
+  // The anchor WAS located, yet containment did not fire: the abridgement is real but the quoted
+  // span is not one of these characters. Absence of evidence, not disproof, so `unverifiable`
+  // (ADR-C1). The `rejected` verdict is reserved for step 6, where the citation resolved to a real
+  // record and no anchor was supplied to argue otherwise.
   if (locateAnchor(folded, subject, deadlineExpired).located) return unverifiable(claim.id, "no_matching_evidence")
   // The predicate fired during the search, so we do not know the answer. Saying `rejected`
   // here would be accusing a source on the strength of a search that did not finish.

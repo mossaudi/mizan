@@ -459,6 +459,43 @@ describe("the report shows the quote beside the record it was checked against", 
   })
 })
 
+/* ------------------------------------------------------------------ the mode label has one source */
+
+/**
+ * Story 4's "a *single* shared label feeds the CLI header", checked at the place the fork happened.
+ *
+ * `demo.ts` carried its own `PRECOMPUTED` literal in the demo banner while `render.ts` read
+ * `transcriptLabel`. The two strings were already different on one screen — "deterministic replay"
+ * above, "committed answers replayed" below — so a judge saw two answers to "which mode is this?".
+ * That is the exact misread R10 names, produced by the very mechanism meant to prevent it.
+ *
+ * The check is source-level for the same reason `apps/web/test/page.test.ts` checks `render.ts` the
+ * same way: the fact under test is *where the string comes from*, and a behavioural assertion
+ * cannot distinguish "read from the map" from "typed the same characters by hand". The behavioural
+ * half lives in `demo-command.test.ts`, which runs the real command and requires the shared label
+ * on screen.
+ */
+describe("the demo banner's mode word is the shared label, not a local literal", () => {
+  const demoSource = readFileSync(join(import.meta.dir, "..", "src", "demo.ts"), "utf8")
+
+  test("demo.ts reads TRANSCRIPT_LABEL through transcriptLabel", () => {
+    expect(demoSource).toContain('transcriptLabel("precomputed")')
+  })
+
+  test("demo.ts contains no PRECOMPUTED literal of its own", () => {
+    // A bare word, in any quote style, anywhere in the file. `transcriptLabel` is the only route.
+    expect(demoSource).not.toMatch(/["'`]PRECOMPUTED/)
+  })
+
+  test("it keeps the scope clause the shared label does not carry", () => {
+    // `transcriptLabel` supplies the mode word and nothing about the badges. The clause saying the
+    // badges ARE computed belongs to this banner alone, so it is asserted here — a label with no
+    // scope reads as a disclaimer over the whole report, badges included, which would be a false
+    // retraction of the only claim the demo makes.
+    expect(demoSource).toContain("verdicts computed live")
+  })
+})
+
 /* ------------------------------------------------------------------ the real binary, real snapshot */
 
 /**

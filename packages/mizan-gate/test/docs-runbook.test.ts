@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import type { DocsClaim } from "../src/docs-claims.ts"
-import { DEMO_RUNBOOK, runDocsClaimChecks } from "../src/docs-check.ts"
+import { checkedPaths, DEMO_RUNBOOK, runDocsClaimChecks } from "../src/docs-check.ts"
 import { checkRunbookOrder, KEYED_LIVE_PATH, REPLAY_PATH } from "../src/docs-runbook.ts"
 
 /**
@@ -183,7 +183,7 @@ describe("this repository's own runbook satisfies the rule (Story 4, AC1 and AC2
   test("it is audited by the runner as a document, so its paths and commands are checked too", () => {
     // R1 and R4 on a runbook are worth more than on most documents: a renamed script here costs a
     // judge the exact sixty seconds the runbook promised them.
-    expect(runDocsClaimChecks(ROOT).checked).toContain(RUNBOOK)
+    expect(checkedPaths(runDocsClaimChecks(ROOT))).toContain(RUNBOOK)
     expect(rules(runDocsClaimChecks(ROOT).claims).filter((rule) => rule.startsWith("runbook-"))).toEqual([])
   })
 })

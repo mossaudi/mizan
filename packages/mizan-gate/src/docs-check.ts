@@ -89,13 +89,43 @@ export const AUDITED_DOCUMENTS = [...REQUIRED_DOCUMENTS, ENV_EXAMPLE, VALUE_PROO
 /** A `Set` rather than `REQUIRED_DOCUMENTS.includes`, which will not accept a wider union. */
 const REQUIRED: ReadonlySet<string> = new Set(REQUIRED_DOCUMENTS)
 
+/**
+ * Which files are documents, derived from the one list that says so.
+ *
+ * The document tier has to come from a single authority, or a caller could quietly demote a
+ * judge-facing document to "evidence" by recording it from the wrong block. Nothing else in this
+ * file maintains a second list.
+ */
+const DOCUMENT_TIERS: ReadonlySet<string> = new Set(AUDITED_DOCUMENTS)
+
+/**
+ * What a file in `checked` was read for: a `document` whose own claims ran the full rule set, a
+ * `surface` that a corpus-scope claim can reach a judge on (R15, plus the whole-tree sweep), or an
+ * `evidence` artefact read as the authority a rule judges a document against and never itself
+ * audited.
+ *
+ * ## Why the tier is in the type
+ *
+ * The report used to print one flat `27 files audited` over a list in which 14 entries had received
+ * exactly one rule and seven had only been read as evidence. That is a false claim about this
+ * tool's own coverage, made by the tool whose purpose is to stop the repository overstating
+ * coverage. A caller now cannot sum the wrong thing, because the wrong thing is not representable.
+ */
+export type AuditTier = "document" | "surface" | "evidence"
+
+/** One entry in the coverage report: a file, and the strongest tier it was read at. */
+export type CheckedFile = { readonly path: string; readonly tier: AuditTier }
+
 export type DocsCheckResult = {
   readonly ok: boolean
   readonly claims: readonly DocsClaim[]
-  readonly checked: readonly string[]
+  readonly checked: readonly CheckedFile[]
   /** How many files the whole-tree R8 sweep read. Reported so the summary cannot understate it. */
   readonly swept: number
 }
+
+/** The paths in `checked`, for a caller that wants the list and not the tiers. */
+export const checkedPaths = (result: DocsCheckResult): readonly string[] => result.checked.map((entry) => entry.path)
 
 /**
  * Every file the R8 sweep reads, in a stable order.
@@ -178,11 +208,18 @@ const adrIdentifiers = (root: string): ReadonlySet<string> => {
  */
 export const runDocsClaimChecks = (root: string): DocsCheckResult => {
   const claims: DocsClaim[] = []
-  const checked: string[] = []
-  // Every input is listed once even when two rules read it, so the report cannot imply an artefact
-  // was audited twice.
-  const audited = (relative: string): void => {
-    if (!checked.includes(relative)) checked.push(relative)
+  const checked: CheckedFile[] = []
+  /**
+   * Record a file the run read, at the tier the caller observed it.
+   *
+   * First record wins, so a path read twice keeps the tier describing the *stronger* claim — and
+   * `AUDITED_DOCUMENTS` is consulted here rather than at each call site, so a caller cannot demote
+   * a document to `evidence` by recording it from the wrong block. `.env.example` is the case in
+   * point: R2 reads it, and it is also an audited document.
+   */
+  const recorded = (relative: string, tier: AuditTier): void => {
+    if (checked.some((entry) => entry.path === relative)) return
+    checked.push({ path: relative, tier: DOCUMENT_TIERS.has(relative) ? "document" : tier })
   }
 
   // A path a document names belongs to this repository if it is on disk, OR if `.gitignore`
@@ -192,15 +229,15 @@ export const runDocsClaimChecks = (root: string): DocsCheckResult => {
   // deliberately does not ship. `.gitignore` is read rather than a list in this file so there is
   // one authority for what is generated (AGENTS.md section 17); see `docs-generated.ts`.
   const gitignore = readIfPresent(root, GITIGNORE)
-  if (gitignore !== null) audited(GITIGNORE)
+  if (gitignore !== null) recorded(GITIGNORE, "evidence")
   const generated = isDeclaredGenerated(gitignore ?? "")
   const inRepository = (relative: string): boolean => existsSync(join(root, relative)) || generated(relative)
 
   const envExample = readIfPresent(root, ENV_EXAMPLE)
   const provider = readIfPresent(root, PROVIDER_SOURCE)
   if (envExample !== null && provider !== null) {
-    audited(ENV_EXAMPLE)
-    audited(PROVIDER_SOURCE)
+    recorded(ENV_EXAMPLE, "evidence")
+    recorded(PROVIDER_SOURCE, "evidence")
     claims.push(...checkEnvVars(envExample, provider))
   }
 
@@ -213,14 +250,14 @@ export const runDocsClaimChecks = (root: string): DocsCheckResult => {
     { name: "golden", path: GOLDEN_EVAL, text: readIfPresent(root, GOLDEN_EVAL) },
     { name: "redteam", path: REDTEAM_EVAL, text: readIfPresent(root, REDTEAM_EVAL) },
   ]
-  for (const set of evalSets) if (set.text !== null) audited(set.path)
+  for (const set of evalSets) if (set.text !== null) recorded(set.path, "evidence")
 
   // The benchmark artefact travels the same way: R10 judges a document's figures against the
   // committed run, so it needs the run rather than a second account of it. A repository with no
   // benchmark has no artefact to check against, and the rule reports a document that quotes one
   // anyway rather than skipping the section silently.
   const benchmark: StatedBenchmark = { path: BENCHMARK_ARTEFACT, text: readIfPresent(root, BENCHMARK_ARTEFACT) }
-  if (benchmark.text !== null) audited(BENCHMARK_ARTEFACT)
+  if (benchmark.text !== null) recorded(BENCHMARK_ARTEFACT, "evidence")
 
   const scripts = scriptsIn(root)
   const sources = productSources(root)
@@ -235,7 +272,7 @@ export const runDocsClaimChecks = (root: string): DocsCheckResult => {
       if (REQUIRED.has(document)) claims.push(claim("missing-path", document, `${document} is required by the submission and is not in this repository`))
       continue
     }
-    audited(document)
+    recorded(document, "document")
     claims.push(...checkBacktickedPaths(text, document, inRepository))
 
     if (scripts !== null) claims.push(...checkDocumentedScripts(text, document, scripts))
@@ -249,7 +286,7 @@ export const runDocsClaimChecks = (root: string): DocsCheckResult => {
   const registry = readIfPresent(root, REGISTRY)
   const disclosure = readIfPresent(root, "DISCLOSURE.md")
   if (registry !== null && disclosure !== null) {
-    audited(REGISTRY)
+    recorded(REGISTRY, "evidence")
     claims.push(...checkRegistryClaims(registry, disclosure))
   }
 
@@ -259,7 +296,7 @@ export const runDocsClaimChecks = (root: string): DocsCheckResult => {
   // against and therefore makes no claim this rule can falsify, so it is skipped rather than failed.
   const attestation = readIfPresent(root, ATTESTATION)
   if (attestation !== null) {
-    audited(ATTESTATION)
+    recorded(ATTESTATION, "evidence")
     if (disclosure !== null) claims.push(...checkSnapshotArithmetic(disclosure, attestation, "DISCLOSURE.md"))
   }
 
@@ -285,7 +322,7 @@ export const runDocsClaimChecks = (root: string): DocsCheckResult => {
   // gate ids, where a fixture is text like any other, while a corpus-scope claim is made by the
   // documents and decks a judge reads and by nothing else. See `docs-corpus.ts` for why.
   for (const surface of collectCorpusSurfaces(root, AUDITED_DOCUMENTS)) {
-    audited(surface.path)
+    recorded(surface.path, "surface")
     claims.push(...checkCorpusAbsenceUnstated(surface.text, surface.path))
   }
 

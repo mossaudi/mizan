@@ -40,6 +40,17 @@ import type { GateOutcome } from "../src/run-gates.ts"
 
 const gateStub = async (): Promise<readonly GateOutcome[]> => []
 
+/**
+ * The budget for any test that spawns the real `tsc`.
+ *
+ * One named constant rather than a literal per test, because the failure this prevents is silent:
+ * a test that inherits bun's 5000 ms default still passes on a fast machine, so the bug only
+ * surfaces on the cold clone and the loaded runner — the two environments the acceptance criterion
+ * is actually about. Every test in this file that calls `realTools()` declares it, and a future
+ * test that forgets is a flake the next reviewer inherits instead of one they can see here.
+ */
+const REAL_TOOLCHAIN_TIMEOUT_MS = 600_000
+
 /** A workspace with one healthy package and one package broken in a chosen way. */
 const makeWorkspace = async (options: { readonly broken: "types" | "tests" | "none" }): Promise<{ readonly root: string; readonly cleanup: () => Promise<void> }> => {
   const root = await mkdtemp(join(tmpdir(), "mizan-ci-"))
@@ -320,7 +331,13 @@ describe("runCi — the root entrypoints are inside the gate", () => {
     } finally {
       await cleanup()
     }
-  })
+    // 600s, not bun's 5s default. This test spawns the real `tsc --noEmit` three times against a
+    // temporary workspace, and on a cold clone or a loaded CI runner that is comfortably past five
+    // seconds. The budget matches the sibling test in "the real repository is green", which spends
+    // the same work. A test that fails on a slow machine is a flaky CI job, and AGENTS.md section 14
+    // calls a flaky job a defect rather than noise — so the timeout is a property of this file, not
+    // of the machine it happens to run on.
+  }, REAL_TOOLCHAIN_TIMEOUT_MS)
 
   test("a healthy scripts/ directory leaves the run green", async () => {
     const { root, cleanup } = await makeRootScriptWorkspace({ broken: false })
@@ -332,21 +349,22 @@ describe("runCi — the root entrypoints are inside the gate", () => {
     } finally {
       await cleanup()
     }
-  })
+  }, REAL_TOOLCHAIN_TIMEOUT_MS)
 
   test("scripts/ is typechecked but never tested, because root `bun test` is forbidden", async () => {
-    // If `test` were ever added here, this directory would be the one place in the repository
-    // where `bun test` runs from the root — the collection failure AGENTS.md section 8 rules
-    // out, and the reason it would go unnoticed is that it would still be green.
-    const { root, cleanup } = await makeRootScriptWorkspace({ broken: false })
-    try {
-      const report = await runCi(await discoverPackages(root, ["packages/*"]), ["typecheck", "test"], realTools(), gateStub, [rootScriptsPlan(root)])
-      const scriptsOutcome = report.packages.find((outcome) => outcome.package.rel === "scripts")
-      expect(scriptsOutcome?.checks.map((check) => check.check)).toEqual(["typecheck"])
-    } finally {
-      await cleanup()
-    }
-  })
+      // If `test` were ever added here, this directory would be the one place in the repository
+      // where `bun test` runs from the root — the collection failure AGENTS.md section 8 rules
+      // out, and the reason it would go unnoticed is that it would still be green.
+      const { root, cleanup } = await makeRootScriptWorkspace({ broken: false })
+      try {
+        const report = await runCi(await discoverPackages(root, ["packages/*"]), ["typecheck", "test"], realTools(), gateStub, [rootScriptsPlan(root)])
+        const scriptsOutcome = report.packages.find((outcome) => outcome.package.rel === "scripts")
+        expect(scriptsOutcome?.checks.map((check) => check.check)).toEqual(["typecheck"])
+      } finally {
+        await cleanup()
+      }
+    },
+    REAL_TOOLCHAIN_TIMEOUT_MS)
 
   test("an extra plan with no checks does not fabricate a pass", async () => {
     const { root, cleanup } = await makeRootScriptWorkspace({ broken: true })
@@ -379,7 +397,7 @@ describe("the real repository is green under the real runner", () => {
     // fed to buildReport is now (correctly) red for having checked nothing.
     const failures = outcomes.filter((outcome) => !outcome.ok).map((outcome) => summariseReport(buildReport([outcome], gates)))
     expect(failures).toEqual([])
-  }, 600_000)
+  }, REAL_TOOLCHAIN_TIMEOUT_MS)
 
   test("the gates run against the real repository", async () => {
     const root = requireRepositoryRoot(import.meta.dir)

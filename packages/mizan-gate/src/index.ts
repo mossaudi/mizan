@@ -24,7 +24,7 @@ export {
   type DocsClaim,
   type DocsRule,
 } from "./docs-claims.ts"
-export { runDocsClaimChecks, AUDITED_DOCUMENTS, BENCHMARK_ARTEFACT, DEMO_RUNBOOK, GITIGNORE, REQUIRED_DOCUMENTS, ATTESTATION, ENV_EXAMPLE, GOLDEN_EVAL, PROVIDER_SOURCE, REDTEAM_EVAL, REGISTRY, VALUE_PROOF, type DocsCheckResult } from "./docs-check.ts"
+export { checkedPaths, runDocsClaimChecks, AUDITED_DOCUMENTS, BENCHMARK_ARTEFACT, DEMO_RUNBOOK, GITIGNORE, REQUIRED_DOCUMENTS, ATTESTATION, ENV_EXAMPLE, GOLDEN_EVAL, PROVIDER_SOURCE, REDTEAM_EVAL, REGISTRY, VALUE_PROOF, type AuditTier, type CheckedFile, type DocsCheckResult } from "./docs-check.ts"
 export { checkAnswerQualityClaim, checkBenchmarkClaimUnbacked, ANSWER_QUALITY_PHRASES, groupFigure, type StatedBenchmark } from "./docs-value.ts"
 export { ADR_DIRECTORY, ADR_PATTERN, checkAdrCitationUnresolved, checkAdrDocument } from "./docs-adr.ts"
 export { ABSENT_COLLECTION, CORPUS_SURFACE_EXTENSIONS, CORPUS_SURFACE_ROOTS, RENOUNCED, checkCorpusAbsenceUnstated } from "./docs-corpus.ts"

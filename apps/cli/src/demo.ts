@@ -2,7 +2,7 @@
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { err, isOk, ok, type DemoQuestion, type Result, type VerdictReport } from "@mizan/core"
+import { err, isOk, ok, transcriptLabel, type DemoQuestion, type Result, type VerdictReport } from "@mizan/core"
 import { resolveCitations } from "@mizan/corpus"
 import { verifyAnswer } from "@mizan/verify"
 import { runSpine, transcriptProvider, type Provider, type RetrievedContext, type TranscriptFile } from "@mizan/agent"
@@ -103,7 +103,18 @@ const renderDemoHeader = (corpus: DemoCorpus): string => {
     "  mizan — offline demo",
     "  no API key · no network · no data/corpus.db",
     "  key         this command reads no environment variable; a key in your shell is ignored",
-    "  transcript  PRECOMPUTED (committed answers replayed; verdicts computed live)",
+    // The mode word comes from `TRANSCRIPT_LABEL` in `@mizan/core`, which is also what the CLI
+    // header and the static page read. It used to be a literal here, and the two strings on one
+    // screen had already drifted — the header said "deterministic replay" and this line said
+    // "committed answers replayed". A judge reading both would have been shown two answers to
+    // "which mode is this?", which is the opposite of what Story 4 asks this line to do
+    // (AGENTS.md section 17: one source of truth per fact).
+    //
+    // The trailing clause is the half that is NOT in the shared label, and it is the half that
+    // matters: a label with no scope reads as a disclaimer covering the whole report, badges
+    // included, which would be a false retraction of the one claim this demo makes. The answers
+    // are replayed; every badge below them was computed by the verifier on this run.
+    `  transcript  ${transcriptLabel("precomputed")} — verdicts computed live`,
     `  corpus      ${corpus.snapshotHash}`,
     `  records     ${corpus.recordCount} (${collections}), rebuilt from ${DEMO_ANCHORS_RELATIVE}`,
     "  attested    every row's textHash re-checked against its stored text before any verdict",

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { checkBacktickedPaths, type DocsClaim } from "../src/docs-claims.ts"
-import { GITIGNORE, runDocsClaimChecks } from "../src/docs-check.ts"
+import { checkedPaths, GITIGNORE, runDocsClaimChecks } from "../src/docs-check.ts"
 import { isDeclaredGenerated } from "../src/docs-generated.ts"
 
 /**
@@ -120,7 +120,7 @@ describe("R1 reads a documented path through the declaration", () => {
 
 describe("the repository's own .gitignore is the authority, and it is read", () => {
   test("the runner reports that it read the .gitignore it consulted", () => {
-    expect(runDocsClaimChecks(ROOT).checked).toContain(GITIGNORE)
+    expect(checkedPaths(runDocsClaimChecks(ROOT))).toContain(GITIGNORE)
   })
 
   test("the real corpus paths are declared generated, so a clone is not a false claim", () => {

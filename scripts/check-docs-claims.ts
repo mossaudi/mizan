@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { isErr } from "@mizan/core"
-import { requireRepositoryRoot, runDocsClaimChecks } from "@mizan/gate"
+import { requireRepositoryRoot, runDocsClaimChecks, type AuditTier, type DocsCheckResult } from "@mizan/gate"
 
 /**
  * `bun run check:docs` — the command that keeps the disclosure honest (D-1).
@@ -16,6 +16,16 @@ import { requireRepositoryRoot, runDocsClaimChecks } from "@mizan/gate"
  * Drift recurs, so this is a check rather than a review note. It catches four mechanical classes
  * of disagreement — file paths, environment variables, registry claims, and documented commands —
  * and it cannot catch a wrong prose sentence, which is a human's judgement and stays one.
+ *
+ * ## The report is a claim too, and it is checked like one
+ *
+ * This script used to print one flat "27 files audited" over a list whose entries had received
+ * very different treatment: five judge-facing documents ran the full rule set, fourteen corpus
+ * surfaces received exactly one rule, and six artefacts were read only as the authority a rule
+ * judges a document against. A tool whose whole purpose is to stop the repository overstating
+ * coverage was overstating its own, and a judge skimming the output would have taken that at face
+ * value. So the counts are reported per tier and every listed file carries the tier it was read at
+ * — a list that a reader can audit against what the rules actually do.
  *
  * ## Why the decisions live in the gate package
  *
@@ -37,6 +47,19 @@ import { requireRepositoryRoot, runDocsClaimChecks } from "@mizan/gate"
  * `GATE_IDS` rather than leaving it to review. This runs as its own named step in the same CI job.
  */
 
+/** How a tier is described in the printed report, in the order a reader should see them. */
+const TIER_CAPTION: Readonly<Record<AuditTier, string>> = {
+  document: "audited document — the full claim-rule set",
+  surface: "corpus surface — R15, plus the gate-count and ADR sweep",
+  evidence: "evidence — read as the authority a rule judges a document against, not audited",
+}
+
+/** `documents` and `surfaces` counted; `evidence` counted separately because it is a different claim. */
+const summariseTiers = (result: DocsCheckResult): string => {
+  const at = (tier: AuditTier): number => result.checked.filter((entry) => entry.tier === tier).length
+  return `${at("document")} audited documents, ${at("surface")} corpus surfaces, ${at("evidence")} evidence artefacts read`
+}
+
 const main = async (): Promise<number> => {
   const found = requireRepositoryRoot(import.meta.dir)
   if (isErr(found)) {
@@ -47,14 +70,17 @@ const main = async (): Promise<number> => {
 
   const result = runDocsClaimChecks(found.value)
   if (result.ok) {
-    // The two counts are separate because they are different scopes. `checked` is the named
-    // artefacts with a dedicated rule; `swept` is the whole tree R8 read for gate-count claims.
-    // Printing only the first would understate the check, which is the exact sin this tool exists
-    // to catch in documents.
-    console.log(
-      `check:docs OK — ${result.checked.length} files audited, ${result.swept} swept for gate-count claims, no claim disagrees with the repository.`,
-    )
-    for (const file of result.checked) console.log(`  ${file}`)
+    // The three counts are separate because they are different claims, and `swept` is separate
+    // again because it is a different scope. Printing a single total would understate the sweep
+    // and overstate the audit — the two failures this tool exists to catch in documents, committed
+    // here against the report itself.
+    console.log(`check:docs OK — ${summariseTiers(result)}; ${result.swept} files swept for gate-count and ADR citations.`)
+    console.log("  no claim disagrees with the repository.")
+    for (const tier of ["document", "surface", "evidence"] as const) {
+      const paths = result.checked.filter((entry) => entry.tier === tier).map((entry) => entry.path)
+      if (paths.length === 0) continue
+      console.log(`  ${TIER_CAPTION[tier]}: ${paths.join(", ")}`)
+    }
     return 0
   }
 

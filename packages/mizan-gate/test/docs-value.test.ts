@@ -6,6 +6,7 @@ import {
   ANSWER_QUALITY_PHRASES,
   checkAnswerQualityClaim,
   checkBenchmarkClaimUnbacked,
+  checkedPaths,
   runDocsClaimChecks,
   type DocsClaim,
   type StatedBenchmark,
@@ -200,8 +201,8 @@ describe("the runner actually applies rules ten and fourteen", () => {
     })
     const result = runDocsClaimChecks(root)
     expect(rules(result.claims)).toContain("benchmark-claim-unbacked")
-    expect(result.checked).toContain("docs/value-proof.md")
-    expect(result.checked).toContain("data/benchmark/vs-search.json")
+    expect(checkedPaths(result)).toContain("docs/value-proof.md")
+    expect(checkedPaths(result)).toContain("data/benchmark/vs-search.json")
   })
 
   test("audits the pack for answer-quality claims too", () => {
@@ -215,6 +216,6 @@ describe("the runner actually applies rules ten and fourteen", () => {
   test("an absent pack is not a failure, because audited is not the same as required", () => {
     const result = runDocsClaimChecks(tree({ "data/benchmark/vs-search.json": ARTEFACT }))
     expect(rules(result.claims)).not.toContain("benchmark-claim-unbacked")
-    expect(result.checked).not.toContain("docs/value-proof.md")
+    expect(checkedPaths(result)).not.toContain("docs/value-proof.md")
   })
 })

@@ -10,7 +10,9 @@ import {
   checkLiveProviderClaim,
   checkRegistryClaims,
   checkSnapshotArithmetic,
+  checkedPaths,
   runDocsClaimChecks,
+  type DocsCheckResult,
   type DocsClaim,
   type SourceFile,
 } from "../src/index.ts"
@@ -747,8 +749,58 @@ describe("runDocsClaimChecks — the runner, end to end", () => {
     const result = runDocsClaimChecks(tree(clean))
     expect(details(result.claims)).toBe("")
     expect(result.ok).toBe(true)
-    expect(result.checked).toContain("DISCLOSURE.md")
-    expect(result.checked).toContain("data/registry/sources.json")
+    expect(checkedPaths(result)).toContain("DISCLOSURE.md")
+    expect(checkedPaths(result)).toContain("data/registry/sources.json")
+  })
+
+  /**
+   * The report must not be able to say it audited something it only read.
+   *
+   * `check:docs` used to print one flat count over documents, corpus surfaces and read-only
+   * artefacts together, so its own output overstated its coverage — the one thing a judge would
+   * have taken at face value, made by the tool that exists to catch exactly that. The tier is now
+   * part of the type, and these four assertions are the pair that proves the distinction is real in
+   * both directions: a document is not filed as evidence, and an artefact is not filed as a
+   * document.
+   */
+  describe("the coverage report is tiered, so it cannot overstate what it audited", () => {
+    const tierOf = (result: DocsCheckResult, path: string): string | undefined => result.checked.find((entry) => entry.path === path)?.tier
+
+    test("a judge-facing document is filed as a document, not as evidence", () => {
+      const result = runDocsClaimChecks(tree(clean))
+      expect(tierOf(result, "DISCLOSURE.md")).toBe("document")
+      expect(tierOf(result, "README.md")).toBe("document")
+      expect(tierOf(result, "INTEGRITY.md")).toBe("document")
+    })
+
+    test("an artefact read to judge a document is filed as evidence and never as a document", () => {
+      const result = runDocsClaimChecks(tree(clean))
+      expect(tierOf(result, "data/registry/sources.json")).toBe("evidence")
+      expect(tierOf(result, "apps/cli/src/provider-config.ts")).toBe("evidence")
+    })
+
+    test("a file that is both read as evidence and audited is reported at the stronger tier", () => {
+      // `.env.example` is in `AUDITED_DOCUMENTS` and is also the input to the env-var rule. It
+      // appears once, at `document`, because first-record-wins would demote it to `evidence` if the
+      // evidence block happened to read it first — and a runbook a judge is told to copy audited
+      // only as an input is precisely the false-egress disclosure R2 alone cannot see.
+      const result = runDocsClaimChecks(tree(clean))
+      expect(tierOf(result, ".env.example")).toBe("document")
+      expect(checkedPaths(result).filter((path) => path === ".env.example")).toHaveLength(1)
+    })
+
+    test("every entry carries one of exactly the three tiers, so no caller can invent a fourth", () => {
+      const result = runDocsClaimChecks(tree(clean))
+      for (const entry of result.checked) {
+        expect(["document", "surface", "evidence"]).toContain(entry.tier)
+      }
+      // And the tiers partition the list: summing them reproduces the total, which is what makes
+      // the printed per-tier counts add up instead of quietly dropping or double-counting a file.
+      const total = result.checked.filter((e) => e.tier === "document").length
+        + result.checked.filter((e) => e.tier === "surface").length
+        + result.checked.filter((e) => e.tier === "evidence").length
+      expect(total).toBe(result.checked.length)
+    })
   })
 
   test("fails a tree whose disclosure names a file that is absent", () => {
@@ -823,8 +875,8 @@ describe("runDocsClaimChecks — the runner, end to end", () => {
 
     const consistent = runDocsClaimChecks(tree(honest))
     expect(details(consistent.claims)).toBe("")
-    expect(consistent.checked).toContain("data/eval/golden-normalization.json")
-    expect(consistent.checked).toContain("data/eval/redteam-fabricated.json")
+    expect(checkedPaths(consistent)).toContain("data/eval/golden-normalization.json")
+    expect(checkedPaths(consistent)).toContain("data/eval/redteam-fabricated.json")
 
     const drifted = runDocsClaimChecks(
       tree({ ...honest, "README.md": "Two cases never share a span. The 2 golden cases draw on 200 records.\nThere is no live model provider.\n" }),
@@ -837,8 +889,8 @@ describe("runDocsClaimChecks — the runner, end to end", () => {
     // document making claims about the repository — so it has to appear in the report exactly once
     // and be checked by both.
     const result = runDocsClaimChecks(tree(clean))
-    expect(result.checked.filter((entry) => entry === ".env.example")).toHaveLength(1)
-    expect(result.checked).toContain(".env.example")
+    expect(checkedPaths(result).filter((entry) => entry === ".env.example")).toHaveLength(1)
+    expect(checkedPaths(result)).toContain(".env.example")
   })
 
   test("a false egress claim in .env.example fails the build, which is what the file is for", () => {
@@ -865,7 +917,7 @@ describe("runDocsClaimChecks — the runner, end to end", () => {
     expect(details(result.claims)).toBe("")
     expect(result.ok).toBe(true)
     // And it is not in the report, because it was not read.
-    expect(result.checked).not.toContain(".env.example")
+    expect(checkedPaths(result)).not.toContain(".env.example")
   })
 
   test("a missing judge-facing deliverable is still a failure", () => {
@@ -896,6 +948,6 @@ describe("runDocsClaimChecks — the runner, end to end", () => {
     expect(details(result.claims)).toBe("")
     expect(result.ok).toBe(true)
     // And the snapshot arithmetic was among the things audited, not skipped for want of a fixture.
-    expect(result.checked).toContain("attestation.json")
+    expect(checkedPaths(result)).toContain("attestation.json")
   })
 })
