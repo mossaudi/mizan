@@ -30,7 +30,7 @@ export { ADR_DIRECTORY, ADR_PATTERN, checkAdrCitationUnresolved, checkAdrDocumen
 export { ABSENT_COLLECTION, CORPUS_SURFACE_EXTENSIONS, CORPUS_SURFACE_ROOTS, RENOUNCED, checkCorpusAbsenceUnstated } from "./docs-corpus.ts"
 export { isDeclaredGenerated } from "./docs-generated.ts"
 export { checkRunbookOrder, KEYED_LIVE_PATH, REPLAY_PATH } from "./docs-runbook.ts"
-export { checkGateCountClaim, extractGateCountClaims, GATE_CLAIM_EXCLUDES, GATE_CLAIM_EXTENSIONS, type GateCountClaim } from "./docs-gates.ts"
+export { checkGateCountClaim, extractGateCountClaims, tokenToNumber, GATE_CLAIM_EXCLUDES, GATE_CLAIM_EXTENSIONS, type GateCountClaim } from "./docs-gates.ts"
 export { checkSnapshotArithmetic } from "./docs-snapshot.ts"
 export { checkEvalBreadth, type StatedSet } from "./docs-artifacts.ts"
 export { checkLiveProviderClaim } from "./docs-egress.ts"

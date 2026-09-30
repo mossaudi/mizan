@@ -114,8 +114,16 @@ export type BenchmarkOutcome = Schema.Schema.Type<typeof BenchmarkOutcome>
  * artefact record that the system arm never ran the verifier and still satisfy the schema — which is
  * precisely the defect this replaced, where a detection rate of 1.0 was a restatement of the fixture.
  * There is no spelling of "the system arm did not execute the verifier", so an artefact claiming
- * otherwise cannot be written. Gate B-1 enforces the other half: that the executor cannot read the
- * labels it would otherwise be restating.
+ * otherwise cannot be written.
+ *
+ * ## What this schema does not do
+ *
+ * It pins the ARTEFACT's claim, which is the claim a reader checks. It cannot pin the other half —
+ * that the executor cannot read the labels it would otherwise be restating — and no gate pins it
+ * either: there is no `B-1` in `GATE_IDS` and no `packages/mizan-gate/src/benchmark-provenance.ts`,
+ * because that scan is specified and unshipped. `scripts/benchmark/system-arm.ts` holds it by type
+ * and by review. Read the single literal as "this file cannot lie about how it ran", which is
+ * strictly narrower than "this benchmark cannot be a tautology".
  */
 export const SystemArmSource = Schema.Literal("executed-verifier")
 export type SystemArmSource = Schema.Schema.Type<typeof SystemArmSource>

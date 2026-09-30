@@ -18,8 +18,18 @@ import { verifyAnswer } from "@mizan/verify"
  * So the executor here is structurally unable to see the expectations. It receives a quote, a
  * citation and a snapshot hash, and returns the verdict `verifyAnswer` computed. Nothing in this
  * file mentions what the set says should happen; a module that cannot read the label cannot report
- * it. Gate B-1 enforces the ban mechanically by rejecting the token that would name it, and its
- * self-test plants a violation to prove the gate can fail.
+ * it.
+ *
+ * ## What holds that, and what does not
+ *
+ * The ban rests on the `SystemCase` type below, which has no field a label could arrive in, plus
+ * review of this file. It is NOT held by a gate. There is no `B-1` in `GATE_IDS` and no
+ * `packages/mizan-gate/src/benchmark-provenance.ts`; a structural scan that would reject the token
+ * naming a verdict expectation is specified and unshipped, and that token is live in the eval
+ * generator which publishes the sets. So this is a *reviewed* invariant, not a checked one, and
+ * `docs/value-proof.md` states the same limit in the words a judge reads. It is written here
+ * because the headline number of this project is the one place where an unshipped check named in
+ * prose is least defensible.
  *
  * ## The arms stay independent
  *

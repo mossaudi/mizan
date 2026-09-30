@@ -141,8 +141,9 @@ const NUMBER_WORDS = [
  * for the count a document writes in figures. The run is what keeps a two-digit count readable
  * without a table entry per value, and it is the branch that was missing when this rule was words
  * only. The single capturing group is the matched count, which `extractGateCountClaims` reads back
- * through `tokenToNumber`; nothing outside the two shapes reaches that lookup, which is what lets it
- * be a single `Number` call.
+ * through `tokenToNumber`; the two shapes the pattern admits are exactly the two that function
+ * resolves, so a third spelling added here without a branch beside it would be dropped as unread
+ * rather than graded as some number nobody wrote.
  */
 const CARDINAL_PATTERN = new RegExp(`\\b(${NUMBER_WORDS.join("|")}|\\d+)\\s+structural\\s+gates\\b`, "gi")
 
@@ -157,16 +158,31 @@ export type GateCountClaim = {
 }
 
 /**
- * The number a cardinal claim asserts, or null when the token is outside the table.
+ * A run of one or more digits and nothing else.
  *
- * A token is either a digit run or one of the words in the table, and the match admits nothing
- * else — so `Number` discriminates the two shapes by asking whether it is a count at all, and a
- * single-digit and a two-digit token resolve through the same line. `Number` is total over the
- * strings that reach it; the guard only keeps that total from being assumed rather than stated.
+ * The pattern admits `\d+`, so this rejects nothing it matched — and "rejects nothing" is the
+ * defect. The previous version asked `Number` the same question, and `Number` is total: it answers
+ * `0` for the empty string and `NaN` for a word. So a caller reaching this function with a token the
+ * shape check did not recognise was handed either a fabricated zero or a lookup miss, and the type
+ * could not tell the caller which. Asking the shape question directly makes both failures the same
+ * failure — a null the caller can refuse — and stops an empty capture group from reading as a claim
+ * that there are none of something.
  */
-const tokenToNumber = (token: string): number | null => {
-  const digits = Number(token)
-  if (Number.isFinite(digits)) return digits
+const DIGIT_RUN = /^\d+$/
+
+/**
+ * The number a cardinal claim asserts, or null when the token is a shape this function does not know.
+ *
+ * Both arms are reachable and both are planted in the self-test, which is the point of exporting it:
+ * a guard nothing can reach is a guard nothing proves. The digits arm used to be unreachable in the
+ * other direction, because `Number` answered on its behalf and never returned null — so widening
+ * `CARDINAL_PATTERN` would have produced a claim nobody made instead of an admission the rule could
+ * not read. Null is the honest answer for an unresolvable shape: the caller drops the claim and the
+ * residual documented in this file's header covers it, rather than inventing a count and grading
+ * typography.
+ */
+export const tokenToNumber = (token: string): number | null => {
+  if (DIGIT_RUN.test(token)) return Number(token)
   const index = NUMBER_WORDS.indexOf(token.toLowerCase() as (typeof NUMBER_WORDS)[number])
   return index === -1 ? null : index
 }
@@ -196,6 +212,11 @@ export const extractGateCountClaims = (text: string): readonly GateCountClaim[] 
     claims.push({ kind: "range", value: to, text: match[0] })
   }
   for (const match of text.matchAll(CARDINAL_PATTERN)) {
+    // The pattern and `tokenToNumber` admit the same two shapes, so this arm does not fire on
+    // anything a document can write today. It is kept because it is the only thing standing between
+    // a widened pattern and a fabricated count, and because it is no longer a claim about that —
+    // `tokenToNumber` is exported and both of its arms are planted, so a reader can check that
+    // rather than take it on trust.
     const value = tokenToNumber(match[1] ?? "")
     if (value === null) continue
     claims.push({ kind: "cardinal", value, text: match[0] })

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { checkGateCountClaim, extractGateCountClaims } from "../src/docs-gates.ts"
+import { checkGateCountClaim, extractGateCountClaims, tokenToNumber } from "../src/docs-gates.ts"
 import { GATE_IDS, HIGHEST_GATE_ID, runGates } from "../src/run-gates.ts"
 import { findRepositoryRoot } from "../src/repo-root.ts"
 import type { GateId } from "../src/scan.ts"
@@ -144,6 +144,43 @@ describe("extractGateCountClaims", () => {
   test("is case-insensitive on the cardinal word", () => {
     const shouted = ["Six", "Structural", "Gates"].join(" ")
     expect(extractGateCountClaims(shouted)).toEqual([{ kind: "cardinal", value: 6, text: shouted }])
+  })
+})
+
+/**
+ * The count reader, on its own, because that is where the claim is actually made.
+ *
+ * `extractGateCountClaims` is the rule a document meets; `tokenToNumber` is the two-line lookup under
+ * it, and the previous version of that lookup had a failure nobody could reach and a shape it could
+ * not recognise. It is exported so this suite can plant both, which is what turns the guard in
+ * `extractGateCountClaims` from a comment into something a reader can check.
+ */
+describe("tokenToNumber", () => {
+  test("resolves both admitted shapes, in either case", () => {
+    expect(tokenToNumber("4")).toBe(4)
+    expect(tokenToNumber("12")).toBe(12)
+    expect(tokenToNumber("four")).toBe(4)
+    expect(tokenToNumber("Four")).toBe(4)
+  })
+
+  test("refuses a shape it does not know instead of inventing a count", () => {
+    // Both plants fail on the version this replaced, for two different reasons. `Number` was asked
+    // whether the token was a count at all, and it is total: the empty string came back `0`, which
+    // is a claim about how many of something there are, manufactured out of a token that named
+    // none. A word the table does not list came back `NaN`, was not finite, and fell into the same
+    // `Number.isFinite` arm the digits needed. So the old function could not answer `null` for the
+    // one input a caller most needs it for — and `expect(0).toBeNull()` is a failing test, not a
+    // stylistic disagreement.
+    expect(tokenToNumber("")).toBeNull()
+    expect(tokenToNumber("a dozen")).toBeNull()
+  })
+
+  test("a leading or trailing space is not a digit run", () => {
+    // `\b` in the pattern means the pattern never hands one over, so these are also plants for the
+    // anchoring rather than the branch: an unanchored test would read `" 4 "` as four and the
+    // caller would silently repair a token nobody wrote.
+    expect(tokenToNumber(" 4")).toBeNull()
+    expect(tokenToNumber("4 ")).toBeNull()
   })
 })
 

@@ -29,6 +29,16 @@ Rerun that arm with `bun run benchmark:vs-search`. Its own `systemArmSource` fie
 fixture's expectations, which is the defect that used to make the detection rate a restatement of the
 input instead of a measurement.
 
+**What is checked here, and what is only reviewed.** The anti-tautology property has two halves and
+they are not equally enforced, so the headline number is stated at the width the code supports. The
+`SystemArmSource` literal makes an artefact claiming `declared-expectations` unwritable, and that half
+is a compile error. The other half — that the executor cannot read the labels it would be restating —
+is **not** held by a gate: no structural scan rejects the token that would name them, and none is
+built for this cycle. It holds because `scripts/benchmark/system-arm.ts` receives a case whose type
+has no field a label could arrive in, and because that file is read. So the honest description is *an
+executed arm whose label-blindness is reviewed rather than checked* — narrower than "cannot be a
+tautology by construction", and the only claim the code makes.
+
 | Artefact field | Figure |
 | --- | --- |
 | `systemDetectionRate` | **100.0%** |
