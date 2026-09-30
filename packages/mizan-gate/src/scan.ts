@@ -41,13 +41,17 @@ export type Finding = {
 /**
  * The extensions the structural gates read.
  *
- * `.html` is in this list because `apps/web/index.html` is a shipped product surface and a gate
- * that skips it is a gate that protects the source and not the bytes a judge actually opens. A
- * hand edit that adds a `<script>` to the committed page is exactly the failure the page's
- * tests catch, and those tests run only when someone runs them — this makes the same edit a red
- * build. It is safe to scan markup with token rules because every gate here matches *sink*
- * tokens (`innerHTML`, `document.write`, `eval(`) rather than markup itself; a tag named
- * `<script>` in a document is a tag, and the rules that forbid it live in the page's tests.
+ * `.html` is in this list because `apps/web/index.html` is a shipped product surface, and a
+ * tree-wide gate that skips it is a gate that protects the source and not the bytes a judge
+ * actually opens. Being READ is not the same as being CHECKED, and this list must not be read as
+ * a claim that a sink rule can see markup: every rule here matches *sink tokens* (`innerHTML`,
+ * `document.write`, `eval(`), and a document contains tags rather than sink calls. G-2 does catch
+ * a sink API written inside a `<script>` body, because that body is code — but it cannot catch an
+ * injected `<script>`, an inline `on*=` handler, a `javascript:` URL or an `<iframe>`, and its
+ * `"code"` scan mode blanks string bodies, which is exactly where a handler attribute's payload
+ * lives. `packages/mizan-gate/test/gates.test.ts` pins that boundary so it cannot be rediscovered
+ * as a false property. The check that actually covers the committed page's bytes lives in
+ * `apps/web/test/page.test.ts`; the gate-claim sweep is the reason `.html` is here at all.
  */
 export const CODE_EXTENSIONS = [".ts", ".tsx", ".html"] as const
 

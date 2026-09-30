@@ -46,8 +46,14 @@ const gateStub = async (): Promise<readonly GateOutcome[]> => []
  * One named constant rather than a literal per test, because the failure this prevents is silent:
  * a test that inherits bun's 5000 ms default still passes on a fast machine, so the bug only
  * surfaces on the cold clone and the loaded runner — the two environments the acceptance criterion
- * is actually about. Every test in this file that calls `realTools()` declares it, and a future
- * test that forgets is a flake the next reviewer inherits instead of one they can see here.
+ * is actually about. Every test in this file that calls `realTools()` declares it, and the claim is
+ * checkable by eye rather than by trust: `grep -n "realTools()" test/ci.test.ts` shows a
+ * `REAL_TOOLCHAIN_TIMEOUT_MS` on every one, so a future test that forgets is a reviewer-visible
+ * omission instead of a flake the next person inherits.
+ *
+ * Declared on the two tests that pass no `tsc` at all, on purpose. The invariant above is then
+ * literally true rather than true-with-an-exception, which is the only kind of invariant a future
+ * edit can quietly break.
  */
 const REAL_TOOLCHAIN_TIMEOUT_MS = 600_000
 
@@ -193,7 +199,7 @@ describe("runPackageChecks — a planted type error must fail and must be attrib
     } finally {
       await cleanup()
     }
-  })
+  }, REAL_TOOLCHAIN_TIMEOUT_MS)
 
   test("the report names the failing package", async () => {
     const { root, cleanup } = await makeWorkspace({ broken: "types" })
@@ -213,7 +219,7 @@ describe("runPackageChecks — a planted type error must fail and must be attrib
     } finally {
       await cleanup()
     }
-  })
+  }, REAL_TOOLCHAIN_TIMEOUT_MS)
 
   test("the compiler's own message survives, so the error is diagnosable", async () => {
     const { root, cleanup } = await makeWorkspace({ broken: "types" })
@@ -227,7 +233,7 @@ describe("runPackageChecks — a planted type error must fail and must be attrib
     } finally {
       await cleanup()
     }
-  })
+  }, REAL_TOOLCHAIN_TIMEOUT_MS)
 
   test("a healthy package passes", async () => {
     const { root, cleanup } = await makeWorkspace({ broken: "none" })
@@ -239,7 +245,7 @@ describe("runPackageChecks — a planted type error must fail and must be attrib
     } finally {
       await cleanup()
     }
-  })
+  }, REAL_TOOLCHAIN_TIMEOUT_MS)
 })
 
 describe("runPackageChecks — a planted failing test must fail", () => {
@@ -255,7 +261,7 @@ describe("runPackageChecks — a planted failing test must fail", () => {
     } finally {
       await cleanup()
     }
-  })
+  }, REAL_TOOLCHAIN_TIMEOUT_MS)
 
   test("a type error short-circuits the test run", async () => {
     const { root, cleanup } = await makeWorkspace({ broken: "types" })
@@ -267,7 +273,7 @@ describe("runPackageChecks — a planted failing test must fail", () => {
     } finally {
       await cleanup()
     }
-  })
+  }, REAL_TOOLCHAIN_TIMEOUT_MS)
 })
 
 describe("buildReport", () => {
@@ -378,7 +384,7 @@ describe("runCi — the root entrypoints are inside the gate", () => {
     } finally {
       await cleanup()
     }
-  })
+  }, REAL_TOOLCHAIN_TIMEOUT_MS)
 })
 
 describe("the real repository is green under the real runner", () => {

@@ -35,6 +35,36 @@ const pageFixtureLabelOf = (page: string): string | null => page.match(/class="m
 /** The mode line's own sentence, for the assertion that covers both halves of what the label means. */
 const modeNoteOf = (page: string): string => page.match(/class="mode-note">([^<]+)</)?.[1] ?? ""
 
+/**
+ * The tags an attacker reaches for and the page never legitimately emits.
+ *
+ * `style` and `div` are absent on purpose: the page ships its own stylesheet, so asserting they
+ * are absent would either fail on correct output or force a narrowing that hides a real tag.
+ *
+ * Module scope because the same list is asserted against two different things: a fresh render
+ * with a payload planted in it, and the committed `index.html` a judge opens. The second is the
+ * one that ships.
+ */
+const INJECTABLE_TAGS = ["<script", "<img", "<svg", "<iframe", "<object", "<embed", "<b>", "<a ", "<a>"] as const
+
+/**
+ * The two injection shapes a tag list cannot express.
+ *
+ * An event handler and a `javascript:` URL are attributes, not elements, so `<script` and friends
+ * never see them — and both are what a hand edit or a compromised build step would reach for in a
+ * page that has no script element to hide in. `on` plus a word boundary is the whole of the HTML
+ * handler set, so the pattern is exact rather than a list that grows with every new attribute.
+ */
+const INLINE_HANDLER = /<[a-z][^>]*\son[a-z]+\s*=/i
+const JAVASCRIPT_URL = /javascript:/i
+
+/** Every injection shape above, applied to one document. */
+const assertNoInjection = (page: string): void => {
+  for (const tag of INJECTABLE_TAGS) expect(page).not.toContain(tag)
+  expect(page).not.toMatch(INLINE_HANDLER)
+  expect(page).not.toMatch(JAVASCRIPT_URL)
+}
+
 /* ------------------------------------------------------------------ AC1 — the badge comes from the map */
 
 describe("the three badge lines come from the shared verdict map", () => {
@@ -88,14 +118,6 @@ describe("corpus and model text cannot inject markup", () => {
     "recordText",
   ]
 
-  /**
-   * The tags an attacker reaches for and the page never legitimately emits.
-   *
-   * `style` and `div` are absent on purpose: the page ships its own stylesheet, so asserting they
-   * are absent would either fail on correct output or force a narrowing that hides a real tag.
-   */
-  const INJECTABLE_TAGS = ["<script", "<img", "<svg", "<iframe", "<object", "<embed", "<b>", "<a ", "<a>"] as const
-
   test("the fixture's every untrusted field reaches the document, and no field is left unplanted", () => {
     // Completeness, from the schema rather than from a hand-typed list: a new `PageExample` field
     // appears here as an unplanted field and fails, so it cannot reach the document untested. The
@@ -119,14 +141,14 @@ describe("corpus and model text cannot inject markup", () => {
     expect(page).toContain("&quot;quoted&quot; &amp; &lt;b&gt;bold&lt;/b&gt;")
     // The whole-document check, because "the payload is encoded" and "the payload did not become
     // markup somewhere else" are different claims and only the second is the security property.
-    for (const tag of INJECTABLE_TAGS) expect(page).not.toContain(tag)
+    assertNoInjection(page)
   })
 
   test("a payload in every field at once still yields no injectable tag anywhere in the document", () => {
     const base = loadFixture()
     const poisoned = Object.fromEntries(UNTRUSTED_FIELDS.map((field) => [field, PAYLOAD]))
     const page = renderPage({ ...base, examples: [{ ...base.examples[0]!, ...poisoned }] })
-    for (const tag of INJECTABLE_TAGS) expect(page).not.toContain(tag)
+    assertNoInjection(page)
     // The page's own markup is still there, so the loop above is not passing because the document
     // is empty or because the example was dropped.
     expect(page).toContain("<h1>mizan</h1>")
@@ -137,10 +159,6 @@ describe("corpus and model text cannot inject markup", () => {
   test("the encoder is total over the five characters that matter", () => {
     expect(encodeText("&< >\"'")).toBe("&amp;&lt; &gt;&quot;&#39;")
     expect(encodeText("قُلْ هُوَ ٱللَّهُ أَحَدٌ")).toBe("قُلْ هُوَ ٱللَّهُ أَحَدٌ")
-  })
-
-  test("the committed page contains no script element at all", () => {
-    expect(committedPage()).not.toMatch(/<script/i)
   })
 
   test("a very long quotation is emitted whole — wrapped by CSS, never truncated", () => {
@@ -192,9 +210,36 @@ describe("an unknown verdict fails the build rather than rendering", () => {
 
 /* ------------------------------------------------------------------ offline + byte-identical committed page */
 
+/**
+ * The committed `index.html` is the artefact a judge opens, and it is the ONLY control over its own
+ * markup — see the boundary block in `packages/mizan-gate/test/gates.test.ts`, which measures that
+ * G-2's sink-token rules cannot see an injected element, a handler attribute or a `javascript:`
+ * URL, and `docs/specs/adr/ADR-C3.md`, which states the same split. So every claim in this block is
+ * asserted against the committed BYTES, not against a fresh render of the fixture: byte-identity
+ * proves nobody hand-edited the file, and the element-level assertions prove that what a hand edit
+ * would put there is the shape the file does not have.
+ */
 describe("the committed page", () => {
   test("is byte-identical to a fresh render of the fixture", () => {
     expect(committedPage()).toBe(renderPage(loadFixture()))
+  })
+
+  test("carries no injected element, event handler or javascript: URL", () => {
+    assertNoInjection(committedPage())
+  })
+
+  test("the injection guard is armed: it rejects every shape it claims to catch", () => {
+    // A list of patterns that match nothing is a list that has stopped checking anything, and the
+    // only way to know is to feed it what it forbids. Each entry below is planted, so a tag added
+    // to `INJECTABLE_TAGS` and an expression narrowed into uselessness both fail here rather than
+    // passing silently for the life of the file.
+    for (const tag of INJECTABLE_TAGS) expect(() => assertNoInjection(`<div>${tag}</div>`)).toThrow()
+    expect(() => assertNoInjection('<div onclick="x()">y</div>')).toThrow()
+    expect(() => assertNoInjection('<div ONERROR="x()">y</div>')).toThrow()
+    expect(() => assertNoInjection('<a href="javascript:x()">y</a>')).toThrow()
+    // And the committed bytes are not rejected, so the guard is a check rather than a refusal
+    // that would fail for reasons unrelated to injection.
+    expect(() => assertNoInjection(committedPage())).not.toThrow()
   })
 
   test("requires no network: no http URL, no fetch, no external resource", () => {

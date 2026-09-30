@@ -85,6 +85,28 @@ const TRANSCRIPT_PATH = join(ROOT, "data", "transcript.json")
 const REDTEAM_PATH = join(ROOT, "data", "eval", "redteam-fabricated.json")
 const CORPUS = join(ROOT, "data", "corpus.db")
 
+/**
+ * The gitignored snapshot decides two blocks below: the transcript-vs-snapshot drift alarm, and the
+ * last-mile block that spawns the real CLI against the real database. Both SKIP when it is absent,
+ * which is every clean clone and both CI matrix legs.
+ *
+ * A `skipIf` alone is silent, and silent is the failure mode: a reader of a green run cannot tell
+ * "six assertions passed against the shipped snapshot" from "six assertions did not run", and the
+ * comment above a `describe.skipIf` is not an announcement in a terminal. So the skip is announced
+ * here, once, at module load — the same pattern `happy-path.test.ts` and the gate's
+ * `docs-corpus.test.ts` use for the same two artefacts, so "skipped loudly" means the same thing
+ * in all three files. The claim being protected is that a skip is never the only thing standing
+ * between a claim and its evidence: the money-shot section below is hermetic and runs everywhere.
+ */
+const CORPUS_PRESENT = existsSync(CORPUS)
+if (!CORPUS_PRESENT) {
+  console.warn(
+    "[demo] data/corpus.db is absent — the committed-snapshot checks are SKIPPED " +
+      "(1 drift alarm, 5 real-binary replay tests). Run `bun run ingest` to exercise them locally; " +
+      "the hermetic money-shot section above runs either way.",
+  )
+}
+
 const parseJson = (path: string): unknown => JSON.parse(readFileSync(path, "utf8")) as unknown
 
 const readEvalSet = (path: string): EvalSet => {
@@ -259,7 +281,7 @@ describe("the transcript the demo replays", () => {
    * and the numbers can move under it. This is the one assertion in the file that is DELIBERATELY
    * allowed to fail when the corpus moves: it is the alarm, not a nuisance.
    */
-  test.skipIf(!existsSync(CORPUS))("every claim it replays cites a record the shipped snapshot still has", () => {
+  test.skipIf(!CORPUS_PRESENT)("every claim it replays cites a record the shipped snapshot still has", () => {
     const db = openSnapshot(CORPUS)
     try {
       for (const entry of entries()) {
@@ -503,9 +525,11 @@ describe("the demo banner's mode word is the shared label, not a local literal",
  *
  * Everything above is in-process. This spawns `apps/cli/src/main.ts` the way a judge does, because
  * the only way to observe the demo as a caller sees it is from outside — and because the exit code
- * is part of the product. Skipped, loudly, when the gitignored snapshot is absent.
+ * is part of the product. Skipped, and announced at the top of this file, when the gitignored
+ * snapshot is absent; the announcement names how many tests did not run, so a green line in CI
+ * cannot be read as a passing replay.
  */
-describe.skipIf(!existsSync(CORPUS))("every committed demo question replays to its declared verdict", () => {
+describe.skipIf(!CORPUS_PRESENT)("every committed demo question replays to its declared verdict", () => {
   // Every run below appends to the committed run ledger. Restored by the shared guard, so this
   // block cannot leave the tree dirty or make `verify:runs` report a chain the tests extended.
   preserveCommittedLedger()

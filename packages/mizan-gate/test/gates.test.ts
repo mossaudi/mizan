@@ -167,13 +167,54 @@ describe("G-2 no raw HTML", () => {
     expect(rules(checkNoRawHtml([file("apps/web/src/q.tsx", "return <div dangerouslySetInnerHTML={{ __html: t }} />\n")]))).toHaveLength(1)
   })
 
-  test("planted: a raw sink inside a shipped .html page is caught, not skipped as markup", () => {
+  test("planted: a sink API inside a shipped .html page's script body is caught", () => {
     const page = file("apps/web/index.html", '<div id="c"></div>\n<script>c.innerHTML = corpus</script>\n')
     expect(rules(checkNoRawHtml([page]))).toEqual(["G-2.1 no-raw-html"])
   })
 
   test("the scan admits markup, so the committed page is inside every tree-wide gate", () => {
     expect([...CODE_EXTENSIONS]).toContain(".html")
+  })
+})
+
+/**
+ * The boundary of the gate above, measured rather than asserted in prose.
+ *
+ * ## Why this block exists
+ *
+ * `.html` was added to `CODE_EXTENSIONS` so the committed page is inside the tree-wide gates, and
+ * the first draft of ADR-C3 then claimed that a raw sink planted in that page is "a red build".
+ * It is not. This block is what that claim is worth: the payloads below were run through the real
+ * `checkNoRawHtml`, and the caught/missed split is the result. A `<script>` body is code, so a
+ * sink token written inside one is seen; a tag is not a token, and `"code"` mode blanks string
+ * bodies, which is where a handler attribute's payload lives.
+ *
+ * ## What this is NOT
+ *
+ * It is not an assertion that blindness is acceptable. It is the reason the real control is
+ * named: markup injection into `apps/web/index.html` is covered by `apps/web/test/page.test.ts`
+ * (byte-identity against `renderPage(fixture)`, element-level assertions over the committed
+ * bytes, and the no-network assertions), and by nothing here. `docs/specs/adr/ADR-C3.md` states
+ * the same split, so the two cannot drift: a future change that closes the gap makes this block
+ * red, and a future change that widens `HTML_SINKS` with an element rule moves a payload from
+ * `MISSED` to `CAUGHT` and forces the ADR to be rewritten rather than left standing.
+ */
+describe("G-2 on a shipped page: the measured boundary of the sink-token rules", () => {
+  const page = (text: string) => file("apps/web/index.html", text)
+
+  test("a sink API in a script body is caught, because a script body is code", () => {
+    expect(rules(checkNoRawHtml([page('<script>c.innerHTML = corpus</script>\n')]))).toEqual(["G-2.1 no-raw-html"])
+  })
+
+  test.each([
+    ["an injected script that reaches no sink token", "<script>alert(1)</script>\n"],
+    ["an inline event handler, whose payload is a string body", '<div onclick="document.write(1)">x</div>\n'],
+    ["a javascript: URL", '<a href="javascript:alert(1)">x</a>\n'],
+    ["an iframe", '<iframe src="https://evil.example"></iframe>\n'],
+  ])("G-2 cannot see %s", (_label, text) => {
+    // The blind spot, stated as an expectation rather than left to a reader's inference. If a
+    // future rule closes it, this goes red and the ADR has to say so.
+    expect(checkNoRawHtml([page(text)])).toEqual([])
   })
 })
 

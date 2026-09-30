@@ -29,7 +29,7 @@ framework, no client runtime, no network request to render.
 
 ## Consequences
 
-The decision imposes six requirements, and each is checked rather than trusted:
+The decision imposes these requirements, and each is checked rather than trusted:
 
 - One entity encoder, total over `& < > " '`, used by every string the page emits.
 - Text nodes only — the badge lines and the corpus quotes are inserted as characters, never as
@@ -37,11 +37,22 @@ The decision imposes six requirements, and each is checked rather than trusted:
 - The fixture is decoded at the boundary before anything is rendered, so a malformed committed file
   fails the build rather than the browser.
 - No `<script>`, no external `<link>` or `src`, no `fetch` — the page renders from `file://`.
-- The gates read markup as well as code: `CODE_EXTENSIONS` and `GATE_CLAIM_EXTENSIONS` include
-  `.html`, so a raw sink planted in the committed page is a red build rather than something only
-  the page's tests would catch, and a gate count printed on the page is checked against the runner
-  like a gate count printed anywhere else. Widening an extension is safe here because every gate
-  matches sink tokens (`innerHTML`, `document.write`, `eval(`) rather than markup itself.
+- **`.html` is read by the gate sweep for gate-count and ADR claims, and nothing more.**
+  `GATE_CLAIM_EXTENSIONS` includes `.html`, so a number or an ADR citation printed on the page is
+  checked like one printed anywhere else.
+- **G-2 is NOT the control for this page, and the reason is structural rather than an oversight.**
+  Its rules match *sink tokens* (`innerHTML`, `document.write`, …), and an HTML file has no sink
+  tokens — it has tags. It also scans in `"code"` mode, which blanks string bodies, so a sink
+  written inside an attribute value is invisible to it too.
+  `packages/mizan-gate/test/gates.test.ts` measures the boundary rather than asserting it: a sink
+  API inside a `<script>` body is caught, and an injected `<script>`, an inline `on*=` handler, a
+  `javascript:` URL and an `<iframe>` are all missed. An injected element in the committed page is
+  therefore caught by `apps/web/test/page.test.ts` — the byte-identity assertion against
+  `renderPage(fixture)`, plus the element-level assertions over the committed bytes and the
+  no-network assertions — and by nothing else. Widening `CODE_EXTENSIONS` was kept because those
+  tests read the file, not because a gate scans it for markup. Matching *elements* (`<script`,
+  `<iframe`, `<object`, `<embed`, `on\w+=`, `javascript:`) would be a new `GATE_IDS` entry, and so
+  a change to a published claim; that is a decision for the next ADR, not a consequence of this one.
 - **The provider mode is shared, not restated.** The page prints `transcriptLabel(fixture.transcript)`
   from `@mizan/core` — the same function `apps/cli/src/render.ts` calls — so a replay reads
   `PRECOMPUTED (deterministic replay)` in a browser and in a terminal by construction rather than by
