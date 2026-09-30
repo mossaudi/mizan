@@ -34,8 +34,9 @@ import {
  * the adjudicated spans exist. Containment alone cannot draw that line — telling a paraphrase from
  * a fabrication is the similarity measurement ADR-03 forbids — so here a paraphrase with no span
  * still lands on `rejected`: the arm is opt-in, and a case nobody ruled on gets none. The flip for
- * the 26 adjudicated cases is asserted where the arm is exercised, in `apps/cli/test/anchor.test.ts`
- * and `apps/cli/test/adjudicated-elisions.test.ts`.
+ * the 26 adjudicated cases is asserted where the arm is exercised, in
+ * `packages/mizan-verify/test/adjudicated-elisions.test.ts`, and the locator that decides whether
+ * the arm runs at all is pinned in `packages/mizan-verify/test/anchor.test.ts`.
  */
 
 const resolved = (citation: ReturnType<typeof cite>, records: readonly typeof BUKHARI_1[], ambiguous = false): ResolvedCitation => ({

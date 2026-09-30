@@ -70,6 +70,35 @@ describe("extractGateCountClaims", () => {
     ])
   })
 
+  test("reads the same count written in digits, and as a run for two digits", () => {
+    // The branch that was missing. Words only was the shipped state, so the rule could not see one
+    // of the two ways a person writes a count — and a claim of coverage that its own pattern does
+    // not have is the defect `scan.ts` names as worse than a stated blind spot. Two plants, because
+    // the second is a different mechanism: a listed alternative per value reads one digit and a
+    // digit *run* reads a count nobody listed.
+    expect(extractGateCountClaims(`run the ${cardinal("4")} first`)).toEqual([{ kind: "cardinal", value: 4, text: cardinal("4") }])
+    expect(extractGateCountClaims(`run the ${cardinal("12")} first`)).toEqual([{ kind: "cardinal", value: 12, text: cardinal("12") }])
+  })
+
+  test("the two spellings of one count are read as the same number", () => {
+    // The reason the digits branch exists rather than a second list of words: the word form and the
+    // digit form are one sentence, and a rule that graded them differently would be grading the
+    // typography. Built from the helper, so neither spelling is written out in this file — the file
+    // is scanned by the rule it is testing.
+    const spelled = extractGateCountClaims(cardinal("four"))
+    const figured = extractGateCountClaims(cardinal("4"))
+    expect(spelled[0]?.value).toBe(4)
+    expect(figured[0]?.value).toBe(4)
+  })
+
+  test("a digit count with no qualifier is still not a claim", () => {
+    // The `structural` requirement does not weaken for the new spelling. Without this, the digit
+    // branch would swallow the two unrelated senses of `gate` the header documents, and a rule that
+    // cries wolf is switched off rather than narrowed.
+    expect(extractGateCountClaims("CI runs 4 gates.")).toEqual([])
+    expect(extractGateCountClaims("the 2 gate G-6 can check")).toEqual([])
+  })
+
   test("does not assemble a range out of a sub-rule id and a gate id", () => {
     // G-6.5 is a rule inside G-6. Reading "G-6.5 and G-7" as a range ending at 5 would be a
     // false positive on a true sentence, which is how a check gets switched off.
@@ -139,6 +168,20 @@ describe("checkGateCountClaim", () => {
     const claims = checkGateCountClaim(`the ${cardinal("six")} run in CI`, "DISCLOSURE.md", truth)
     expect(claims).toHaveLength(1)
     expect(claims[0]?.rule).toBe("gate-count-stale")
+  })
+
+  test("a stale cardinal written in digits fails the same way, and names the truth", () => {
+    // The end-to-end form of the digit branch: a rule that flagged the word form and let the digit
+    // form past would be a rule a document can defeat by picking a font, so the discrimination is
+    // asserted through `checkGateCountClaim` rather than only on the extraction above.
+    const claims = checkGateCountClaim(`the ${cardinal("4")} run in CI`, "README.md", truth)
+    expect(claims).toHaveLength(1)
+    expect(claims[0]?.rule).toBe("gate-count-stale")
+    expect(claims[0]?.detail).toContain("7 (G-1, G-2, G-3, G-4, G-5, G-6, G-7)")
+  })
+
+  test("a correct cardinal in digits passes", () => {
+    expect(checkGateCountClaim(`the ${cardinal("7")} run in CI`, "README.md", truth)).toEqual([])
   })
 
   test("a range ending past the top gate fails too", () => {

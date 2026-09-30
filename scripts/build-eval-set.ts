@@ -8,7 +8,7 @@
  *
  * ## What makes a set publishable
  *
- * Six conditions, all enforced here, all fatal:
+ * Every condition below, all enforced here, all fatal:
  *
  *  1. Every class has exactly its declared case count.
  *  2. No two cases share an id, and no case folds to an empty quote.
@@ -23,8 +23,15 @@
  *  6. Every stamped `anchorText` is a normalized substring of its own quote and of the record it
  *     cites, and `CLAIM_ANCHOR_TEXTS` covers exactly the adjudicated set. A span that does not
  *     locate would make the published `redTeamMovement` a wish.
+ *  7. Each finished set is decoded through the SAME schema `apps/cli/test/eval.test.ts` reads it
+ *     with, so a field the test needs cannot be quietly left out of the writer.
  *
- * Nothing is written unless all six hold. A partial set that a judge might run is worse than
+ * The list is not counted here on purpose. A derived count restated in prose is the drift
+ * `docs-gates.ts` exists to catch, and the argument that follows this header — a partial set that
+ * a judge might run is worse than no set — applies to this file's own description of itself just
+ * as much as it does to the sets.
+ *
+ * Nothing is written unless all of them hold. A partial set that a judge might run is worse than
  * no set, because its size and class counts would still look authoritative.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
@@ -209,10 +216,10 @@ const main = (): number => {
   ]
 
   /*
-   * The seventh condition, and the one that keeps the other six honest: each finished set is decoded
-   * through the SAME schema `apps/cli/test/eval.test.ts` reads it with. Hand-rolled validation
-   * checks what the builder intended; this checks that what it built is actually the contract, so
-   * a field the test needs cannot be quietly left out of the writer.
+   * The last of the conditions in this file's header, and the one that keeps the rest honest: each
+   * finished set is decoded through the SAME schema `apps/cli/test/eval.test.ts` reads it with.
+   * Hand-rolled validation checks what the builder intended; this checks that what it built is
+   * actually the contract, so a field the test needs cannot be quietly left out of the writer.
    *
    * The adjudication file is decoded with ITS schema rather than `EvalSet`. They are different
    * shapes and forcing one onto the other would have meant loosening a contract to accommodate a

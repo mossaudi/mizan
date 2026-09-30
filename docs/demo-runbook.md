@@ -116,5 +116,8 @@ each.
 
 Which is also the sentence `bun run ci` exists to keep true: gate **G-1** fails the build if
 `packages/mizan-verify` ever grows a dependency beyond `@mizan/core`, and no gate can join the
-`GATE_IDS` table without `docs-gates.ts` failing every document that states a different number — the
-table is the only place the set is written down, so this sentence deliberately does not count them.
+`GATE_IDS` table without `docs-gates.ts` catching a document that restates the count — a
+`G-1…G-N` range, or a cardinal count of *structural* gates, written either in digits or in words.
+Both shapes are narrow by design, and `docs-gates.ts` states its own residual: a sentence that
+counts the suite without the word `structural` is caught by review, not by the build. That is why
+this sentence does not count them.

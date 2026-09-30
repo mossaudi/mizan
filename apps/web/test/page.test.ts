@@ -336,6 +336,18 @@ describe("the committed page", () => {
     expect(page).not.toMatch(/\shref\s*=/i)
   })
 
+  test("the declared build command is the page build, so a judge is never sent to a corpus", () => {
+    // The toolchain a judge reads names `bun run build`, and the root manifest is what makes that
+    // command exist — so it is an alias with a meaning, and nothing else in CI reads it. Pointed at
+    // `build:eval` or `make:transcript` it would still pass a "the script exists" check while
+    // turning the build red on a correct fresh checkout, because both open `data/corpus.db`, which
+    // this repository deliberately does not ship. Asserting the exact target is what keeps the
+    // build hermetic: the committed page is the whole build output, and this is the line that says so.
+    const root = readJson("package.json") as { scripts: Record<string, string> }
+    expect(root.scripts["build"]).toBe("bun run build:web")
+    expect(root.scripts["build:web"]).toBe("bun run apps/web/scripts/build-page.ts")
+  })
+
   test("carries no secret, no key reference and no configuration (A05/A07)", () => {
     const page = committedPage()
     for (const forbidden of [".env", "API_KEY", "apiKey", "MIZAN_", "Authorization", "Bearer "]) {

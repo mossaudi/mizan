@@ -32,21 +32,27 @@ import { byCodeUnit, gateNumber, type GateId } from "./scan.ts"
  *    `through`. The range must END on the highest gate id. This is the high-value shape: it names
  *    the gates explicitly, so being wrong about it is unambiguous.
  *  - **A cardinal count followed by the word `structural`**, as in "the N structural gates". The
- *    word `structural` is required, and the omission is deliberate.
+ *    word `structural` is required, and the omission is deliberate. A count is read in digits or in
+ *    words, because the two spellings are one sentence, and a rule that read only the word form
+ *    would be checking one spelling of the shape its own header documents — which is the defect
+ *    `scan.ts` names as worse than being blind. Neither spelling is written out in full beside the
+ *    word `structural` anywhere in this file: the rule scans this file, so an example spelled out
+ *    here is a finding against this header.
  *
  * A sentence about a **sub-rule** is not matched at either end of a range. `G-6.5` is a rule
  * inside G-6, not a gate, so a line naming one states something R8 has no opinion about, and
  * reading the `6` out of it would report a true sentence as a stale count. The pattern therefore
  * requires a *complete* id on both ends — see `RANGE_PATTERN` for how each end is enforced.
  *
- * A bare `<number word> gates` is **not** matched, because this repository already uses the word
+ * A bare `<count> gates` is **not** matched, because this repository already uses the word
  * `gate` in two unrelated senses: `apps/cli/test/eval.test.ts` has a heading reading "The two
  * gates, and why their bars differ" about the evidence invariant, and `scripts/eval/plan.ts` says
  * "the one gate G-6 can check". Both are true sentences, neither is a claim about the gate suite,
  * and a rule that flagged them would be a rule that cries wolf — which `scan.ts` says is strictly
- * worse than a rule that is sometimes blind. The residual is stated rather than hidden: a
- * future sentence that counts the suite without the word `structural` slips through, and is caught
- * by review instead.
+ * worse than a rule that is sometimes blind. The residual is stated rather than hidden, and it is
+ * exactly one thing: a sentence that counts the suite in some other phrasing — without the word
+ * `structural`, or with the count in a shape neither pattern reads — slips through and is caught by
+ * review instead. Everything the two documented shapes cover, in either spelling, is checked.
  *
  * ## Determinism
  *
@@ -97,6 +103,19 @@ const RANGE_PATTERN = new RegExp(
  * unrecognised one. The word for zero is not written next to the word `structural` anywhere in
  * this file, which is not a style preference: the pattern below scans this file too, and prose
  * that spells out a stale example would make the rule report its own header.
+ *
+ * ## Why digits are not in this table
+ *
+ * Because a count written in figures is matched as a *run* by `CARDINAL_PATTERN` rather than as one
+ * listed alternative per value, and listing the digits here as well would be a second spelling of
+ * the rule the first one already covers — the exact duplication `AGENTS.md` section 17 exists to
+ * prevent. It also fixes the hole the table previously had: read as words only, the count written
+ * in figures passed `check:docs` while the same count spelled out failed, so the rule was checking
+ * one spelling of the shape its own header documented. Half a rule is worse than a documented
+ * residual, which is why the residual paragraph in this file's header now names only what is still
+ * unread. Neither spelling is written out beside the word `structural` in this file, for the same
+ * reason the table's own zero is not: the rule scans this file too, and an example spelled out here
+ * would be a finding against this header.
  */
 const NUMBER_WORDS = [
   "zero",
@@ -117,8 +136,15 @@ const NUMBER_WORDS = [
 /**
  * A cardinal count qualified by the word `structural`, which is what distinguishes "this project
  * has N safety gates" from the two unrelated senses of `gate` documented in the header.
+ *
+ * Two spellings of one claim, so both are read: the words of `NUMBER_WORDS`, and a run of digits
+ * for the count a document writes in figures. The run is what keeps a two-digit count readable
+ * without a table entry per value, and it is the branch that was missing when this rule was words
+ * only. The single capturing group is the matched count, which `extractGateCountClaims` reads back
+ * through `tokenToNumber`; nothing outside the two shapes reaches that lookup, which is what lets it
+ * be a single `Number` call.
  */
-const CARDINAL_PATTERN = new RegExp(`\\b(${NUMBER_WORDS.join("|")})\\s+structural\\s+gates\\b`, "gi")
+const CARDINAL_PATTERN = new RegExp(`\\b(${NUMBER_WORDS.join("|")}|\\d+)\\s+structural\\s+gates\\b`, "gi")
 
 /** A gate-count claim found in a file, with the number it asserts. */
 export type GateCountClaim = {
@@ -130,9 +156,18 @@ export type GateCountClaim = {
   readonly text: string
 }
 
-/** The number a cardinal claim asserts, or null when the word is outside the table. */
-const wordToNumber = (word: string): number | null => {
-  const index = NUMBER_WORDS.indexOf(word.toLowerCase() as (typeof NUMBER_WORDS)[number])
+/**
+ * The number a cardinal claim asserts, or null when the token is outside the table.
+ *
+ * A token is either a digit run or one of the words in the table, and the match admits nothing
+ * else — so `Number` discriminates the two shapes by asking whether it is a count at all, and a
+ * single-digit and a two-digit token resolve through the same line. `Number` is total over the
+ * strings that reach it; the guard only keeps that total from being assumed rather than stated.
+ */
+const tokenToNumber = (token: string): number | null => {
+  const digits = Number(token)
+  if (Number.isFinite(digits)) return digits
+  const index = NUMBER_WORDS.indexOf(token.toLowerCase() as (typeof NUMBER_WORDS)[number])
   return index === -1 ? null : index
 }
 
@@ -161,7 +196,7 @@ export const extractGateCountClaims = (text: string): readonly GateCountClaim[] 
     claims.push({ kind: "range", value: to, text: match[0] })
   }
   for (const match of text.matchAll(CARDINAL_PATTERN)) {
-    const value = wordToNumber(match[1] ?? "")
+    const value = tokenToNumber(match[1] ?? "")
     if (value === null) continue
     claims.push({ kind: "cardinal", value, text: match[0] })
   }
