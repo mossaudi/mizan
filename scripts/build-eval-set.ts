@@ -8,7 +8,7 @@
  *
  * ## What makes a set publishable
  *
- * Four conditions, all enforced here, all fatal:
+ * Six conditions, all enforced here, all fatal:
  *
  *  1. Every class has exactly its declared case count.
  *  2. No two cases share an id, and no case folds to an empty quote.
@@ -17,21 +17,36 @@
  *     quotation elsewhere would be a fixture asserting the verifier is wrong when it is right.
  *  4. The generator is structurally unable to ask the verifier for an answer. `plan.ts` holds
  *     the expectations and imports nothing from `@mizan/verify`.
+ *  5. The adjudication table covers every case it claims to, and the published file on disk
+ *     matches what the table now says — a stale artefact is a failure, not something to
+ *     overwrite quietly.
+ *  6. Every stamped `anchorText` is a normalized substring of its own quote and of the record it
+ *     cites, and `CLAIM_ANCHOR_TEXTS` covers exactly the adjudicated set. A span that does not
+ *     locate would make the published `redTeamMovement` a wish.
  *
- * Nothing is written unless all four hold. A partial set that a judge might run is worse than
+ * Nothing is written unless all six hold. A partial set that a judge might run is worse than
  * no set, because its size and class counts would still look authoritative.
  */
-import { mkdirSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { Database } from "bun:sqlite"
-import { decodeOrFail, decodeSync, isOk, EvalSet as EvalSetSchema } from "@mizan/core"
-import { anchorsOf, buildGolden, buildRedTeam, finalise, validate } from "./eval/build.ts"
+import { decodeOrFail, decodeSync, isOk, AnchorAdjudicationSet, EvalSet as EvalSetSchema } from "@mizan/core"
+import { anchorsOf, anchorProblems, buildGolden, buildRedTeam, finalise, unassigned, validate } from "./eval/build.ts"
 import { indexCorpus, loadFoldedCorpus } from "./eval/anchors.ts"
-import { DIGIT_FACTS, expectedCounts, GOLDEN_TARGET, goldenTotal, KNOWN_DIVERGENCE } from "./eval/plan.ts"
+import { ADJUDICATION_ROWS, ADJUDICATION_TARGET, redTeamMovement } from "./eval/adjudication.ts"
+import { adjudicationLookup, buildAdjudicationBody, checkStaleAdjudication, validateAdjudications } from "./eval/adjudication-loader.ts"
+import { anchorCoverageProblems, CLAIM_ANCHOR_TEXTS } from "./eval/anchor-texts.ts"
+import { DIGIT_FACTS, expectedCounts, GOLDEN_TARGET, goldenTotal } from "./eval/plan.ts"
 
 const CORPUS_PATH = "data/corpus.db"
 const OUT_DIR = "data/eval"
-const SCHEMA_VERSION = 1
+const ADJUDICATION_PATH = join(OUT_DIR, "adjudication.json")
+/*
+ * 2: `EvalCase.anchorText` added, the per-case `divergence` stamp removed, and `EvalSet.knownDivergence`
+ * made optional because MIZ-106 closed the gap it recorded. Bumped rather than left alone because a
+ * field a reader cannot rely on anymore is exactly what a version number exists to announce.
+ */
+const SCHEMA_VERSION = 2
 
 /** Why the sets are hand-adjudicated, printed into both files so nobody has to ask. */
 const EXPECTATION_SOURCE = "Hand-adjudicated in scripts/eval/plan.ts from the documented behaviour of the fold table. Never observed from @mizan/verify: a set whose expectations were recorded from the code under test is a regression test of the code against itself."
@@ -60,6 +75,14 @@ const tally = (cases: readonly { readonly classId: string; readonly expectedVerd
   return { byClass, byVerdict }
 }
 
+/**
+ * The anchor spans, keyed the way `finalise` looks them up.
+ *
+ * A map rather than the record itself so the stamp and the join are one lookup, and so
+ * `CLAIM_ANCHOR_TEXTS` stays the single place a span is written down (AGENTS.md section 17).
+ */
+const anchorLookup = (): ReadonlyMap<string, string> => new Map(Object.entries(CLAIM_ANCHOR_TEXTS))
+
 const buildSet = (name: string, title: string, purpose: string, cases: ReturnType<typeof finalise>, anchors: ReturnType<typeof anchorsOf>) => {
   const { byClass, byVerdict } = tally(cases)
   return {
@@ -71,7 +94,6 @@ const buildSet = (name: string, title: string, purpose: string, cases: ReturnTyp
     regenerateWith: "bun run build:eval",
     determinism: DETERMINISM,
     expectationSource: EXPECTATION_SOURCE,
-    knownDivergence: KNOWN_DIVERGENCE,
     digitFacts: DIGIT_FACTS,
     classCounts: byClass,
     verdictCounts: byVerdict,
@@ -79,6 +101,27 @@ const buildSet = (name: string, title: string, purpose: string, cases: ReturnTyp
     licenceNotice: LICENCE_NOTICE,
     anchors,
     cases,
+  }
+}
+
+/**
+ * The committed adjudication file, or undefined when it does not exist yet.
+ *
+ * The absence is NOT a failure: the build is what creates the file, so treating "no file" as a
+ * problem would make the first run impossible — which is the bootstrap deadlock that moved this
+ * logic out of the loader and into a candidate-based check. `checkStaleAdjudication` reports the
+ * per-field differences of a file that DOES exist, which is the case that matters: a judge reading
+ * a stale artefact is being misled, while a judge reading a not-yet-created one is not.
+ *
+ * Parsed leniently on purpose — the strict decode is `validateAdjudications`' job, and this
+ * function's only question is whether the bytes on disk differ from what the table now says.
+ */
+const readCommittedAdjudication = (): unknown => {
+  if (!existsSync(ADJUDICATION_PATH)) return undefined
+  try {
+    return JSON.parse(readFileSync(ADJUDICATION_PATH, "utf8")) as unknown
+  } catch (cause) {
+    return { __unparseable: cause instanceof Error ? cause.message : "unparseable" }
   }
 }
 
@@ -99,10 +142,36 @@ const main = (): number => {
   const builtRedTeam = buildRedTeam(db)
   db.close()
 
-  const golden = finalise(builtGolden, "golden")
-  const redTeam = finalise(builtRedTeam, "redteam")
+  /*
+   * The adjudication set is a THIRD file, and the order here is forced.
+   *
+   * `finalise` assigns the case ids (`golden-095`) that the table is keyed by, so the body cannot
+   * be built until the cases exist — but the cases cannot be finalised until their decisions are
+   * known. The cycle is broken by `unassigned`, which projects each case down to the three fields
+   * a decision is about: its id, its class, and the citation its anchor is stamped from. Both sides
+   * then join on those, which is why the loader takes structural types rather than `EvalCase`.
+   */
+  const cases = [...unassigned(builtGolden, "golden"), ...unassigned(builtRedTeam, "redteam")]
+  const { body: adjudicationBody, problems: stampProblems } = buildAdjudicationBody(cases)
+  const committed = readCommittedAdjudication()
+  const lookup = adjudicationLookup(adjudicationBody)
+  const spans = anchorLookup()
 
-  const problems = [...validate("golden", golden, foldedCorpus, index), ...validate("redteam", redTeam, foldedCorpus, index)]
+  const golden = finalise(builtGolden, "golden", lookup, spans)
+  const redTeam = finalise(builtRedTeam, "redteam", lookup, spans)
+
+  const goldenAnchors = anchorsOf(builtGolden)
+  const redTeamAnchors = anchorsOf(builtRedTeam)
+  const problems = [
+    ...stampProblems,
+    ...anchorCoverageProblems(),
+    ...checkStaleAdjudication(adjudicationBody, committed),
+    ...validateAdjudications(adjudicationBody, cases).problems,
+    ...validate("golden", golden, foldedCorpus, index),
+    ...validate("redteam", redTeam, foldedCorpus, index),
+    ...anchorProblems("golden", golden, goldenAnchors),
+    ...anchorProblems("redteam", redTeam, redTeamAnchors),
+  ]
   if (golden.length !== GOLDEN_TARGET) problems.push(`golden: ${golden.length} cases, expected exactly ${GOLDEN_TARGET}`)
   if (goldenTotal() !== GOLDEN_TARGET) problems.push(`plan.ts: the class table sums to ${goldenTotal()}, not the ${GOLDEN_TARGET} the architecture names`)
   if (redTeam.some((entry) => entry.expectedVerdict === "verified")) problems.push("redteam: contains a case expected to verify, which defeats its purpose")
@@ -114,36 +183,51 @@ const main = (): number => {
   }
 
   const files = [
+    { path: ADJUDICATION_PATH, body: adjudicationBody, count: ADJUDICATION_ROWS.length },
     {
       path: join(OUT_DIR, "golden-normalization.json"),
+      count: golden.length,
       body: buildSet(
         "golden",
         "Golden normalization and verification set",
         `${GOLDEN_TARGET} cases over ${Object.keys(expectedCounts("golden")).length} classes: four renderings of a correct quotation that must all verify, then the ways a text stops being a quotation, then the two citation shapes that make a verdict impossible rather than wrong. Run against the real resolver and the real verifier; nothing is mocked.`,
         golden,
-        anchorsOf(builtGolden),
+        goldenAnchors,
       ),
     },
     {
       path: join(OUT_DIR, "redteam-fabricated.json"),
+      count: redTeam.length,
       body: buildSet(
         "redteam",
         "Red-team set: fabrications that must never verify",
         "Every case is a fabrication of a real corpus span. A single `verified` here is a false positive on invented religious text, which is the failure this repository exists to prevent, so the gate is exactly zero rather than the golden set's accuracy bar.",
         redTeam,
-        anchorsOf(builtRedTeam),
+        redTeamAnchors,
       ),
     },
   ]
 
-  // Fifth condition, and the one that keeps the other four honest: each finished set is decoded
-  // through the SAME schema `apps/cli/test/eval.test.ts` reads it with. Hand-rolled validation
-  // checks what the builder intended; this checks that what it built is actually the contract, so
-  // a field the test needs cannot be quietly left out of the writer.
-  for (const file of files) {
-    const decoded = decodeOrFail(decodeSync(EvalSetSchema), file.body, file.path)
+  /*
+   * The seventh condition, and the one that keeps the other six honest: each finished set is decoded
+   * through the SAME schema `apps/cli/test/eval.test.ts` reads it with. Hand-rolled validation
+   * checks what the builder intended; this checks that what it built is actually the contract, so
+   * a field the test needs cannot be quietly left out of the writer.
+   *
+   * The adjudication file is decoded with ITS schema rather than `EvalSet`. They are different
+   * shapes and forcing one onto the other would have meant loosening a contract to accommodate a
+   * second document, which is how a contract stops meaning anything.
+   */
+  const contracts = [
+    { path: ADJUDICATION_PATH, body: adjudicationBody, schema: AnchorAdjudicationSet, name: "AnchorAdjudicationSet", count: ADJUDICATION_ROWS.length },
+    ...files
+      .filter((file) => file.path !== ADJUDICATION_PATH)
+      .map((file) => ({ path: file.path, body: file.body, schema: EvalSetSchema, name: "EvalSet", count: file.count })),
+  ]
+  for (const contract of contracts) {
+    const decoded = decodeOrFail(decodeSync(contract.schema), contract.body, contract.path)
     if (isOk(decoded)) continue
-    console.error(`FAIL ${file.path} does not satisfy EvalSet: ${decoded.error.detail}`)
+    console.error(`FAIL ${contract.path} does not satisfy ${contract.name}: ${decoded.error.detail}`)
     console.error("\nNothing was written.")
     return 1
   }
@@ -151,10 +235,13 @@ const main = (): number => {
   for (const file of files) {
     mkdirSync(dirname(file.path), { recursive: true })
     writeFileSync(file.path, `${JSON.stringify(file.body, null, 2)}\n`, "utf8")
-    console.log(`wrote ${file.path} — ${file.body.cases.length} cases, ${file.body.anchorCount} anchors`)
+    console.log(`wrote ${file.path} — ${file.count} entries`)
   }
   console.log(`\ngolden verdicts  : ${JSON.stringify(tally(golden).byVerdict)}`)
   console.log(`redteam verdicts : ${JSON.stringify(tally(redTeam).byVerdict)}`)
+  console.log(`adjudications    : ${adjudicationBody.decidedCount} decided, ${adjudicationBody.undecidedCount} undecided`)
+  console.log(`anchored claims  : golden ${golden.filter((entry) => entry.anchorText !== undefined).length}, redteam ${redTeam.filter((entry) => entry.anchorText !== undefined).length}`)
+  console.log(`movement (claim) : ${JSON.stringify(redTeamMovement())} rejected -> unverifiable, published in adjudication.json`)
   return 0
 }
 

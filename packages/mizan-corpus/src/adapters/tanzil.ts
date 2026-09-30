@@ -1,4 +1,4 @@
-import { err, ok, sha256Hex } from "@mizan/core"
+import { err, ok, QURAN_COLLECTION, sha256Hex } from "@mizan/core"
 import type { FetchContext, RawRecord, SourceAdapter } from "./types.ts"
 
 /**
@@ -52,9 +52,13 @@ export const tanzilAdapter: SourceAdapter = {
     }
 
     const limited = lines.slice(0, context.limit)
+    // One report, after the single fetch. Tanzil is one request, so the heartbeat that matters here
+    // is `runIngest`'s own `started` line, which is emitted BEFORE this call; anything reported
+    // after it is a fact about bytes that already arrived.
+    context.report?.(limited.length)
     const records: RawRecord[] = limited.map((textDisplay, index) => ({
       id: `quran:${index + 1}`,
-      collection: "quran",
+      collection: QURAN_COLLECTION,
       number: String(index + 1),
       textDisplay,
       sourceUrl: null,

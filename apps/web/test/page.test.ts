@@ -1,0 +1,291 @@
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
+import { describe, expect, test } from "bun:test"
+import { badgeFor, isErr, isOk, transcriptLabel, VERDICT_BADGE, type TranscriptKind, type Verdict } from "@mizan/core"
+import { decodeFixture, encodeText, renderPage, type PageFixture } from "../src/page.ts"
+
+/**
+ * Story 3's acceptance criteria, and the provenance that makes the page believable.
+ *
+ * Three groups, in the order the story states them: the badge strings come from the shared map,
+ * untrusted text cannot become markup, and an unknown verdict never reaches the page. A fourth
+ * group the story does not name but the page depends on: the committed `index.html` is exactly
+ * what a fresh render produces, and the fixture it was rendered from is the committed demo and
+ * nothing a hand typed.
+ */
+
+const PACKAGE_DIR = join(import.meta.dir, "..")
+const REPO_ROOT = join(PACKAGE_DIR, "..", "..")
+
+const readText = (path: string): string => readFileSync(path, "utf8")
+const readJson = (relative: string): unknown => JSON.parse(readText(join(REPO_ROOT, relative)))
+
+/** A test helper may throw — AGENTS.md section 2 exempts test helpers and nothing else. */
+const loadFixture = (): PageFixture => {
+  const decoded = decodeFixture(readJson(join("apps", "web", "fixtures", "page.json")))
+  if (!isOk(decoded)) throw new Error(`the committed page fixture did not decode: ${decoded.error.detail}`)
+  return decoded.value
+}
+
+const committedPage = (): string => readText(join(PACKAGE_DIR, "index.html"))
+
+/** The mode label, read back out of the rendered bytes rather than assumed from the renderer. */
+const pageFixtureLabelOf = (page: string): string | null => page.match(/class="mode-label">([^<]+)</)?.[1] ?? null
+
+/** The mode line's own sentence, for the assertion that covers both halves of what the label means. */
+const modeNoteOf = (page: string): string => page.match(/class="mode-note">([^<]+)</)?.[1] ?? ""
+
+/* ------------------------------------------------------------------ AC1 — the badge comes from the map */
+
+describe("the three badge lines come from the shared verdict map", () => {
+  const page = renderPage(loadFixture())
+
+  test.each(["verified", "unverifiable", "rejected"] as const)("%s is rendered as the map's string", (verdict) => {
+    expect(page).toContain(`<span class="badge">${badgeFor(verdict)}</span>`)
+  })
+
+  test("all three badges appear, and no fourth does", () => {
+    const badges = [...page.matchAll(/class="badge">([^<]+)</g)].map((match) => match[1])
+    expect(new Set(badges)).toEqual(new Set(["VERIFIED", "UNVERIFIABLE", "REJECTED"]))
+  })
+
+  test("the CLI reads the same map instead of keeping a copy", () => {
+    const renderSource = readText(join(REPO_ROOT, "apps", "cli", "src", "render.ts"))
+    expect(renderSource).toContain("badgeFor(")
+    expect(renderSource).not.toMatch(/["'](VERIFIED|REJECTED|UNVERIFIABLE)["']/)
+  })
+})
+
+/* ------------------------------------------------------------------ AC3 — untrusted text stays text */
+
+describe("corpus and model text cannot inject markup", () => {
+  const PAYLOAD = `<script>alert(1)</script><img src=x onerror=alert(1)>"quoted" & <b>bold</b>`
+
+  test("a planted payload is encoded into characters, never into tags", () => {
+    const planted = loadFixture()
+    const page = renderPage({ ...planted, examples: [{ ...planted.examples[0]!, quote: PAYLOAD, recordText: PAYLOAD }] })
+    expect(page).toContain("&lt;script&gt;alert(1)&lt;/script&gt;")
+    expect(page).toContain("&lt;img src=x onerror=alert(1)&gt;")
+    expect(page).toContain("&quot;quoted&quot; &amp; &lt;b&gt;bold&lt;/b&gt;")
+    expect(page).not.toContain("<script>")
+    expect(page).not.toContain("<img")
+  })
+
+  test("the encoder is total over the five characters that matter", () => {
+    expect(encodeText("&< >\"'")).toBe("&amp;&lt; &gt;&quot;&#39;")
+    expect(encodeText("قُلْ هُوَ ٱللَّهُ أَحَدٌ")).toBe("قُلْ هُوَ ٱللَّهُ أَحَدٌ")
+  })
+
+  test("the committed page contains no script element at all", () => {
+    expect(committedPage()).not.toMatch(/<script/i)
+  })
+
+  test("a very long quotation is emitted whole — wrapped by CSS, never truncated", () => {
+    const base = loadFixture()
+    const long = "بِسْمِ ٱللَّهِ ".repeat(400)
+    const page = renderPage({ ...base, examples: [{ ...base.examples[0]!, quote: long }] })
+    expect(page).toContain(`<pre dir="auto">${long}</pre>`)
+    expect(page).not.toContain("…")
+  })
+
+  test("an empty example list renders the legend and no example, rather than a fallback badge", () => {
+    const page = renderPage({ ...loadFixture(), examples: [] })
+    expect(page).not.toContain('class="example"')
+    expect(new Set([...page.matchAll(/class="badge">([^<]+)</g)].map((match) => match[1]))).toEqual(
+      new Set(["VERIFIED", "UNVERIFIABLE", "REJECTED"]),
+    )
+  })
+
+  test("every quotation block declares auto direction, so Arabic lays out RTL", () => {
+    const quotes = [...committedPage().matchAll(/<pre[^>]*>/g)].map((match) => match[0])
+    expect(quotes).toHaveLength(loadFixture().examples.length * 2)
+    expect(quotes.every((tag) => tag.includes('dir="auto"'))).toBe(true)
+  })
+})
+
+/* ------------------------------------------------------------------ AC4 — an unknown verdict never renders */
+
+describe("an unknown verdict fails the build rather than rendering", () => {
+  test("a verdict outside the union is refused at the boundary", () => {
+    const good = loadFixture().examples[0]!
+    const refused = decodeFixture({ examples: [{ ...good, verdict: "madeUp" }] })
+    expect(isErr(refused)).toBe(true)
+  })
+
+  // The compile-time half: this line must be a type error. `@ts-expect-error` reports an
+  // UNUSED directive, so `tsc --noEmit` fails if `Verdict` ever widens to accept it — which is
+  // the acceptance criterion's "the build runs, then tsc fails", checked by every typecheck.
+  // @ts-expect-error "madeUp" is not a member of the verdict union.
+  const unknownVerdict: Verdict = "madeUp"
+
+  test("the compile-time assertion above is armed", () => {
+    expect(String(unknownVerdict)).toBe("madeUp")
+  })
+
+  test("the map holds exactly the union's three keys — there is no fallback entry to fall back to", () => {
+    expect(Object.keys(VERDICT_BADGE).sort()).toEqual(["rejected", "unverifiable", "verified"])
+  })
+})
+
+/* ------------------------------------------------------------------ offline + byte-identical committed page */
+
+describe("the committed page", () => {
+  test("is byte-identical to a fresh render of the fixture", () => {
+    expect(committedPage()).toBe(renderPage(loadFixture()))
+  })
+
+  test("requires no network: no http URL, no fetch, no external resource", () => {
+    const page = committedPage()
+    expect(page).not.toMatch(/https?:\/\//)
+    expect(page).not.toMatch(/\bfetch\s*\(/)
+    expect(page).not.toMatch(/XMLHttpRequest/)
+    expect(page).not.toMatch(/<link\b/i)
+    expect(page).not.toMatch(/\bsrc\s*=/i)
+    expect(page).not.toMatch(/\shref\s*=/i)
+  })
+
+  test("carries no secret, no key reference and no configuration (A05/A07)", () => {
+    const page = committedPage()
+    for (const forbidden of [".env", "API_KEY", "apiKey", "MIZAN_", "Authorization", "Bearer "]) {
+      expect(page).not.toContain(forbidden)
+    }
+  })
+})
+
+/* ------------------------------------------------------------------ Story 4 — the page says which mode it is in */
+
+describe("the page states whether its answers were generated or replayed", () => {
+  const fixture = loadFixture()
+
+  test("the committed page prints the shared mode label, not a local wording", () => {
+    expect(pageFixtureLabelOf(committedPage())).toBe(transcriptLabel(fixture.transcript))
+  })
+
+  test("the label is the one the CLI header prints", () => {
+    // The same source-level check the badge map gets above: two surfaces, one string, verified by
+    // both reading `transcriptLabel` rather than by a comment promising they will.
+    const renderSource = readText(join(REPO_ROOT, "apps", "cli", "src", "render.ts"))
+    expect(renderSource).toContain("transcriptLabel(")
+    expect(renderSource).not.toMatch(/["']PRECOMPUTED\b/)
+    expect(pageFixtureLabelOf(committedPage())).toBe(transcriptLabel(fixture.transcript))
+  })
+
+  test("a live fixture prints LIVE, so a live run is never shown as a replay", () => {
+    const page = renderPage({ ...fixture, transcript: "live" })
+    expect(pageFixtureLabelOf(page)).toBe(transcriptLabel("live"))
+    expect(page).not.toContain("PRECOMPUTED")
+  })
+
+  test("a mode outside the two the trace admits is refused at the boundary", () => {
+    // Fail closed rather than default: an unrecognised mode is a fixture this build cannot describe.
+    const refused = decodeFixture({ ...fixture, transcript: "cached" })
+    expect(isErr(refused)).toBe(true)
+  })
+
+  test("the mode line states that the verdicts are computed on both paths", () => {
+    // The half a reader is most likely to collapse: replayed sentences, computed badges. The page
+    // has to say both, or the label reads as a disclaimer covering the whole report — including the
+    // badges, which it is not.
+    const note = modeNoteOf(committedPage())
+    expect(note).toContain("replayed from a committed transcript")
+    expect(note).toContain("computed by the verifier")
+  })
+
+  test("a live fixture's note says the answers were generated, not replayed", () => {
+    const note = modeNoteOf(renderPage({ ...fixture, transcript: "live" }))
+    expect(note).toContain("generated live")
+    expect(note).not.toContain("replayed")
+  })
+
+  test("no example is needed for the label to be on the page", () => {
+    expect(pageFixtureLabelOf(renderPage({ ...fixture, examples: [] }))).toBe(transcriptLabel(fixture.transcript))
+  })
+})
+
+/* ------------------------------------------------------------------ provenance — the fixture is the demo */
+
+type DeclaredExpectation = {
+  readonly claimId: string
+  readonly expectedVerdict: string
+  readonly expectedReason: string
+  readonly recordId: string
+}
+type DeclaredQuestion = { readonly question: string; readonly expectations: readonly DeclaredExpectation[] }
+type DeclaredQuestions = { readonly questions: readonly DeclaredQuestion[] }
+type TranscriptClaim = { readonly id: string; readonly quote: string | null }
+type TranscriptEntry = { readonly stage: string; readonly answer: { readonly prose: string; readonly transcript: TranscriptKind; readonly claims: readonly TranscriptClaim[] } }
+type Transcript = { readonly entries: readonly TranscriptEntry[] }
+type Anchor = { readonly recordId: string; readonly collection: string; readonly number: string; readonly textDisplay: string }
+type Anchors = { readonly anchors: readonly Anchor[] }
+
+/** Fail loudly when a fixture field has no committed counterpart, instead of comparing `undefined`. */
+const mustFind = <T>(found: T | undefined, what: string): T => {
+  if (found === undefined) throw new Error(`the committed demo does not declare ${what}`)
+  return found
+}
+
+const declaredExpectations = (): Map<string, { question: string; expectation: DeclaredExpectation }> => {
+  const declared = readJson(join("data", "demo-questions.json")) as DeclaredQuestions
+  const byClaim = new Map<string, { question: string; expectation: DeclaredExpectation }>()
+  for (const question of declared.questions) {
+    for (const expectation of question.expectations) byClaim.set(expectation.claimId, { question: question.question, expectation })
+  }
+  return byClaim
+}
+
+describe("every example on the page is the committed demo, not a hand-typed string", () => {
+  const fixture = loadFixture()
+
+  test("the page shows every claim the demo declares — and no claim it does not", () => {
+    const declared = declaredExpectations()
+    expect(new Set(fixture.examples.map((example) => example.claimId))).toEqual(new Set(declared.keys()))
+  })
+
+  test("the verdict and reason are the ones data/demo-questions.json declares", () => {
+    const declared = declaredExpectations()
+    for (const example of fixture.examples) {
+      const entry = mustFind(declared.get(example.claimId), `claim ${example.claimId} in data/demo-questions.json`)
+      expect(entry.expectation.expectedVerdict).toBe(example.verdict)
+      expect(entry.expectation.expectedReason).toBe(example.reason)
+      expect(entry.question).toBe(example.question)
+    }
+  })
+
+  test("the prose and quotation are the committed transcript's, verbatim", () => {
+    const transcript = readJson(join("data", "transcript.json")) as Transcript
+    const answers = new Map<string, { prose: string; claim: TranscriptClaim }>()
+    for (const entry of transcript.entries) {
+      if (entry.stage !== "answer") continue
+      for (const claim of entry.answer.claims) answers.set(claim.id, { prose: entry.answer.prose, claim })
+    }
+    for (const example of fixture.examples) {
+      const answer = mustFind(answers.get(example.claimId), `claim ${example.claimId} in data/transcript.json`)
+      expect(answer.prose).toBe(example.prose)
+      expect(answer.claim.quote ?? "").toBe(example.quote)
+    }
+  })
+
+  test("the page's mode label is the committed transcript's own mode, not a typed assumption", () => {
+    // The label is the claim most likely to be wrong in the direction that costs the demo: a
+    // replayed answer labelled live. So the fixture's mode is read out of `data/transcript.json`,
+    // whose every answer entry states its own `transcript`, rather than being trusted as written.
+    const transcript = readJson(join("data", "transcript.json")) as Transcript
+    const modes = new Set(transcript.entries.filter((entry) => entry.stage === "answer").map((entry) => entry.answer.transcript))
+    expect(modes.size).toBeGreaterThan(0)
+    for (const mode of modes) expect(fixture.transcript).toBe(mode)
+  })
+
+  test("the record text and label are the attested anchor's, verbatim", () => {
+    const anchors = readJson(join("data", "eval", "demo-anchors.json")) as Anchors
+    const declared = declaredExpectations()
+    for (const example of fixture.examples) {
+      const recordId = mustFind(declared.get(example.claimId)?.expectation.recordId, `a record id for claim ${example.claimId}`)
+      const anchor = mustFind(
+        anchors.anchors.find((candidate) => candidate.recordId === recordId),
+        `anchor ${recordId} in data/eval/demo-anchors.json`,
+      )
+      expect(anchor.textDisplay).toBe(example.recordText)
+      expect(`${anchor.collection} ${anchor.number}`).toBe(example.sourceLabel)
+    }
+  })
+})

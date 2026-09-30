@@ -37,6 +37,30 @@ export const GradeBasis = Schema.Union([
 ])
 export type GradeBasis = Schema.Schema.Type<typeof GradeBasis>
 
+/**
+ * The one collection that is not a hadith book.
+ *
+ * ## Why this constant exists, and why the retrieval package needs it
+ *
+ * `collection` is a per-source slug: `abudawud`, `nasai`, `tirmidhi`, and so on. There is no
+ * `hadith` collection, because hadith is a *family* of books rather than a book — which is
+ * exactly the kind of assumption that a filter written as `collection = 'hadith'` gets wrong,
+ * and that one did: `hadithSearch` filtered on that string for the whole life of the retrieval
+ * package and matched zero of the corpus's 27 234 rows, so hadith retrieval was silently dead
+ * and every hadith question degraded to `no sources found`.
+ *
+ * So the two parts of this corpus are defined by that one distinction — the Qur'an, and
+ * everything else — and the definition is stated once, here, where the `collection` field is
+ * documented. `@mizan/corpus` writes it (the Tanzil adapter) and `@mizan/retrieval` reads it
+ * (the Qur'an-only tool). A third family, were one ever added, would make this a union rather
+ * than a single slug; `docs/` notes the tafsir corpus is deliberately not being built.
+ *
+ * Hadith membership is deliberately NOT expressed through `gradeApplicable`. That flag says a
+ * dataset grades its rows, and coupling retrieval to it would make a hadith book whose dataset
+ * declines to grade it unsearchable — a grade policy leaking into what the corpus *is*.
+ */
+export const QURAN_COLLECTION = "quran"
+
 export const CorpusRecord = Schema.Struct({
   /** `"{collection}:{number}"`, or `"{collection}:{seq}"` for unnumbered rows. Namespaced, so duplicate ids across collections are safe. */
   id: Schema.String,

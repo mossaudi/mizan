@@ -13,7 +13,18 @@ import { stripComments, stripCommentsOnly } from "./strip-comments.ts"
 
 export type SourceFile = { readonly path: string; readonly text: string }
 
-export type GateId = "G-1" | "G-2" | "G-3" | "G-4" | "G-5" | "G-6"
+export type GateId = "G-1" | "G-2" | "G-3" | "G-4" | "G-5" | "G-6" | "G-7"
+
+/**
+ * The number inside a gate id, and the single parse of the gate vocabulary.
+ *
+ * Declared here because this is the module that owns the `GateId` union. Two modules need the
+ * parse — `run-gates.ts` sorts the gate table by it, and `docs-gates.ts` compares a range a
+ * document asserts against it — and two copies of `Number(id.slice(2))` would be two places for
+ * a future `G-10` or a re-prefixed id to change the answer, which is the drift AGENTS.md
+ * section 17 exists to prevent.
+ */
+export const gateNumber = (gate: GateId): number => Number(gate.slice(2))
 
 export type Finding = {
   readonly gate: GateId
@@ -27,7 +38,18 @@ export type Finding = {
   readonly excerpt: string
 }
 
-export const CODE_EXTENSIONS = [".ts", ".tsx"] as const
+/**
+ * The extensions the structural gates read.
+ *
+ * `.html` is in this list because `apps/web/index.html` is a shipped product surface and a gate
+ * that skips it is a gate that protects the source and not the bytes a judge actually opens. A
+ * hand edit that adds a `<script>` to the committed page is exactly the failure the page's
+ * tests catch, and those tests run only when someone runs them — this makes the same edit a red
+ * build. It is safe to scan markup with token rules because every gate here matches *sink*
+ * tokens (`innerHTML`, `document.write`, `eval(`) rather than markup itself; a tag named
+ * `<script>` in a document is a tag, and the rules that forbid it live in the page's tests.
+ */
+export const CODE_EXTENSIONS = [".ts", ".tsx", ".html"] as const
 
 const SKIP_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", "coverage", ".next", ".turbo"])
 
@@ -36,8 +58,20 @@ export const repoPath = (from: string, to: string): string => relative(from, to)
 
 const isCode = (name: string): boolean => CODE_EXTENSIONS.some((extension) => name.endsWith(extension))
 
-/** Byte-identical output order, so a gate's log is a precondition rather than a coincidence. */
-const byPath = (a: SourceFile, b: SourceFile): number => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)
+/**
+ * Byte-identical output order, so a gate's log is a precondition rather than a coincidence.
+ *
+ * A UTF-16 **code-unit** comparison, and never `localeCompare`. Collation order is a property of
+ * the ICU data on the machine that ran the check, so the same gate over the same commit can
+ * report in two different orders on two machines. The pair that exposes it is not exotic: ICU
+ * orders `seven` before `Seven`, code units order `S` before `s`. A small-ICU runtime makes the
+ * two implementations agree, which is exactly why this class of bug survives until someone runs
+ * the check in a full-ICU container.
+ */
+export const byCodeUnit = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
+
+/** {@link byCodeUnit} over paths, which is the order every collected file and every finding is reported in. */
+export const byPath = (a: SourceFile, b: SourceFile): number => byCodeUnit(a.path, b.path)
 
 /**
  * Walk `root` and return every TypeScript source file, sorted so a gate's output order is

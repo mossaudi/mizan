@@ -1,0 +1,25 @@
+{
+  "transcript": "precomputed",
+  "examples": [
+    {
+      "claimId": "ikhlas-1",
+      "verdict": "verified",
+      "reason": "exact_containment",
+      "question": "What does the Qur'an say about the oneness of God?",
+      "prose": "The Qur'an states the oneness of God directly and without qualification. Surah al-Ikhlas opens by commanding the Prophet to say that He is one, and the surah then denies any likeness to Him.",
+      "quote": "قُلْ هُوَ ٱللَّهُ أَحَدٌ",
+      "sourceLabel": "quran 6222",
+      "recordText": "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ قُلْ هُوَ ٱللَّهُ أَحَدٌ"
+    },
+    {
+      "claimId": "knowledge-fading-1",
+      "verdict": "rejected",
+      "reason": "quote_absent_at_cited_id",
+      "question": "What does the hadith say about the end of the world and knowledge diminishing?",
+      "prose": "A well-known report on the signs of the Hour holds that the world draws near while knowledge diminishes, tribulations surface, and people grow stingy and careless in speech. It is cited here to Sunan Abi Dawud 4255.",
+      "quote": "يَتَقَارَبُ الزَّمَانُ وَيَنْقُصُ الْفِقْهُ وَتَظْهَرُ الْفِتَنُ وَيُلْقَى الشُّحُّ وَيَكْثُرُ الْهَرْجُ",
+      "sourceLabel": "abudawud 4255",
+      "recordText": "حَدَّثَنَا أَحْمَدُ بْنُ صَالِحٍ، حَدَّثَنَا عَنْبَسَةُ، حَدَّثَنِي يُونُسُ، عَنِ ابْنِ شِهَابٍ، قَالَ حَدَّثَنِي حُمَيْدُ بْنُ عَبْدِ الرَّحْمَنِ، أَنَّ أَبَا هُرَيْرَةَ، قَالَ قَالَ رَسُولُ اللَّهِ صلى الله عليه وسلم ‏\"‏ يَتَقَارَبُ الزَّمَانُ وَيَنْقُصُ الْعِلْمُ وَتَظْهَرُ الْفِتَنُ وَيُلْقَى الشُّحُّ وَيَكْثُرُ الْهَرْجُ ‏\"‏ ‏.‏ قِيلَ يَا رَسُولَ اللَّهِ أَيَّةُ هُوَ قَالَ ‏\"‏ الْقَتْلُ الْقَتْلُ ‏\"‏ ‏.‏"
+    }
+  ]
+}

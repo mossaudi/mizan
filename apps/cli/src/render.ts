@@ -1,6 +1,9 @@
-import type { Claim, ClaimVerdict, VerdictReport } from "@mizan/core"
+import type { Claim, ClaimVerdict, Relevance, ResolvedCitation, VerdictReport } from "@mizan/core"
+import { badgeFor, normalizeForTerminal, transcriptLabel } from "@mizan/core"
 import type { TranscriptSource } from "@mizan/agent"
 import { longestRunFor, resolutionKey } from "@mizan/verify"
+import { correctionFor, renderCorrection } from "./correction.ts"
+import { relevanceLabel } from "./relevance.ts"
 
 /**
  * Rendering. Text nodes only, no markup — AGENTS.md section 11.
@@ -31,6 +34,35 @@ import { longestRunFor, resolutionKey } from "@mizan/verify"
  * characters, so a two-column Arabic table renders as visual nonsense in most terminals. A
  * labelled stack is unambiguous in every one of them.
  *
+ * ## Two statements, printed side by side
+ *
+ * The badge answers "is this quote in that record". It does not answer "does this answer address
+ * the question", and Sprint 2 added the second statement without disturbing the first:
+ *
+ *  - **correction**, for a `rejected` claim, locates the run the record does share, so the reader
+ *    can see dropped-clause against invented-sentence. It is a *location* — see `correction.ts`,
+ *    which explains why the span type has no number in it that could be divided.
+ *  - **relevance**, per claim, states whether the quoted span addresses the question, as one of
+ *    three discrete words. `undetermined` is printed as itself, never softened into `answers`.
+ *
+ * Neither can change a badge. Gate G-7 re-asserts the separation at every run, and G-7.7 forbids
+ * the relevance module from naming an outcome at all, so this is structural rather than a promise
+ * in a comment.
+ *
+ * ## Corpus text is neutralised before it reaches a terminal
+ *
+ * `normalizeForTerminal` is applied to every piece of record text and model prose this file prints.
+ * A record came from the internet; a string carrying an escape sequence can clear the screen or set
+ * the window title, and in a product whose claim is "the badge you see was computed", text that can
+ * erase its own badge is a spoofing primitive. The stored `textDisplay` is untouched — it is
+ * verbatim because the licence terms require it, and this file's own tests assert the report
+ * contains it verbatim — and the transform is applied at the moment of display only.
+ *
+ * The function removes terminal control sequences and *nothing else*. In particular it does not
+ * compose in the render bidi fold, because that fold also removes the `U+200F` marks Sunan Abi
+ * Dawud publishes around its quoted matn; see `normalizeForTerminal` in `@mizan/core` for the
+ * residual it states instead.
+ *
  * ## The `run:` line is a diagnostic, and this module cannot change a verdict with it
  *
  * `longestRunFor` lives in `packages/mizan-verify/src/diagnostics/` precisely so this file can
@@ -43,27 +75,20 @@ import { longestRunFor, resolutionKey } from "@mizan/verify"
  */
 
 /**
- * Keyed by the verdict union rather than by `string`, so adding a verdict to `@mizan/core` is
- * a compile error here instead of a claim that silently renders as `UNVERIFIABLE`.
- */
-type Verdict = VerdictReport["claims"][number]["verdict"]
-
-const VERDICT_GLYPH: Readonly<Record<Verdict, string>> = {
-  verified: "VERIFIED",
-  rejected: "REJECTED",
-  unverifiable: "UNVERIFIABLE",
-}
-
-/**
  * The badge is shown only when the report can back it up.
  *
  * `verified` is permitted only with evidence attached, and the verifier never emits that
  * combination. This is therefore not a fix for an observable bug: it is the renderer refusing
  * to be the last component that would print a verified claim whose source it cannot show. A
  * report assembled by hand in a future refactor would lose its badge here rather than gain one.
+ *
+ * The badge strings themselves come from `badgeFor` in `@mizan/core`, which is keyed by the
+ * verdict union and is the same map the static page reads — so the terminal and the page cannot
+ * disagree about what a verdict is called, and adding a verdict to the schema is a compile error
+ * in both rather than a claim that silently renders as `UNVERIFIABLE`.
  */
 const displayVerdict = (claim: VerdictReport["claims"][number]): string =>
-  claim.verdict === "verified" && claim.evidence === null ? VERDICT_GLYPH.unverifiable : VERDICT_GLYPH[claim.verdict]
+  claim.verdict === "verified" && claim.evidence === null ? badgeFor("unverifiable") : badgeFor(claim.verdict)
 
 const bar = (width: number): string => "─".repeat(width)
 
@@ -120,6 +145,45 @@ export type SourceExcerpt = {
  */
 export type SourceTable = ReadonlyMap<string, SourceExcerpt>
 
+/**
+ * Build the evidence table the renderer reads, keyed twice.
+ *
+ * Once by `resolutionKey(citation)` — the same key the verifier resolves with, so the renderer
+ * cannot disagree with it about which record a citation means — and once by record id, because a
+ * `verified` verdict names the exact record that matched and the verifier picks the lowest id
+ * among candidates. Showing any other candidate would be showing the wrong text beside a badge.
+ *
+ * An ambiguous or unresolved citation contributes no entry at all, which precisely makes the
+ * renderer say "no record in this snapshot matches …" for those cases instead of inventing a
+ * source to sit next to the badge. No extra I/O: `textMatch` came back with the resolution.
+ *
+ * ## Why it lives here and not in `main.ts`
+ *
+ * It is the renderer's input, and it is a `SourceExcerpt` producer — the same concern as
+ * `citationLabel` directly above, which is here for the same reason. When `demo.ts` needed the
+ * identical table, keeping it in `main.ts` would have meant either an import of an entry point
+ * (a script that calls `process.exit` at module scope) or a second copy that could drift and
+ * quietly disagree with the verifier about which record a citation means. Two spellings of that
+ * key is precisely the failure AGENTS.md section 17 exists to prevent.
+ */
+export const buildSourceTable = (resolved: readonly ResolvedCitation[]): SourceTable => {
+  const table = new Map<string, SourceExcerpt>()
+  for (const entry of resolved) {
+    for (const record of entry.records) {
+      const excerpt: SourceExcerpt = {
+        recordId: record.id,
+        label: citationLabel(record.collection, record.number),
+        sourceUrl: record.sourceUrl,
+        textDisplay: record.textDisplay,
+        textMatch: record.textMatch,
+      }
+      table.set(resolutionKey(entry.citation), excerpt)
+      table.set(record.id, excerpt)
+    }
+  }
+  return table
+}
+
 /** The record a verdict was decided against, or null when the citation resolved to nothing. */
 const resolveSource = (verdict: ClaimVerdict, claim: Claim, sources: SourceTable): SourceExcerpt | null => {
   if (verdict.evidence !== null) return sources.get(verdict.evidence.recordId) ?? null
@@ -138,21 +202,41 @@ const unresolvedLine = (claim: Claim): string => {
 }
 
 /**
+ * The relevance line, and why it is a line rather than a badge.
+ *
+ * Relevance is a *second* statement, printed next to the first. The badge is a computed fact about
+ * a quote and a record, and a lexical heuristic must not overrule it — `relevance.ts` is forbidden
+ * from naming an outcome by gate G-7.7, so it could not if it tried. What a reader must not be
+ * left with is a green badge and no notice that the quote was off-topic, so the state is printed
+ * in its own words, on every claim, with `undetermined` shown as itself.
+ */
+const renderRelevance = (relevance: Relevance | undefined): string => {
+  if (relevance === undefined) return `${INDENT}relevance: not assessed — this report was built without a question to compare against`
+  const located = relevance.located.length === 0 ? "none" : relevance.located.join(", ")
+  return `${INDENT}relevance: ${relevanceLabel(relevance)} — ${relevance.reason} (question terms in this quote: ${located})`
+}
+
+/**
  * One claim: the badge, then the evidence for it.
  *
  * `claim` is looked up positionally and may be absent, because `verifyAnswer` preserves order
  * but a hand-built report is not guaranteed to. A missing claim prints "no quotation to check"
  * rather than throwing, so a renderer bug can never be the reason a demo fails on screen.
+ *
+ * `relevance` is positional for the same reason and is likewise allowed to be absent; an absent
+ * assessment prints as *not assessed*, which is a different statement from any of the three states
+ * and is the honest one.
  */
-const renderClaim = (verdict: ClaimVerdict, claim: Claim | undefined, sources: SourceTable): string[] => {
+const renderClaim = (verdict: ClaimVerdict, claim: Claim | undefined, sources: SourceTable, relevance: Relevance | undefined): string[] => {
   const lines = [`[${displayVerdict(verdict)}] ${verdict.claimId} — ${verdict.reason} (match: ${verdict.matchStrength.kind})`]
+  lines.push(renderRelevance(relevance))
 
   const quote = claim?.quote ?? null
   if (quote === null || quote.trim().length === 0) {
     lines.push(`${INDENT}quoted:  (none — there was no quotation to check)`)
     return lines
   }
-  lines.push(`${INDENT}quoted:  ${quote}`)
+  lines.push(`${INDENT}quoted:  ${normalizeForTerminal(quote)}`)
 
   if (claim === undefined) return lines
   const source = resolveSource(verdict, claim, sources)
@@ -161,13 +245,19 @@ const renderClaim = (verdict: ClaimVerdict, claim: Claim | undefined, sources: S
     return lines
   }
 
-  lines.push(`${INDENT}source:  ${source.label} — ${source.sourceUrl}`)
-  lines.push(`${CONTINUATION}${displayed(source.textDisplay)}`)
+  lines.push(`${INDENT}source:  ${normalizeForTerminal(source.label)} — ${normalizeForTerminal(source.sourceUrl)}`)
+  lines.push(`${CONTINUATION}${normalizeForTerminal(displayed(source.textDisplay))}`)
 
-  // Display-only. See the module comment: this number cannot reach `verify.ts`, and the badge
+  // Display-only. See the module header: this number cannot reach `verify.ts`, and the badge
   // above was printed from `ClaimVerdict`, not from anything computed on this line.
   const run = longestRunFor(quote, source.textMatch)
   lines.push(`${INDENT}run:     ${run.runChars} of ${run.quoteChars} folded characters shared — display only, never a verdict`)
+
+  // A correction is offered for a rejection and for nothing else. `correctionFor` is total, so a
+  // rejected claim whose citation resolved to nothing degrades to a stated reason rather than
+  // silently printing nothing — which would read as "there is no correction to make" rather than
+  // "we could not look".
+  lines.push(...renderCorrection(correctionFor({ verdict: verdict.verdict, quote, recordTextMatch: source.textMatch })))
   return lines
 }
 
@@ -182,8 +272,10 @@ export const renderHeader = (options: {
     `sources       ${options.sourceCount} from the local snapshot`,
     `model         ${options.model}`,
     // The transcript kind is on its own line, in capitals, because a replay presented as a
-    // live generation is the failure this project cannot afford.
-    `transcript    ${options.transcript === "precomputed" ? "PRECOMPUTED (deterministic replay)" : "LIVE"}`,
+    // live generation is the failure this project cannot afford. The wording is `transcriptLabel`
+    // in `@mizan/core` rather than a ternary here, so the static page and this header cannot
+    // drift apart (AGENTS.md section 17).
+    `transcript    ${transcriptLabel(options.transcript)}`,
     `snapshot      ${options.snapshotHash.slice(0, 16)}…`,
     bar(64),
   ].join("\n")
@@ -195,19 +287,25 @@ export const renderReport = (options: {
   readonly claims: readonly Claim[]
   /** Resolved records to show as evidence, keyed for lookup. See `SourceTable`. */
   readonly sources: SourceTable
+  /**
+   * One relevance assessment per claim, in the same order. `null` for a report assembled without a
+   * question, which renders as *not assessed* — a fourth, visible state, not a default.
+   */
+  readonly relevance: readonly Relevance[] | null
   readonly transcript: TranscriptSource
   readonly model: string
   readonly sourceCount: number
   readonly snapshotHash: string
 }): string => {
   const sections: string[] = [renderHeader({ transcript: options.transcript, model: options.model, snapshotHash: options.snapshotHash, sourceCount: options.sourceCount })]
-  sections.push(options.prose)
+  sections.push(normalizeForTerminal(options.prose))
   sections.push("")
   // `verifyAnswer` preserves the caller's claim order, so index `i` of the report is the verdict
   // for index `i` of the claims. A report whose lengths disagree still renders: the extra
   // verdicts print their badge, and the missing evidence prints "no quotation to check".
   options.report.claims.forEach((verdict, index) => {
-    sections.push(...renderClaim(verdict, options.claims[index], options.sources))
+    const assessed = options.relevance === null ? undefined : options.relevance[index]
+    sections.push(...renderClaim(verdict, options.claims[index], options.sources, assessed))
   })
   if (options.report.degraded.length > 0) sections.push(`\ndegraded: ${options.report.degraded.join(", ")}`)
   return sections.join("\n")

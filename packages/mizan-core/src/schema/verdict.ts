@@ -39,6 +39,33 @@ export const Verdict = Schema.Union([
 ])
 export type Verdict = Schema.Schema.Type<typeof Verdict>
 
+/**
+ * The one spelling of each badge, keyed by the union rather than by `string`.
+ *
+ * ## Why it lives beside the union and not in a renderer
+ *
+ * `Record<Verdict, string>` is exhaustive: the day a fourth verdict joins the schema, every map
+ * keyed this way stops compiling until somebody writes its badge. Two surfaces render badges —
+ * `apps/cli/src/render.ts` and the static page `apps/web/src/page.ts` — and a second copy would
+ * be a second place for one of them to disagree about what a `verified` claim is labelled. One
+ * spelling of "VERIFIED" is an AGENTS.md section 17 requirement, not a convenience.
+ *
+ * ## Why there is no fallback branch
+ *
+ * `badgeFor` has no `default` and no `??`. A verdict this repository does not recognise is a
+ * compile error, never a badge invented for a state nobody defined — a component that silently
+ * renders *something* for an unknown state is exactly the honest-degradation failure AGENTS.md
+ * section 16 forbids, one layer down from the failure table.
+ */
+export const VERDICT_BADGE: Readonly<Record<Verdict, string>> = {
+  verified: "VERIFIED",
+  rejected: "REJECTED",
+  unverifiable: "UNVERIFIABLE",
+}
+
+/** @see VERDICT_BADGE */
+export const badgeFor = (verdict: Verdict): string => VERDICT_BADGE[verdict]
+
 export const ExactMatchStrength = Schema.Struct({
   kind: Schema.Literal("exact"),
   percent: Schema.Literal(100),

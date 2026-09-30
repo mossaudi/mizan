@@ -28,7 +28,7 @@ const MESSAGE = [
   "",
   "Run the suite the supported way instead — it iterates packages and names the one that failed:",
   "",
-  "    bun run ci              typecheck + test per package, then gates G-1..G-6",
+  "    bun run ci              typecheck + test per package, then gates G-1..G-7",
   "    bun run ci:typecheck    types only",
   "    bun run ci:test         tests only",
   "    bun run ci:gates        structural gates only",

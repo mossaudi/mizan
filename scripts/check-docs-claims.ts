@@ -29,11 +29,12 @@ import { requireRepositoryRoot, runDocsClaimChecks } from "@mizan/gate"
  * A disclosure that drifted in six places should be fixed in one pass, not discovered one build at
  * a time.
  *
- * ## Not a seventh gate
+ * ## Not a gate
  *
- * G-1..G-6 have published numbers, an acceptance criterion each, and a `runGates` entry. Adding a
- * seventh would change published claims about what this project guarantees — and "we have seven
- * gates" is itself a claim a judge can check. This runs as its own named step in the same CI job.
+ * The gates have published numbers, an acceptance criterion each, and a `runGates` entry. Adding
+ * to that list would change published claims about what this project guarantees — and "we have
+ * seven gates" is itself a claim a judge can check, which is why rule R8 now checks it against
+ * `GATE_IDS` rather than leaving it to review. This runs as its own named step in the same CI job.
  */
 
 const main = async (): Promise<number> => {
@@ -46,7 +47,13 @@ const main = async (): Promise<number> => {
 
   const result = runDocsClaimChecks(found.value)
   if (result.ok) {
-    console.log(`check:docs OK — ${result.checked.length} files audited, no claim disagrees with the repository.`)
+    // The two counts are separate because they are different scopes. `checked` is the named
+    // artefacts with a dedicated rule; `swept` is the whole tree R8 read for gate-count claims.
+    // Printing only the first would understate the check, which is the exact sin this tool exists
+    // to catch in documents.
+    console.log(
+      `check:docs OK — ${result.checked.length} files audited, ${result.swept} swept for gate-count claims, no claim disagrees with the repository.`,
+    )
     for (const file of result.checked) console.log(`  ${file}`)
     return 0
   }

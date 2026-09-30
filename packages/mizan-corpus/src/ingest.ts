@@ -35,6 +35,38 @@ import { partitionQuarantined, type QuarantinedRecord } from "./quarantine.ts"
 
 export const ADAPTERS: readonly SourceAdapter[] = [tanzilAdapter, quranlabAdapter]
 
+/**
+ * What an operator is told while a network-bound ingest runs.
+ *
+ * ## Why this exists, and why it is a value rather than a printed line
+ *
+ * Acquisition is minutes of HTTP against two upstreams, and it has no runtime SLO to be measured
+ * against — so the only question worth answering during it is "is it alive, and on what". A run
+ * that prints nothing until it finishes cannot answer either: a slow fetch and a hung one look
+ * identical from a terminal, and the natural response to that is to kill a working ingest and start
+ * over. MIZ-101 asks for "a progress line so an operator can tell stall from hang", and the only
+ * version of that which works is a line emitted BEFORE the blocking call naming the source it is
+ * about to block on.
+ *
+ * It is a plain data value with no clock and no formatting, so the library stays free of both (the
+ * caller owns time — see `IngestOptions.now`) and the same event stream is reproducible between
+ * runs. `detail` carries the failure text a caller already prints and never corpus content.
+ */
+export type IngestProgress = {
+  /** The source slug, exactly as the registry spells it. */
+  readonly source: string
+  /**
+   * `started` — emitted before the first network call, which is the whole point of the type.
+   * `rows` — the adapter accepted this many rows so far. `completed` / `failed` — the last event
+   * for this source, always, so a source that dies mid-stream is never silent.
+   */
+  readonly stage: "started" | "rows" | "completed" | "failed"
+  /** Rows so far, or `null` for the stages that have no count. Never a placeholder number. */
+  readonly rows: number | null
+  /** The failure reason, on `failed` only. Never fetched text. */
+  readonly detail: string | null
+}
+
 export type IngestOptions = {
   readonly root: string
   /** `Infinity` for a full ingest. Tests and quick runs pass a small number. */
@@ -44,6 +76,12 @@ export type IngestOptions = {
   readonly fetcher?: Fetcher
   /** Allow a source failure and record it as a disabled source instead. Never used in CI. */
   readonly allowPartial?: boolean
+  /**
+   * Progress sink. Omit it and this module says nothing at all — every existing caller and test
+   * keeps the silent behaviour, and silence stays the default rather than becoming something a
+   * caller has to opt out of.
+   */
+  readonly onProgress?: (event: IngestProgress) => void
   /** ISO timestamp for the ledger and the attestation. The caller owns the clock. */
   readonly now: string
 }
@@ -52,6 +90,29 @@ export type IngestFailure = {
   readonly _tag: "ingest_failed"
   readonly source: string
   readonly detail: string
+}
+
+/**
+ * Hand one event to the caller's sink, and let nothing the sink does reach the corpus.
+ *
+ * A progress line is a display concern; the corpus is not, and the ingest's own result is the
+ * authority on what happened. So a sink that throws — a closed stderr pipe being the realistic
+ * case — must not turn a completed fetch into a failed run, and a sink that writes to the event
+ * must not be able to reach anything downstream of it. The event is therefore built here, frozen,
+ * and the failure is absorbed deliberately rather than by accident.
+ *
+ * The catch is the one swallow in this module, and it is bounded on purpose: a display sink
+ * cannot cause, prevent or alter a fetch, a record or a failure, because it is only ever called
+ * after the fact with a value it did not produce.
+ */
+const emit = (onProgress: ((event: IngestProgress) => void) | undefined, event: IngestProgress): void => {
+  if (onProgress === undefined) return
+  try {
+    onProgress(Object.freeze({ ...event }))
+  } catch {
+    // Deliberate, and the comment above is the justification. Reporting this upward would mean
+    // failing a run over a stderr write, which is the one outcome worse than a missing line.
+  }
 }
 
 export type IngestResult = {
@@ -121,23 +182,37 @@ export const runIngest = async (options: IngestOptions): Promise<Result<IngestRe
       continue
     }
 
+    const source = meta.descriptor.source
+    // Before the adapter is called, and therefore before any network request. This is the line an
+    // operator reads to learn WHICH source a stalled run is stalled on; emitting it afterwards
+    // would be a progress line that is silent for exactly the interval it exists to cover.
+    emit(options.onProgress, { source, stage: "started", rows: null, detail: null })
+
     const get = async (url: string) => {
       const body = await fetcher(url)
       if (isOk(body)) return { ok: true as const, body: body.value }
       return { ok: false as const, detail: describeFetchFailure(body.error) }
     }
 
-    const result = await adapter.fetchRecords({ get, limit })
+    const result = await adapter.fetchRecords({
+      get,
+      limit,
+      report: (rows) => emit(options.onProgress, { source, stage: "rows", rows, detail: null }),
+    })
     if (isErr(result)) {
-      const failure = toIngestFailure(meta.descriptor.source, result.error)
+      const failure = toIngestFailure(source, result.error)
+      // In both modes. Strict mode returns on the next line, so without this the operator's last
+      // line would be `started` and would carry no reason at all.
+      emit(options.onProgress, { source, stage: "failed", rows: null, detail: failure.detail })
       if (options.allowPartial !== true) return err(failure)
       failures.push(failure)
       continue
     }
 
-    const built = result.value.records.map((raw) => toCorpusRecord(raw, { meta, gradeSource: meta.descriptor.source }))
+    const built = result.value.records.map((raw) => toCorpusRecord(raw, { meta, gradeSource: source }))
     records.push(...built)
-    rows.set(meta.descriptor.source, { rows: built.length, sha256: result.value.sha256 })
+    rows.set(source, { rows: built.length, sha256: result.value.sha256 })
+    emit(options.onProgress, { source, stage: "completed", rows: built.length, detail: null })
   }
 
   const duplicates = findDuplicateIds(records)

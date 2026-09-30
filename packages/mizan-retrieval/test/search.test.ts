@@ -34,18 +34,28 @@ const record = (overrides: Partial<CorpusRecord> & Pick<CorpusRecord, "id" | "co
 })
 
 /**
- * A tiny two-collection corpus, folded exactly the way ingest folds it.
+ * A tiny two-corpus fixture, folded exactly the way ingest folds it.
  *
  * `quran:2` carries `gradeApplicable: false` on purpose: it is the case where a null grade has a
  * MEANING, and a projection that loses the flag would make it indistinguishable from a record the
  * dataset simply declines to grade.
+ *
+ * ## Why the hadith rows are `bukhari`, and why that detail is load-bearing
+ *
+ * They used to be `collection: "hadith"`, and that is the bug the fixture was hiding. A real
+ * corpus has no `hadith` collection — `collection` is a per-source slug, and the hadith side is
+ * five books (`abudawud`, `bukhari`, `malik`, `nasai`, `tirmidhi`). Naming a fixture collection
+ * `"hadith"` made `hadithSearch`'s equally wrong `collection = 'hadith'` filter look correct: the
+ * filter and the fixture agreed with each other and neither agreed with the data. A fixture that
+ * invents a shape the corpus does not have cannot catch a filter that assumes one, so this one
+ * now uses the slugs `data/corpus.db` actually contains.
  */
 const fixture = (): readonly CorpusRecord[] => [
   record({ id: "quran:1", collection: "quran", number: "1", textDisplay: "بسم الله الرحمن الرحيم" }),
   record({ id: "quran:2", collection: "quran", number: "2", textDisplay: "الحمد لله رب العالمين", gradeApplicable: false }),
   // "مسجدا" against a "مسجد" query is what proves the prefix pass is reachable at all.
-  record({ id: "hadith:1", collection: "hadith", number: "1", textDisplay: "من بنى مسجدا لله بنى الله له بيتا في الجنة" }),
-  record({ id: "hadith:2", collection: "hadith", number: "2", textDisplay: "قال رسول الله صلى الله عليه وسلم" }),
+  record({ id: "bukhari:1", collection: "bukhari", number: "1", textDisplay: "من بنى مسجدا لله بنى الله له بيتا في الجنة" }),
+  record({ id: "bukhari:2", collection: "bukhari", number: "2", textDisplay: "قال رسول الله صلى الله عليه وسلم" }),
 ]
 
 /**
@@ -84,8 +94,8 @@ describe("search against a real FTS5 index", () => {
       if (!result.ok) return
       expect(result.value.chunks.length).toBeGreaterThan(0)
       const chunk = result.value.chunks[0]
-      expect(chunk?.id).toBe("hadith:1")
-      expect(chunk?.collection).toBe("hadith")
+      expect(chunk?.id).toBe("bukhari:1")
+      expect(chunk?.collection).toBe("bukhari")
       expect(chunk?.sourceUrl).toBe("https://example.invalid/record")
       expect(chunk?.attribution).toBe("Fixture")
       expect(chunk?.license).toBe("CC0-1.0")
@@ -100,8 +110,8 @@ describe("search against a real FTS5 index", () => {
       if (!isOk(tokens)) throw new Error("expected tokens")
       expect(bm25Order(db, broadExpression(tokens.value), undefined, 10)).toEqual([])
       expect(bm25Order(db, phraseExpression(tokens.value), undefined, 10)).toEqual([])
-      expect(bm25Order(db, prefixExpression(tokens.value), undefined, 10)).toEqual(["hadith:1"])
-      expect(foundIds(search(db, { text: "مسجد" }))).toEqual(["hadith:1"])
+      expect(bm25Order(db, prefixExpression(tokens.value), undefined, 10)).toEqual(["bukhari:1"])
+      expect(foundIds(search(db, { text: "مسجد" }))).toEqual(["bukhari:1"])
     })
   })
 
@@ -153,10 +163,16 @@ describe("search against a real FTS5 index", () => {
     })
   })
 
-  test("the collection filter is applied, not merely passed through", () => {
+  test("the scope filter is applied, not merely passed through", () => {
     withSnapshot((db) => {
-      const scoped = search(db, { text: "الله", collection: "quran" })
-      expect(foundIds(scoped).every((id) => id.startsWith("quran:"))).toBe(true)
+      const quran = search(db, { text: "الله", scope: "quran" })
+      expect(foundIds(quran).every((id) => id.startsWith("quran:"))).toBe(true)
+      // The half of the fix that no previous test could have caught: `hadith` is an EXCLUSION of
+      // the one non-hadith collection, so a hadith search is non-empty and contains no quran row.
+      // Written against `collection: "hadith"`, this tool matched nothing at all.
+      const hadith = search(db, { text: "الله", scope: "hadith" })
+      expect(foundIds(hadith).length).toBeGreaterThan(0)
+      expect(foundIds(hadith).some((id) => id.startsWith("quran:"))).toBe(false)
     })
   })
 
@@ -180,17 +196,31 @@ describe("search against a real FTS5 index", () => {
 })
 
 describe("the tools", () => {
-  test("quranSearch is pinned to the Qur'an collection", () => {
+  /**
+   * Both scope tests below assert NON-EMPTINESS first, and that is the whole point.
+   *
+   * The previous versions asked only that every returned id carry the right prefix, which
+   * `[].every(...) === true` satisfies — so they passed while `hadithSearch` matched nothing at
+   * all, and while its query matched no fixture record either. A scope filter that returns zero
+   * rows is indistinguishable from a correct one when the assertion is vacuous, which is why these
+   * use words that are really in the fixtures (`BUKHARI_1` and `QURAN_2_255`) and check the count.
+   */
+  test("quranSearch is pinned to the Qur'an, and finds the Qur'an", () => {
     withSnapshot((db) => {
-      const result = quranSearch(db, { text: "الله" })
+      const result = quranSearch(db, { text: "العالمين" })
+      expect(foundIds(result)).toContain("quran:2")
       expect(foundIds(result).every((id) => id.startsWith("quran:"))).toBe(true)
     })
   })
 
-  test("hadithSearch is pinned to the hadith collection", () => {
+  test("hadithSearch is pinned to hadith, and finds hadith", () => {
     withSnapshot((db) => {
       const result = hadithSearch(db, { text: "مسجد" })
-      expect(foundIds(result).every((id) => id.startsWith("hadith:"))).toBe(true)
+      // Non-empty is the assertion the old test could not make. `bukhari:1` contains this word
+      // and lives in a hadith collection, so the scope has to let it through — and it could not
+      // before, because the filter named a collection that does not exist.
+      expect(foundIds(result)).toContain("bukhari:1")
+      expect(foundIds(result).some((id) => id.startsWith("quran:"))).toBe(false)
     })
   })
 

@@ -665,7 +665,62 @@ describe("reading the committed artefacts back — decoded, never cast", () => {
     if (isErr(decoded)) throw new Error(`unexpected: ${describeReadFailure(decoded.error)}`)
     expect(decoded.value.recordCount).toBe(42260)
   })
+
+  test("a UTF-8 byte order mark is an encoding artefact, not a corrupt attestation", () => {
+    // `Set-Content`, `Out-File` under Windows PowerShell 5.1 and `>` redirection in `cmd.exe` all
+    // write UTF-8 WITH a BOM, and this repository's CI matrix runs `windows-latest`. An operator who
+    // re-saved `attestation.json` after a legitimate edit would otherwise have been told
+    // `attestation_unreadable: malformed_json`, which asserts the file is corrupt when it is
+    // byte-for-byte correct and names no action that would help.
+    //
+    // Refusing here would be a false negative on the control that decides which corpus is
+    // authorised, and a false negative teaches the next operator to switch the check off. RFC 8259
+    // section 8.1 permits ignoring a BOM, and ignoring it cannot weaken anything that follows: the
+    // text still has to decode through `AttestationSchema` and then match `snapshotHash` and
+    // `recordCount` exactly.
+    const attestation = {
+      schemaVersion: "1.0.0",
+      generatedAt: "2026-01-01T00:05:00.000Z",
+      snapshotHash: "b".repeat(64),
+      recordCount: 42260,
+      quarantinedRows: 0,
+      collectionCounts: { quran: 6236 },
+      sources: [],
+      chainHead: "b".repeat(64),
+      chainLength: 2,
+    }
+    const decoded = decodeAttestationText(`﻿${JSON.stringify(attestation)}`)
+    if (isErr(decoded)) throw new Error(`a BOM was reported as corruption: ${describeReadFailure(decoded.error)}`)
+    expect(decoded.value.snapshotHash).toBe("b".repeat(64))
+  })
+
+  test("exactly one mark is stripped, and any other U+FEFF is refused as content", () => {
+    // "One" is the whole rule, and both halves of it are asserted because the permissive reading is
+    // the dangerous one. Trimming every occurrence — or `trim()`-ing the document, which would take
+    // a U+FEFF anywhere including the middle — is a second, silent way of changing what was
+    // attested, and this is the boundary where that leniency becomes a bypass.
+    const shape = {
+      schemaVersion: "1.0.0",
+      generatedAt: "2026-01-01T00:05:00.000Z",
+      snapshotHash: "b".repeat(64),
+      recordCount: 42260,
+      quarantinedRows: 0,
+      collectionCounts: { quran: 6236 },
+      sources: [],
+      chainHead: "b".repeat(64),
+      chainLength: 2,
+    }
+    const stamp = decodeAttestationText(`﻿${JSON.stringify(shape)}`)
+    if (isErr(stamp)) throw new Error(`a single leading mark was reported as corruption: ${describeReadFailure(stamp.error)}`)
+    expect(stamp.value.recordCount).toBe(42260)
+
+    // Two at the front: the second is not the front, so the document is not valid JSON and is refused.
+    expect(isErr(decodeAttestationText(`﻿﻿${JSON.stringify(shape)}`))).toBe(true)
+    // One in the middle: content, not an encoding artefact.
+    expect(isErr(decodeAttestationText(`{"schemaVersion"﻿:"1.0.0"}`))).toBe(true)
+  })
 })
+
 
 describe("the source catalogue is a set of decisions, not a list of URLs", () => {
   test("every source has a licence class, and every excluded one has a reason", () => {

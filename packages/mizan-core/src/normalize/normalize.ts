@@ -19,6 +19,7 @@ import {
   foldDigit,
   type FoldStage,
 } from "./fold-table.ts"
+import { stripTerminalControls } from "./terminal.ts"
 
 /**
  * The three normalization functions. Pure: no I/O, no clock, no locale, no
@@ -35,6 +36,9 @@ import {
  */
 
 const collapseAndTrim = (value: string): string => value.replace(WHITESPACE_RUN, " ").trim()
+
+/** The render-time bidi strip, named so the render and terminal forms cannot drift apart. */
+const stripBidi = (value: string): string => value.replace(BIDI_CONTROL_MARKS, "")
 
 const foldDigits = (value: string): string => value.replace(ARABIC_INDIC_DIGITS, foldDigit).replace(EXTENDED_ARABIC_INDIC_DIGITS, foldDigit)
 
@@ -132,7 +136,44 @@ export const normalizeForMatch = (input: string): string =>
  * NFKC, no tashkeel stripping, no letter folding — display text stays exactly as the
  * source published it, which is also what the no-derivatives terms require.
  */
-export const normalizeForRender = (input: string): string => foldDigits(input.replace(BIDI_CONTROL_MARKS, ""))
+export const normalizeForRender = (input: string): string => foldDigits(stripBidi(input))
+
+/**
+ * What a terminal may be shown, and the only form a judge-facing report should print.
+ *
+ * Terminal-control neutralisation and nothing else. `ESC [ 2 J` in a record's text would clear
+ * the screen the badge is printed on, and an OSC title sequence would rewrite the window a judge
+ * is reading — in a product whose claim is "the badge you see was computed", text that can erase
+ * its own badge is a spoofing primitive. See `terminal.ts` for the sequence grammar and for the
+ * newline/tab carve-out.
+ *
+ * ## Why the render fold is NOT composed in here
+ *
+ * It is tempting to write `stripTerminalControls(normalizeForRender(input))` — a terminal-safe
+ * *and* bidi-safe form in one call, and composing them keeps the order argument in one place. It
+ * is wrong here, and the reason is the corpus contract rather than the fold.
+ *
+ * `normalizeForRender` strips `BIDI_CONTROL_MARKS`, which is
+ * `U+061C U+200E U+200F U+202A–U+202E U+2066–U+2069`. A record's `textDisplay` contains `U+200F`
+ * — Sunan Abi Dawud publishes its quoted matn wrapped in right-to-left marks, and a dozen
+ * committed anchors carry them. `textDisplay` is stored verbatim because the no-derivatives licence
+ * terms require it, and the display path prints it verbatim, which the CLI's own tests assert
+ * (`toContain(record.textDisplay)`). Composing the render fold in would delete marks the source
+ * published, in a product whose licence terms forbid a derivative rendering.
+ *
+ * So the two controls stay separate and the honest one is the narrower one: this function claims
+ * only that no byte here can move a cursor or clear a screen.
+ *
+ * ## Stated residual
+ *
+ * A bidi override or isolate (`U+202E`, `U+2066`) in corpus text is therefore *not* removed on the
+ * display path, because removing it would also remove the legitimate marks around it. That is the
+ * pre-existing R12 posture of `textDisplay` — the corpus ships as published, and the reader
+ * compares it against a source they can open — and changing it is a corpus-contract decision, not
+ * a renderer one. It is named here rather than left implied by a function name that says "for
+ * terminal".
+ */
+export const normalizeForTerminal = stripTerminalControls
 
 /** True when a value is usable as a citation identifier after structural folding. */
 export const isNonBlank = (input: string): boolean => normalize(input).length > 0

@@ -4,7 +4,7 @@ import { requireRepositoryRoot } from "../src/repo-root.ts"
 import { runGates, summariseOutcomes } from "../src/index.ts"
 
 /**
- * `bun run gate` — run the six structural gates and exit non-zero on any finding.
+ * `bun run gate` — run the seven structural gates and exit non-zero on any finding.
  *
  * Deliberately minimal: no colour codes, no spinners, no `--fix`. The output of a gate is
  * evidence, and evidence should be diffable and greppable in a CI log.

@@ -372,7 +372,7 @@ describe("the report shows the quote beside the record it was checked against", 
     // table by record id alone silently printed an empty `source:` line.
     sources.set(resolutionKey(published.citation), excerpt)
     sources.set(record.id, excerpt)
-    return { ...snapshot, record, claim, report, output: renderReport({ prose: "prose", report, claims: [claim], sources, transcript: "precomputed", model: "transcript-v1", sourceCount: 1, snapshotHash: snapshot.snapshotHash }) }
+    return { ...snapshot, record, claim, report, output: renderReport({ prose: "prose", report, claims: [claim], sources, relevance: null, transcript: "precomputed", model: "transcript-v1", sourceCount: 1, snapshotHash: snapshot.snapshotHash }) }
   }
 
   test("it prints the fabricated quote, the rejected badge, the record and its URL", () => {
@@ -429,6 +429,7 @@ describe("the report shows the quote beside the record it was checked against", 
         report: built.report,
         claims: [],
         sources: new Map(),
+        relevance: null,
         transcript: "precomputed",
         model: "transcript-v1",
         sourceCount: 0,
@@ -447,7 +448,7 @@ describe("the report shows the quote beside the record it was checked against", 
     try {
       const claim = claimOf("orphan", "text", "يَتَقَارَبُ الزَّمَانُ", { collection: "nasai", number: "999999", grade: null, raw: "x" })
       const report = verifyAnswer({ claims: [claim], evidence: [], snapshotHash: built.snapshotHash })
-      const output = renderReport({ prose: "prose", report, claims: [claim], sources: new Map(), transcript: "precomputed", model: "m", sourceCount: 0, snapshotHash: built.snapshotHash })
+      const output = renderReport({ prose: "prose", report, claims: [claim], sources: new Map(), relevance: null, transcript: "precomputed", model: "m", sourceCount: 0, snapshotHash: built.snapshotHash })
       expect(output).toContain("[UNVERIFIABLE]")
       expect(output).toContain("identifier_unresolved")
       expect(output).toContain("no record in this snapshot matches nasai 999999")

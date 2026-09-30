@@ -2,7 +2,7 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import { isErr, isOk, nowIso } from "@mizan/core"
 import { canonicalJson } from "@mizan/core"
-import { buildRegistryJsonl, runIngest } from "../src/index.ts"
+import { buildRegistryJsonl, runIngest, type IngestProgress } from "../src/index.ts"
 
 /**
  * `bun run ingest` — build the snapshot, the registry, the ledger and the attestation.
@@ -27,6 +27,13 @@ import { buildRegistryJsonl, runIngest } from "../src/index.ts"
  *   --allow-partial    continue past a failing source, recording it as DISABLED with the
  *                      failure as its exclusionReason. Local convenience only; CI uses strict
  *                      mode, where a failing source fails the run.
+ *
+ * ## Progress, and why it is on stderr
+ *
+ * A full ingest is minutes of HTTP against two upstreams. Each source prints a `fetching` line
+ * before its first request and a timestamped row count as pages come back, so a stalled run names
+ * the source it stalled on and the age of the last line answers "slow or hung". These go to stderr
+ * because everything on stdout is a result someone may pipe.
  */
 
 const args = process.argv.slice(2)
@@ -47,9 +54,36 @@ if (Number.isNaN(limit)) {
 const only = onlyArgument === undefined ? undefined : onlyArgument.split(",").map((slug) => slug.trim()).filter(Boolean)
 const root = flag("root") ?? process.cwd()
 
+/**
+ * One line per progress event, on stderr, stamped with the moment it was written.
+ *
+ * stderr rather than stdout because every line on stdout is a result someone may pipe into a file
+ * or a diff, and a heartbeat interleaved into that would corrupt it. The timestamp is the part
+ * that does the work: "the last line is forty seconds old" is how an operator tells a slow fetch
+ * from a hung one, and no amount of wording in the line itself can answer that.
+ *
+ * `nowIso()` is read per line rather than once, because a single stamp taken at the top would be
+ * exactly the thing that cannot distinguish stall from hang.
+ */
+const reportProgress = (event: IngestProgress): void => {
+  if (event.stage === "started") {
+    console.error(`${nowIso()}  ingest   fetching ${event.source}`)
+    return
+  }
+  if (event.stage === "rows") {
+    console.error(`${nowIso()}  ingest   ${event.source} ${event.rows ?? 0} rows`)
+    return
+  }
+  if (event.stage === "completed") {
+    console.error(`${nowIso()}  ingest   ${event.source} done, ${event.rows ?? 0} rows`)
+    return
+  }
+  console.error(`${nowIso()}  ingest   ${event.source} FAILED: ${event.detail ?? "no reason given"}`)
+}
+
 await mkdir(`${root}/data/registry`, { recursive: true })
 
-const result = await runIngest({ root, limit, only, allowPartial: has("allow-partial"), now: nowIso() })
+const result = await runIngest({ root, limit, only, allowPartial: has("allow-partial"), onProgress: reportProgress, now: nowIso() })
 
 if (isErr(result)) {
   // Fail loud. A partially-ingested corpus that looks complete is the worst outcome here.

@@ -1,5 +1,5 @@
 import { err, ok, sha256Hex } from "@mizan/core"
-import type { AdapterFailure, FetchContext, RawRecord, SourceAdapter } from "./types.ts"
+import type { FetchContext, RawRecord, SourceAdapter } from "./types.ts"
 
 /**
  * quranlab/hadith — the Arabic matn of the Kutub al-Sittah, over the Hugging Face
@@ -54,6 +54,18 @@ export const QURANLAB_COLLECTIONS = [
 const DATASET = "quranlab%2Fhadith"
 const PAGE_SIZE = 100
 const MAX_ROWS_PER_COLLECTION = 12_000
+
+/**
+ * How many pages pass between progress reports, and why the unit is pages.
+ *
+ * A page count is the only cadence this module can use without a clock, and the library has no
+ * clock — the caller owns time, which is why `FetchContext.report` takes a row count and nothing
+ * else. At `PAGE_SIZE = 100` this is one line per 1,000 rows, so the 36,024-row hadith fetch emits
+ * roughly 36 lines across its several minutes: often enough that the newest line's timestamp tells
+ * an operator the run is alive, sparse enough that the log stays readable and the cadence is
+ * reproducible rather than machine-dependent.
+ */
+const PROGRESS_PAGE_INTERVAL = 10
 
 /** The fields this adapter reads. Anything else in the response is ignored on purpose. */
 type HadithRow = {
@@ -139,6 +151,7 @@ export const quranlabAdapter: SourceAdapter = {
     const bodies: string[] = []
     let malformed = 0
     let fetched = 0
+    let pages = 0
 
     for (const collection of QURANLAB_COLLECTIONS) {
       let offset = 0
@@ -154,6 +167,7 @@ export const quranlabAdapter: SourceAdapter = {
           })
         }
         bodies.push(response.body)
+        pages += 1
 
         const parsed = JSON.parse(response.body) as RowsResponse
         if (parsed.error !== undefined) {
@@ -174,6 +188,10 @@ export const quranlabAdapter: SourceAdapter = {
         }
         if (page.length < length) break
         offset += PAGE_SIZE
+        // The heartbeat, on a page cadence rather than a clock. `fetched` is cumulative across
+        // collections because an operator asking "how far along is this" wants one number, and
+        // per-collection numbers would need a collection label to mean anything.
+        if (pages % PROGRESS_PAGE_INTERVAL === 0) context.report?.(fetched)
       }
     }
 

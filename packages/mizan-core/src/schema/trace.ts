@@ -42,6 +42,31 @@ export const TranscriptKind = Schema.Union([Schema.Literal("live"), Schema.Liter
 export type TranscriptKind = Schema.Schema.Type<typeof TranscriptKind>
 
 /**
+ * The one wording of each mode, keyed by the union rather than by `string`.
+ *
+ * ## Why this is a map and not a ternary at each call site
+ *
+ * Two surfaces print it: the CLI header in `apps/cli/src/render.ts` and the static page in
+ * `apps/web/src/page.ts`. A replay presented as a live generation is the single failure this
+ * project cannot afford (the spec's risk R10 — a judge reading `PRECOMPUTED` as "not real", or
+ * worse, reading a live run as a replay), so the label is the one fact both surfaces must agree
+ * on byte for byte, and AGENTS.md section 17 says a duplicated fact is a place where two surfaces
+ * can legitimately disagree. This is the same move as `VERDICT_BADGE` in `verdict.ts`, for the same
+ * reason, and it is exhaustive by type: a third mode stops this file compiling rather than
+ * rendering an invented label.
+ *
+ * The words are the ones already on stdout, so the CLI's output is unchanged by the move — which
+ * `apps/cli/test/demo.test.ts` and `happy-path.test.ts` both assert.
+ */
+export const TRANSCRIPT_LABEL: Readonly<Record<TranscriptKind, string>> = {
+  live: "LIVE",
+  precomputed: "PRECOMPUTED (deterministic replay)",
+}
+
+/** @see TRANSCRIPT_LABEL */
+export const transcriptLabel = (kind: TranscriptKind): string => TRANSCRIPT_LABEL[kind]
+
+/**
  * Whether the rankers that produced a result set were fused or degraded.
  *
  * A silent downgrade is a lie about fidelity (AGENTS.md section 16): if only one lexical

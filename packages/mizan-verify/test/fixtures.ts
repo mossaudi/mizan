@@ -95,10 +95,17 @@ export const cite = (collection: string, number: string | null, grade: string | 
 })
 
 /** A claim as a model would write it: prose opinion plus a falsifiable quoted span. */
-export const claim = (id: string, quote: string | null, citations: readonly Citation[], text = "prose"): Claim => ({
+export const claim = (
+  id: string,
+  quote: string | null,
+  citations: readonly Citation[],
+  text = "prose",
+  anchor?: string | null,
+): Claim => ({
   id,
   text,
   quote,
+  anchor: anchor ?? undefined,
   citations: [...citations],
 })
 

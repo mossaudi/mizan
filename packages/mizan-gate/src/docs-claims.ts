@@ -24,17 +24,21 @@
  * drift impossible to commit rather than merely unlikely, and each one is a pure function over file
  * contents so it can be tested by planting a violation.
  *
- * This is deliberately NOT a seventh gate. G-1..G-6 have published numbers, an acceptance
- * criterion each, and a `runGates` entry. Renumbering or adding to that list would change
- * published claims about what this project guarantees, and "we have seven gates" is itself a
- * claim a judge can check. This is a check with a distinct name that runs in the same CI job.
+ * This is deliberately NOT a gate. The gates have published numbers, an acceptance criterion each,
+ * and a `runGates` entry. Renumbering or adding to that list would change published claims about
+ * what this project guarantees, and "we have seven gates" is itself a claim a judge can check —
+ * which is why R8 now checks it against the gate table rather than leaving it to review. The doc
+ * rules stay a separate check with a distinct name that runs in the same CI job.
  *
  * ## What it does and does not check
  *
  * It checks the mechanical classes: file paths, environment variables, registry claims, documented
- * commands, the snapshot arithmetic in `docs-snapshot.ts`, and the claims a document makes about the
- * repository's own artefacts in `docs-artifacts.ts`. It cannot check whether a *prose* sentence is
- * true — no gate can, and a gate that claimed to would be the over-claiming AGENTS.md section 12
+ * commands, the snapshot arithmetic in `docs-snapshot.ts`, the claims a document makes about the
+ * repository's own artefacts in `docs-artifacts.ts`, the figures and quality claims a document
+ * makes in `docs-value.ts`, the corpus-scope renunciations in `docs-corpus.ts`, and the live-before-
+ * replay ordering of the demo runbook in `docs-runbook.ts`. It cannot check
+ * whether a *prose* sentence is
+ * true - no gate can, and a gate that claimed to would be the over-claiming AGENTS.md section 12
  * warns about. A judgement call like "a locally hosted model underperforms" stays a human's call;
  * "this file exists", "this number is the number in `attestation.json`" and "no two cases share a
  * span" do not.
@@ -53,6 +57,17 @@ export type DocsRule =
   | "eval-breadth-overstated"
   | "eval-artefact-unreadable"
   | "live-provider-denied"
+  | "gate-count-stale"
+  | "benchmark-claim-unbacked"
+  | "answer-quality-claim"
+  | "adr-citation-unresolved"
+  | "adr-document-incomplete"
+  | "corpus-absence-unstated"
+  | "runbook-live-after-replay"
+  | "runbook-live-unlabelled"
+  | "runbook-replay-unlabelled"
+  | "runbook-no-live-path"
+  | "runbook-no-replay"
 
 export type DocsClaim = {
   readonly rule: DocsRule

@@ -34,7 +34,7 @@ import type { GateOutcome } from "../src/run-gates.ts"
  * real type error really does reach a human, which is the entire claim.
  *
  * The gate suite is passed as `[]` in the fixture tests: these tests are about the runner,
- * and `gates.test.ts` already covers G-1…G-6. Running the real gates here would also read
+ * and `gates.test.ts` already covers G-1…G-7. Running the real gates here would also read
  * the *real* repository, which a unit test must not depend on.
  */
 
@@ -385,6 +385,6 @@ describe("the real repository is green under the real runner", () => {
     const root = requireRepositoryRoot(import.meta.dir)
     if (isErr(root)) throw new Error(root.error)
     const outcomes = await runGates({ root: root.value })
-    expect(outcomes.map((outcome) => outcome.gate)).toEqual(["G-1", "G-2", "G-3", "G-5", "G-6", "G-4"])
+    expect(outcomes.map((outcome) => outcome.gate)).toEqual(["G-1", "G-2", "G-3", "G-5", "G-6", "G-7", "G-4"])
   }, 300_000)
 })

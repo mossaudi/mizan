@@ -286,11 +286,42 @@ export const decodeLedgerText = (text: string): Result<readonly LedgerEntry[], C
   return ok(entries)
 }
 
+/** U+FEFF, the byte order mark, as a character rather than as bytes. Spelled as an escape so it is
+ * visible in a diff: written literally it is invisible in every editor, which is a poor property
+ * for a constant whose whole job is to be an invisible character. */
+const BYTE_ORDER_MARK = "\uFEFF"
+
+/**
+ * Drop one leading byte order mark.
+ *
+ * RFC 8259 section 8.1 says implementations MAY ignore a BOM rather than treating it as an error,
+ * and for THIS file that is not a courtesy — it is the difference between a true statement and a
+ * false alarm on the repository's integrity path.
+ *
+ * `attestation.json` is the only thing on disk that says which corpus is authorised, so
+ * `attestSnapshot` is the check a tampered `corpus.db` has to get past. Windows tooling emits a
+ * BOM routinely — `Set-Content`, `Out-File` under Windows PowerShell 5.1, and `>` redirection in
+ * `cmd.exe` all produce UTF-8 *with* BOM, and this repository's own CI matrix runs
+ * `windows-latest`. An operator who re-saved the file after a legitimate edit would have been told
+ * `attestation_unreadable: malformed_json`, which asserts the attestation is corrupt when it is
+ * byte-for-byte correct and names no action that would help.
+ *
+ * A refused BOM is a false negative on a security control, and a false negative teaches the next
+ * operator to disable the control. Stripping one character cannot weaken the comparison that
+ * follows: the text still has to decode through `AttestationSchema` and then match
+ * `snapshotHash` and `recordCount` exactly, so nothing a BOM could carry survives to reach a
+ * verdict.
+ *
+ * Exactly one, and only at the start. A U+FEFF anywhere else is content, and content is what the
+ * schema decides about — trimming it would be a second, silent way of changing what was attested.
+ */
+const stripByteOrderMark = (text: string): string => (text.startsWith(BYTE_ORDER_MARK) ? text.slice(1) : text)
+
 /** Decode a committed `attestation.json`. */
 export const decodeAttestationText = (text: string): Result<Attestation, CommittedReadFailure> => {
   let parsed: unknown
   try {
-    parsed = JSON.parse(text) as unknown
+    parsed = JSON.parse(stripByteOrderMark(text)) as unknown
   } catch (cause) {
     return err({ _tag: "malformed_json", line: null, detail: cause instanceof Error ? cause.message : "unparseable" })
   }

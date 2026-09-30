@@ -1,5 +1,14 @@
 import { createHash } from "node:crypto"
-import { normalizeForMatch, toRecordMeta, type Citation, type CorpusRecord, type CorpusRecordMeta, type Verdict, type VerdictReason } from "@mizan/core"
+import {
+  normalizeForMatch,
+  toRecordMeta,
+  type AnchorAdjudication,
+  type Citation,
+  type CorpusRecord,
+  type CorpusRecordMeta,
+  type Verdict,
+  type VerdictReason,
+} from "@mizan/core"
 import type { Database } from "bun:sqlite"
 import {
   anchorsWithSpans,
@@ -15,7 +24,7 @@ import {
   type CorpusIndex,
 } from "./anchors.ts"
 import { arabic_indic_digits, digit_substituted, elide_middle, injection_appended, letter_transposed, replaceWord, tatweel_spacing, undiacriticized, word_inserted, SUBSTITUTIONS, type Mutation } from "./mutations.ts"
-import { CASE_CLASSES, expectedCounts, KNOWN_DIVERGENCE, type CaseClass } from "./plan.ts"
+import { CASE_CLASSES, expectedCounts, type CaseClass } from "./plan.ts"
 
 /**
  * Builds the golden and red-team case lists from the real corpus.
@@ -50,8 +59,23 @@ export type EvalCase = {
   readonly expectedReason: VerdictReason
   readonly expectedRationale: string
   readonly anchorId: string
-  /** Present only on cases the user story and the implemented procedure disagree about. */
-  readonly divergence: typeof KNOWN_DIVERGENCE | null
+  /**
+   * The claim's `anchor`, stamped from `CLAIM_ANCHOR_TEXTS` in `scripts/eval/anchor-texts.ts`.
+   *
+   * Omitted rather than null: `schema/eval.ts` declares it optional, so a case with no span would
+   * be 1 line asserting the absence of a thing the reader already knows is absent. The count of
+   * cases that DO carry one is what a reader is checking, and it is printed by `build:eval`.
+   */
+  readonly anchorText?: string
+  /**
+   * The human ruling from `data/eval/adjudication.json`, when one exists for this case.
+   *
+   * Attached beside `expectedVerdict` and never merged into it. The two answer different
+   * questions — `expectedVerdict` is what the procedure must produce, `adjudicatedVerdict` is
+   * what a person concluded is true of the case — and merging them would hide one behind the
+   * other.
+   */
+  readonly adjudication?: AnchorAdjudication
 }
 
 /**
@@ -89,21 +113,42 @@ const from = (klass: CaseClass): { expectedVerdict: Verdict; expectedReason: Ver
   expectedRationale: klass.rationale,
 })
 
-/** Assign `golden-001`-style ids in build order, and attach the divergence where it applies. */
-export const finalise = (built: readonly Built[], prefix: string): readonly EvalCase[] =>
-  built.map((entry, index) => ({
-    id: `${prefix}-${String(index + 1).padStart(3, "0")}`,
-    classId: entry.classId,
-    mutation: entry.mutation,
-    note: entry.note,
-    quote: entry.quote,
-    citation: entry.citation,
-    expectedVerdict: entry.expectedVerdict,
-    expectedReason: entry.expectedReason,
-    expectedRationale: entry.expectedRationale,
-    anchorId: entry.record.id,
-    divergence: KNOWN_DIVERGENCE.affectsClasses.includes(entry.classId as never) ? KNOWN_DIVERGENCE : null,
-  }))
+/**
+ * Assign `golden-001`-style ids in build order, and stamp each case's adjudication and anchor.
+ *
+ * The adjudications and the anchor spans arrive as lookups because the case ids they are keyed by
+ * do not exist until this function has assigned them: the table names `golden-095`, and `095` is
+ * decided by being the 95th case `buildGolden` produced. Joining after the fact is what lets both
+ * sides be written independently and still be checked against each other.
+ */
+export const finalise = (
+  built: readonly Built[],
+  prefix: string,
+  adjudications: ReadonlyMap<string, AnchorAdjudication> = new Map(),
+  anchorTexts: ReadonlyMap<string, string> = new Map(),
+): readonly EvalCase[] =>
+  built.map((entry, index) => {
+    const id = `${prefix}-${String(index + 1).padStart(3, "0")}`
+    const anchorText = anchorTexts.get(id)
+    const adjudication = adjudications.get(id)
+    return {
+      id,
+      classId: entry.classId,
+      mutation: entry.mutation,
+      note: entry.note,
+      quote: entry.quote,
+      citation: entry.citation,
+      expectedVerdict: entry.expectedVerdict,
+      expectedReason: entry.expectedReason,
+      expectedRationale: entry.expectedRationale,
+      anchorId: entry.record.id,
+      // OMITTED rather than null when a case carries neither. `"anchorText": null` on 134 of 200
+      // cases would be 134 lines asserting nothing, and a reader scanning the file would learn to
+      // skip the field — the wrong instinct for the two fields on a case that record human work.
+      ...(anchorText === undefined ? {} : { anchorText }),
+      ...(adjudication === undefined ? {} : { adjudication }),
+    }
+  })
 
 /** Deduplicate by record id, id-ascending. */
 export const anchorsOf = (built: readonly Built[]): readonly EvalAnchor[] => {
@@ -457,4 +502,55 @@ const shapeProblems = (name: "golden" | "redteam", entry: EvalCase, index: Corpu
   return []
 }
 
+/**
+ * Every stamped anchor must be a normalized substring of BOTH the claim it sits on and the record
+ * it cites, or step 5b can never locate it and the published movement figures would be a wish.
+ *
+ * The 3-word minimum, the 8-word maximum and the 160-character cap are NOT checked here. They are
+ * properties of `anchorFrom`'s own bounds, and restating them beside the real implementation would
+ * be a second place the rule is written down (AGENTS.md section 17) that can silently disagree with
+ * the first. `apps/cli/test/eval.test.ts` asserts `anchorFrom(anchorText) !== null`, which is the
+ * check the runtime performs, against the runtime's own numbers.
+ */
+export const anchorProblems = (name: "golden" | "redteam", cases: readonly EvalCase[], anchors: readonly EvalAnchor[]): readonly Problem[] => {
+  const textById = new Map(anchors.map((anchor) => [anchor.id, anchor.textDisplay]))
+  const problems: string[] = []
+  for (const entry of cases) {
+    if (entry.anchorText === undefined) continue
+    const span = normalizeForMatch(entry.anchorText)
+    if (span.length === 0) {
+      problems.push(`${name}: case ${entry.id} carries an anchor that folds to an empty string`)
+      continue
+    }
+    if (!normalizeForMatch(entry.quote).includes(span)) {
+      problems.push(`${name}: case ${entry.id} carries an anchor that is not a substring of its own quote`)
+    }
+    const record = textById.get(entry.anchorId)
+    if (record === undefined) {
+      problems.push(`${name}: case ${entry.id} carries an anchor but cites ${entry.anchorId}, which is not an anchor of this set`)
+      continue
+    }
+    if (!normalizeForMatch(record).includes(span)) {
+      problems.push(`${name}: case ${entry.id} carries an anchor that is not a substring of ${entry.anchorId}, so no locator could ever find it`)
+    }
+  }
+  return problems
+}
+
 export type { Built }
+
+/**
+ * The cases of a set BEFORE ids exist, in the same order `finalise` will number them.
+ *
+ * Exists so the adjudication loader can be handed the id a row names and the citation a row is
+ * checked against, without `finalise` having to run first. Running it first would be a circular
+ * dependency: `finalise` attaches the decisions, and the loader needs the ids to find them. This
+ * is the join key spelled out — `{ id, classId, citation }` is exactly what
+ * `loadAdjudications` reads, and nothing else about a case matters to a decision about it.
+ */
+export const unassigned = (built: readonly Built[], prefix: string): readonly { id: string; classId: string; citation: Citation }[] =>
+  built.map((entry, index) => ({
+    id: `${prefix}-${String(index + 1).padStart(3, "0")}`,
+    classId: entry.classId,
+    citation: entry.citation,
+  }))

@@ -40,3 +40,12 @@ export {
   type AppendResult,
   type LedgerState,
 } from "./run-store.ts"
+
+export {
+  TRANCHE_MIN_ENTRIES,
+  auditTranche,
+  auditTrancheFile,
+  type TrancheAudit,
+  type TrancheFileAudit,
+  type TrancheOptions,
+} from "./tranche.ts"

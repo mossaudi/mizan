@@ -27,15 +27,20 @@ export { CHAIN_SEPARATOR, GENESIS_PREV_HASH, chainHash, isSha256Hex, sha256Hex, 
 export { canonicalJson } from "./json.ts"
 export { elapsedMs, isExpired, nowIso, startDeadline, withDeadline, withDeadlineResult, type Deadline } from "./time.ts"
 
-export { matchesExactly, normalize, normalizeForMatch, normalizeForRender, isNonBlank } from "./normalize/normalize.ts"
+export { matchesExactly, normalize, normalizeForMatch, normalizeForRender, normalizeForTerminal, isNonBlank } from "./normalize/normalize.ts"
 export { BIDI_CONTROL_MARKS, COMBINING_MARKS, FOLD_PIPELINE, FOLD_STAGE_NOTES, type FoldStage } from "./normalize/fold-table.ts"
+export { displayWidth, isBareControl, stripTerminalControls, ESC, ZERO_WIDTH } from "./normalize/terminal.ts"
 
 export { decodeOrFail, decodeSync, describeDecodeFailure, type Decodable, type DecodeFailure } from "./schema/decode.ts"
+export { ANCHOR_PROTOCOL_VERSION, AnchorAdjudication, AnchorAdjudicationSet, AnchorSpan } from "./schema/anchor.ts"
 export { Answer, Citation, Claim, emptyClaim } from "./schema/claim.ts"
-export { DEMO_QUESTION_SET_VERSION, DemoExpectation, DemoQuestion, DemoQuestionSet } from "./schema/demo.ts"
-export { EvalAnchor, EvalCase, EvalSet, KnownDivergence } from "./schema/eval.ts"
+export { BaselineDeclaration, BenchmarkOutcome, BenchmarkResult, BENCHMARK_SCHEMA_VERSION, HONEST_BASELINE, PRE_REGISTERED_HYPOTHESIS, METHOD_NOT_PUBLISHED, PEER_REGISTER_VERSION, PeerFigure, PeerMethod, PeerRegister, peerStatesAFigure } from "./schema/benchmark.ts"
+export { COVERAGE_SCHEMA_VERSION, CollectionCoverage, CoverageTotals, QuarantineCoverage, SourceCoverage } from "./schema/coverage.ts"
+export { Correction, CorrectionSpan, LocatedCorrection, Relevance, RelevanceState, UnverifiableCorrection } from "./schema/display.ts"
+export { DEMO_ANCHOR_SET_VERSION, DEMO_QUESTION_SET_VERSION, DemoAnchor, DemoAnchorSet, DemoExpectation, DemoQuestion, DemoQuestionSet } from "./schema/demo.ts"
+export { DivergenceResolution, EvalAnchor, EvalCase, EvalSet, KnownDivergence } from "./schema/eval.ts"
 export { ResolvedCitation, unresolved } from "./schema/resolved.ts"
-export { CorpusRecord, CorpusRecordMeta, GradeBasis, toRecordMeta } from "./schema/record.ts"
+export { CorpusRecord, CorpusRecordMeta, GradeBasis, QURAN_COLLECTION, toRecordMeta } from "./schema/record.ts"
 export {
   LicenceClass,
   SourceDescriptor,
@@ -48,9 +53,11 @@ export {
   DegradeReason,
   EvidenceRef,
   MatchStrength,
+  VERDICT_BADGE,
   Verdict,
   VerdictReason,
   VerdictReport,
+  badgeFor,
   evidenceIsPresent,
   exactMatchStrength,
   noMatchStrength,
@@ -65,9 +72,11 @@ export {
   Timings,
   ToolCall,
   TRACE_SCHEMA_VERSION,
+  TRANSCRIPT_LABEL,
   TranscriptKind,
   sealTrace,
   summariseClaim,
   traceChainHead,
   traceDigest,
+  transcriptLabel,
 } from "./schema/trace.ts"

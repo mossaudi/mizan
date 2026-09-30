@@ -11,6 +11,7 @@ import {
 import { capCitations, resolutionKey, MAX_CITATIONS_PER_CLAIM, type ResolvedCitation } from "./steps/citations.ts"
 import { containsQuote, foldQuote } from "./steps/containment.ts"
 import { coerceClaimVerdict } from "./steps/coerce.ts"
+import { anchorFrom, locateAnchor } from "./steps/anchor.ts"
 
 /**
  * THE SIX-STEP PER-CLAIM VERIFICATION PROCEDURE.
@@ -18,6 +19,31 @@ import { coerceClaimVerdict } from "./steps/coerce.ts"
  * This is the differentiator, and it is deliberately boring: six steps, no model, no
  * score, no fallback, total function, no clock. The claim `verified` is decidable in the
  * absence of a provider, in a test, in CI, and in a court.
+ *
+ * ## Step 5b — the anchor arm (MIZ-106)
+ *
+ * Between step 5 and step 6 sits one extra branch. A claim that *abridges* a source rather
+ * than quoting it now reports `unverifiable (no_matching_evidence)` instead of `rejected`,
+ * because the source it cites exists and does not disagree — it merely does not contain the
+ * abridgement. The correction is real and it is the reason this exists.
+ *
+ * What the branch is NOT is a second way to reach `verified`. `locateAnchor` returns
+ * `{ located: boolean; span: string }` and there is no arithmetic over the two; the
+ * architecture plan's own summary is the one-line description of the control: *"the anchor
+ * can only ever produce unverifiable."*
+ *
+ * ## Who emits an anchor, and who does not
+ *
+ * The arm is reachable only when the caller hands a claim an `anchor`, and exactly one
+ * producer does: the eval harness, which stamps the 66 human-drawn spans recorded in
+ * `scripts/eval/anchor-texts.ts` onto the cases a person has adjudicated. No model output
+ * is parsed for one, the answer path never sets one, and `SystemCase` — the benchmark's
+ * case type — has no anchor field at all. On every path a judge runs by default the arm is
+ * therefore absent and containment alone decides; the arm is exercised in the eval
+ * harness, where flipping the 26 adjudicated elisions from `rejected` to `unverifiable`
+ * and publishing what that movement costs on the 40 fabrications is asserted case by
+ * case. The protocol, the cost, and the two properties that keep this safe are written up
+ * in `docs/anchor-protocol.md`.
  *
  * ## Preconditions this module assumes, and who guarantees them
  *
@@ -137,8 +163,16 @@ const buildLookup = (evidence: readonly ResolvedCitation[]): ReadonlyMap<string,
 /**
  * Verify one claim. Read the steps in order: each one is a fail-closed early return, and
  * the happy path is the last line (AGENTS.md section 4).
+ *
+ * @param deadlineExpired The caller's clock-free budget predicate, threaded down so that
+ *   the anchor arm can abandon its own work rather than finish late. Omitting it is legal
+ *   and means "no budget", which is what a test wants.
  */
-const verifyClaim = (claim: Claim, resolvedFor: (citation: Claim["citations"][number]) => ResolvedCitation): ClaimVerdict => {
+const verifyClaim = (
+  claim: Claim,
+  resolvedFor: (citation: Claim["citations"][number]) => ResolvedCitation,
+  deadlineExpired?: () => boolean,
+): ClaimVerdict => {
   // Step 1 — the quote. `text` is the model's opinion and is never verified; only a
   // QUOTED SPAN is falsifiable. An empty or diacritics-only quote cannot be contained.
   const foldedQuote = foldQuote(claim.quote ?? "")
@@ -165,6 +199,21 @@ const verifyClaim = (claim: Claim, resolvedFor: (citation: Claim["citations"][nu
   const winner = lowestId(hits)
   if (winner !== null) return coerceClaimVerdict(verified(claim.id, winner, foldedQuote.length))
 
+  // Step 5b — the anchor arm, and ONLY between "no containment hit" and "we may accuse".
+  //
+  // Placement is the whole design. Before it: an abridgement that happens to be a
+  // contiguous quotation is still decided by containment, so adding anchors can never
+  // change a `verified`. After it: the failure to find an anchor is a *reason* not to
+  // accuse, so a source that exists but does not contain the abridgement yields
+  // `unverifiable (no_matching_evidence)` instead of `rejected` — which is the correction
+  // this arm exists to make, and the reason a `rejected` accusation stops being a
+  // statement about a source that demonstrably disagrees.
+  //
+  // The record is the one the citation resolved to, chosen by the same `lowestId` rule
+  // containment uses, so the two steps cannot disagree about which source they mean.
+  const anchored = anchoredOutcome(claim, records, deadlineExpired)
+  if (anchored !== null) return anchored
+
   // Step 6 — coercion. A `verified` without evidence was already downgraded above; here
   // the remaining question is whether we may accuse the citation of misquotation. Only
   // if EVERY capped citation resolved to a real record — a single unresolved citation
@@ -173,6 +222,36 @@ const verifyClaim = (claim: Claim, resolvedFor: (citation: Claim["citations"][nu
   if (!allResolved) return unverifiable(claim.id, "identifier_unresolved")
   if (resolutions.some((resolution) => resolution.ambiguous)) return unverifiable(claim.id, "collection_ambiguous")
   return rejected(claim.id)
+}
+
+/**
+ * Step 5b, extracted so that `verifyClaim` keeps its steps readable as a list.
+ *
+ * Returns `null` for "the anchor arm has no opinion", which is the common case and the
+ * behaviour of this repository before anchors existed. A non-null return is always
+ * `unverifiable`: this arm has no route to `verified` and no route to `rejected`, and
+ * the type system is asked to keep it that way by there being no other constructor here.
+ *
+ * ## Why `no_matching_evidence` and not a paraphrase-flavoured reason
+ *
+ * The 66 hand-adjudicated decisions in `data/eval/adjudication.json` rule the abridgement
+ * cases `no_matching_evidence`, and those rulings are the authority (AGENTS.md section 15
+ * in spirit: a label is never ours to improve on). The architecture plan floated
+ * `paraphrase_or_reworded` BEFORE anyone had ruled on a case. Adding that literal to
+ * `VerdictReason` now would have required rewriting 26 adjudicated rows to match a
+ * document rather than the other way round — so the vocabulary stayed as the humans set
+ * it and the plan was corrected. One vocabulary, one module, section 17.
+ */
+const anchoredOutcome = (claim: Claim, records: readonly CorpusRecord[], deadlineExpired?: () => boolean): ClaimVerdict | null => {
+  const folded = anchorFrom(claim.anchor)
+  if (folded === null) return null
+  const subject = lowestId(records)
+  if (subject === null) return null
+  if (locateAnchor(folded, subject, deadlineExpired).located) return unverifiable(claim.id, "no_matching_evidence")
+  // The predicate fired during the search, so we do not know the answer. Saying `rejected`
+  // here would be accusing a source on the strength of a search that did not finish.
+  if (deadlineExpired?.() === true) return unverifiable(claim.id, "verification_timeout")
+  return null
 }
 
 /**
@@ -190,7 +269,7 @@ export const verifyAnswer = (input: VerifyInput): VerdictReport => {
     // The budget is checked BEFORE the work, not after: a verdict computed past the
     // deadline is a verdict we cannot claim was timely.
     if (input.deadlineExpired?.() === true) return unverifiable(claim.id, "verification_timeout")
-    return verifyClaim(claim, resolvedFor)
+    return verifyClaim(claim, resolvedFor, input.deadlineExpired)
   })
 
   const timedOut = verdicts.some((verdict) => verdict.reason === "verification_timeout")

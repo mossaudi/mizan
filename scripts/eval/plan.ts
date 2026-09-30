@@ -17,18 +17,20 @@ import type { Mutation } from "./mutations.ts"
  * The derivation for each class is the one-line `rationale`, so a judge can check the
  * expectation against the fold table without running anything.
  *
- * ## A divergence the team lead has to decide, recorded rather than hidden
+ * ## A divergence the team lead decided, recorded, then mechanised away
  *
- * The user story says a faithful paraphrase must be `unverifiable` and "never rejected,
- * because a paraphrase is not a lie". The implemented six-step procedure cannot honour that:
- * step 5 sends a resolved identifier whose record lacks the quote to `rejected`, and
- * distinguishing a paraphrase from a fabrication would require exactly the similarity
- * measurement ADR-03 forbids. The two requirements are mutually exclusive.
+ * The user story said a faithful paraphrase must be `unverifiable` and "never rejected, because a
+ * paraphrase is not a lie". The six-step procedure could not honour that: step 5 sends a resolved
+ * identifier whose record lacks the quote to `rejected`, and separating a paraphrase from a
+ * fabrication appeared to need exactly the similarity measurement ADR-03 forbids.
  *
- * This table follows the PROCEDURE, because the procedure is the mechanism the verifier is
- * built on and the one gate G-6 can check. The divergence is recorded in
- * `KNOWN_DIVERGENCE`, stamped onto every affected case, and surfaced in the README — rather
- * than being quietly resolved in whichever direction happened to be easier to implement.
+ * This table followed the PROCEDURE, and the disagreement was published as `KNOWN_DIVERGENCE`
+ * rather than quietly resolved — a record this file no longer carries, because the gap is closed.
+ * Step 5b's anchor arm separates the two without measuring anything: a claim whose anchor is a
+ * contiguous substring of the cited record is one a human marked as real source text, so it is
+ * `unverifiable` (evidence incomplete), while a claim whose anchor is absent is `rejected`. Hence
+ * `elide_middle` is now `unverifiable`, and the 26 cases that carried the stamp match their
+ * adjudicated verdict. `schemaVersion` 2 records the change; `anchor-texts.ts` holds the spans.
  */
 export type CaseClass = {
   readonly id: string
@@ -97,9 +99,9 @@ export const CASE_CLASSES: readonly CaseClass[] = [
   {
     id: "elide_middle",
     mutation: "elide_middle",
-    expectedVerdict: "rejected",
-    expectedReason: "quote_absent_at_cited_id",
-    rationale: `An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. ${ABSENT}`,
+    expectedVerdict: "unverifiable",
+    expectedReason: "no_matching_evidence",
+    rationale: `An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. ${ABSENT} What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.`,
     goldenCount: 26,
     redTeamCount: 0,
   },
@@ -220,20 +222,19 @@ export const expectedCounts = (name: "golden" | "redteam"): Record<string, numbe
 export const goldenTotal = (): number => CASE_CLASSES.reduce((total, klass) => total + klass.goldenCount, 0)
 
 /**
- * The recorded divergence, emitted into both artefacts.
+ * `KNOWN_DIVERGENCE` used to be declared here.
  *
- * Kept as data rather than a comment so it is impossible to publish a set containing the
- * affected cases without also publishing the caveat, and so the test can assert the caveat is
- * present. A judge reading `elide_middle` deserves to know the story asked for something
- * slightly different from what the mechanism can deliver.
+ * It carried the MIZ-105 ruling that a faithful re-rendering is `unverifiable` rather than
+ * `rejected`, stamped onto the 26 golden `elide_middle` cases, alongside the observation that the
+ * procedure still returned `rejected`. MIZ-106's anchor arm closed that gap without measuring
+ * anything, `elide_middle` now declares `unverifiable` directly, and the stamp had nothing left to
+ * say — a field that is always `null` is 26 lines teaching a reader to ignore a field.
+ *
+ * The ruling itself is untouched: it lives in `scripts/eval/adjudication.ts` and in
+ * `data/eval/adjudication.json`. The type survives as an optional `EvalSet.knownDivergence`, so a
+ * set written while the gap was open still decodes. What the arm now does to the 40 fabrications is
+ * published as `redTeamMovement`, which is a measurement of the procedure rather than a
+ * disagreement with the story.
  */
-export const KNOWN_DIVERGENCE = {
-  id: "paraphrase-rejected-not-unverifiable",
-  affectsClasses: ["elide_middle"],
-  storyRequires: "unverifiable",
-  procedureDelivers: "rejected",
-  why: "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-  whoDecides: "team lead — this changes the product's most safety-sensitive label",
-} as const
 
 export * as Plan from "./plan.ts"

@@ -61,15 +61,48 @@ religious text. See ADR-03.
 
 Requires [Bun](https://bun.sh) `1.3.14`.
 
+**Two commands, and that is the whole evaluation path.** `bun run demo` reads no environment
+variable, opens no socket, and needs no corpus download.
+
 ```bash
 bun install --frozen-lockfile
-bun run ingest          # fetch sources, build the snapshot and the registry (~80 MB, gitignored)
-bun run ask "your question"
-bun run ci              # typecheck + tests + the six structural gates
+bun run demo
 ```
+
+`bun run demo` prints a computed `VERIFIED` badge and a computed `REJECTED` badge from the same
+run, in about a second. It rebuilds a two-record snapshot from the committed anchors in
+`data/eval/demo-anchors.json` — the Qur'anic record the demo verifies and the hadith record it
+rejects — re-derives every row's fold from the stored text rather than trusting a stored fold, and
+prints the corpus fingerprint the verdicts were computed against. The answers are a committed
+transcript and the output says so on every line; the badges above them are computed live. A
+tampered anchor, a mismatched `textHash` or a missing anchors file stops the demo with no verdict
+at all rather than falling back to something it found.
+
+The rest of the surface needs the full corpus, which is 27,234 records and about 80 MB:
+
+```bash
+bun run ingest                 # fetch sources, build the snapshot and the registry (gitignored)
+bun run ask "your question"
+bun run benchmark:vs-search    # the red-team set through plain FTS5 search and through mizan
+bun run ci                     # typecheck + tests + the seven structural gates
+```
+
+`bun run ingest` writes `attestation.json`, and every surface that publishes a number now refuses
+to publish one until that attestation matches the snapshot on disk — the benchmark exits 3 and
+prints zero figures, and a disagreement names both digests in full. The published snapshot is
+`7b3b66fbca7fb9df…` over 27,234 records.
+
+`data/benchmark/vs-search.json` carries the benchmark's measured figures and the baseline
+configuration they were produced under, and `bun run benchmark:vs-search` prints them. This README
+deliberately restates none of them: until a check compares a number in prose against that
+artefact, a quoted figure is an unchecked claim, and the point of the benchmark is that its number
+can be re-run.
 
 With no API key configured — the state of a fresh checkout — `bun run ask` replays a committed
 transcript and says so on every line. It never presents a precomputed answer as a live generation.
+`docs/demo-runbook.md` is the whole demo in writing: a live keyed run first, the replay second and
+labelled, and the `model unavailable` degradation in between. A docs rule fails the build if the
+order or either label changes.
 
 ### Try the verifier directly
 
@@ -124,24 +157,60 @@ Three properties make the sets harder to fool than they look:
   `textMatch` with the real normalizer. A fixture cannot make a fabrication verify itself by
   editing a folded string, and editing the source text is caught by the hash.
 
-### Known divergence: paraphrase → `REJECTED`, not `UNVERIFIABLE`
+### Paraphrase → `UNVERIFIABLE`: decided, mechanised, and its cost published
 
-**This is a real, unresolved conflict between the specification and the implementation, recorded
-rather than hidden.** The user story asks that a faithful paraphrase be `UNVERIFIABLE` and "never
-rejected, because a paraphrase is not a lie". The implemented six-step procedure cannot honour
-that: step 5 routes a *resolved* identifier whose record lacks the quote to `REJECTED`, and
-telling a paraphrase apart from a fabrication would require exactly the similarity measurement
-ADR-03 forbids. The two requirements cannot both hold.
+**The specification and the procedure disagreed, and the disagreement was recorded rather than
+hidden.** The user story asks that a faithful paraphrase be `UNVERIFIABLE` and "never rejected,
+because a paraphrase is not a lie". Containment cannot honour that: step 5 routes a *resolved*
+identifier whose record lacks the quote to `REJECTED`, and telling a paraphrase apart from a
+fabrication would require exactly the similarity measurement ADR-03 forbids. Inside containment the
+two requirements cannot both hold.
 
-The mechanism was kept, and the conflict is published: `knownDivergence` in both artefacts, a
-stamp on all 26 affected cases, and a test that fails if the stamp is removed. **The team lead has
-to decide**, because it changes the product's most safety-sensitive label.
+**The decision was made by a person, published, and is now executed by the code.** A person read
+each of the 26 affected cases against its cited source and recorded what the claim *is*; the table is
+`data/eval/adjudication.json` and the protocol, with its reasoning and its rejected alternatives,
+is `docs/anchor-protocol.md`. The ruling: a faithful re-rendering of a cited source is
+`UNVERIFIABLE`, not `REJECTED`, because re-rendering is not misquotation and accusing a correct
+answer of lying is the worse error. 26 cases decided, 0 undecided.
+
+The answer does not come from containment, which cannot give it. It comes from the anchor arm —
+step 5b of the verifier, reachable only after containment has already failed, carrying one
+human-drawn span per adjudicated case. Two properties are what make it safe rather than merely
+strict:
+
+- **A bad anchor can only ever yield `UNVERIFIABLE` or `REJECTED`. Never `VERIFIED`.** The arm's
+  return type admits only `unverifiable` or `null`; every route to `VERIFIED` still terminates in
+  strict normalized substring containment.
+- **The arm stays opt-in.** Remove the span from any of those 26 cases and the verdict falls back
+  to `REJECTED`, which is asserted by a planted regression. An anchor is a decision a human made
+  for a case, never a default applied to text nobody ruled on.
+
+Two things about that ruling are worth more than the ruling itself, because both are the kind of
+detail a product is built to hide:
+
+- **The 40 red-team fabrications are adjudicated `REJECTED` too**, and they are the harder half of
+  the argument. A `one_word_changed` case is eleven twelfths of a real span, which makes it
+  *tempting* to call faithful; recording 40 fabrications as faithful would be a misdescription of
+  the artefact, so they keep `REJECTED` and are not in dispute.
+- **The locator costs signal on exactly the hardest cases, and the bill is measured rather than
+  argued away.** Because those spans are largely real text, an anchor drawn from one locates, so
+  all 40 move `REJECTED` → `UNVERIFIABLE` in observed output. That is a real loss of detection on
+  the cases most likely to fool a reader, and it is published as `redTeamMovement` in the
+  artefact and asserted by a test that fails if the observed count ever differs from it.
+  `falseVerifiedDelta` sits beside it at 0, and that is the bar that does not move: no branch of
+  the protocol can reach `VERIFIED`.
+
+The divergence stamp that used to sit on those 26 cases is retired at `schemaVersion` 2 — a stamp
+is how you record an open conflict, and this one is closed. What remains beside each expectation is
+`EvalCase.adjudication`, the ruling itself, and `adjudication.json` is unchanged: an authority that
+moves when the code moves is not an authority.
 
 ---
 
 ## The corpus
 
-27,234 records. No Bukhari, no Muslim — recorded as absent rather than quietly substituted.
+**4 Sunan + Muwatta + Qur'an, 27,234 records.** No Bukhari, no Muslim — recorded as absent rather
+than quietly substituted.
 
 | Collection | Records | Licence class |
 | --- | --- | --- |
@@ -175,6 +244,9 @@ We took the cost.
   reason**, not quietly used.
 - `data/runs.jsonl` — run traces carrying `questionHash`, never question text. No PII, no corpus
   text, no secrets.
+- `docs/value-proof.md` — the one-page claim: the executed system-arm figures, the adjudicated
+  movement, an excerpt of the run chain, and what is *not* claimed. Every figure in it is printed
+  from a committed artefact, and `bun run check:docs` fails the build when one is not.
 
 Two candidate sources are recorded and **excluded**, with reasons:
 
@@ -190,6 +262,7 @@ Two candidate sources are recorded and **excluded**, with reasons:
 
 ```
 apps/cli              composition root: the only place the parts are wired together
+apps/web              the static page: a framework-free render of the shared badge map
 packages/
   mizan-core          contracts, Result, the Arabic fold table, the decode seam
   mizan-corpus        ingest, snapshot, citation resolution, quarantine, audit
@@ -197,8 +270,14 @@ packages/
   mizan-agent         claim decomposition, transcript replay, the 10s budget
   mizan-verify        THE SIX-STEP PROCEDURE — offline, total, clock-free
   mizan-provenance    ledger, attestation, run traces
-  mizan-gate          the six structural gates
+  mizan-gate          the seven structural gates
 ```
+
+`apps/web/index.html` is a **committed build output**: open it from disk and it makes no
+request, carries no script and renders corpus text as characters. It is regenerated with
+`bun run build:web` from `apps/web/fixtures/page.json`, and `bun test` in `apps/web` fails if
+the committed bytes differ from a fresh render or if any field in that fixture differs from
+`data/demo-questions.json`, `data/transcript.json` or `data/eval/demo-anchors.json`.
 
 ### The six-step procedure
 
@@ -277,7 +356,10 @@ marketing one.
   depend on them; the submission does.
 - **The official guide, participant guide, judging criteria and scientific appendix have not been
   read by a human.** Nothing here should be read as compliance with them.
-- **The paraphrase divergence above is unresolved** and needs a decision.
+- **The anchor spans are hand-drawn**, one per adjudicated case across both sets, so the anchored
+  path is only as good as the ruling table behind it. A case nobody ruled on receives no span and
+  falls back to `REJECTED`, by design — the arm cannot be talked into abstaining about text a
+  person has not looked at.
 - **Nothing judged here was produced by a live model.** Every expected verdict is hand-adjudicated
   in `scripts/eval/plan.ts`, and a test fails if the generator ever imports the verifier. A default
   checkout ships no API key, so `bun run ask` replays the committed transcript and labels every line

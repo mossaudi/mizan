@@ -72,6 +72,21 @@ export type FetchContext = {
   readonly get: (url: string) => Promise<{ readonly ok: true; readonly body: string } | { readonly ok: false; readonly detail: string }>
   /** Stop after this many rows. Tests and quick runs use it; a full ingest passes `Infinity`. */
   readonly limit: number
+  /**
+   * How many rows this adapter has accepted so far, for the caller's progress line.
+   *
+   * Optional, and deliberately the ONLY thing an adapter may say about its own progress. A
+   * 36,024-row hadith fetch is minutes of HTTP against an upstream, and a run that prints nothing
+   * until it finishes cannot distinguish a slow fetch from a hung one - so the instinct to kill a
+   * working run is the expensive mistake, and a caller that wants a heartbeat needs a way to get
+   * one that does not involve a second round trip.
+   *
+   * It is a count and nothing else: no clock, no elapsed time, no bytes, no text. An adapter that
+   * reported a duration would be reporting a fact only it can observe, and one it would have to
+   * take a clock to observe - the same thing AGENTS.md section 16 lists as a fail-open risk when it
+   * appears in a decision module. `runIngest` owns the cadence and the caller owns the clock.
+   */
+  readonly report?: (rows: number) => void
 }
 
 export type SourceAdapter = {

@@ -28,6 +28,17 @@ export const Claim = Schema.Struct({
   id: Schema.String,
   text: Schema.String,
   quote: Schema.NullOr(Schema.String),
+  /**
+   * A 3-8 word fragment of REAL source text that appears in the cited record, used when the
+   * claim abridges the source instead of quoting it. Absent by default, and absence is the
+   * overwhelmingly common case: it means "the answer carried no anchor", not "the anchor
+   * failed", and the answer it gets is the one it got before anchors existed.
+   *
+   * Optional rather than `NullOr`-required so that every existing fixture, transcript and
+   * ledger entry stays decodable without a migration — a field that must be backfilled is a
+   * field that will be backfilled wrong.
+   */
+  anchor: Schema.optional(Schema.String),
   citations: Schema.Array(Citation),
 })
 export type Claim = Schema.Schema.Type<typeof Claim>

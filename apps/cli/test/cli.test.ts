@@ -258,6 +258,7 @@ describe("the report a judge reads", () => {
       ]),
       claims: [],
       sources: new Map(),
+      relevance: null,
       transcript: "precomputed",
       model: "transcript-v1",
       sourceCount: 2,
@@ -276,6 +277,7 @@ describe("the report a judge reads", () => {
       ]),
       claims: [claim],
       sources: sourcesOf(),
+      relevance: null,
       transcript: "live",
       model: "m",
       sourceCount: 1,
@@ -292,7 +294,7 @@ describe("the report a judge reads", () => {
   })
 
   test("the snapshot hash is shown, so the report is tied to a specific corpus", () => {
-    const text = renderReport({ prose: "x", report: report([]), claims: [], sources: new Map(), transcript: "live", model: "m", sourceCount: 0, snapshotHash: "54a20e5d28532eae" })
+    const text = renderReport({ prose: "x", report: report([]), claims: [], sources: new Map(), relevance: null, transcript: "live", model: "m", sourceCount: 0, snapshotHash: "54a20e5d28532eae" })
     expect(text).toContain("54a20e5d28532eae")
   })
 
@@ -307,6 +309,7 @@ describe("the report a judge reads", () => {
       ]),
       claims: [],
       sources: new Map(),
+      relevance: null,
       transcript: "live",
       model: "m",
       sourceCount: 1,
@@ -321,6 +324,7 @@ describe("the report a judge reads", () => {
       report: report([{ claimId: "c1", verdict: "unverifiable", reason: "no_citation", matchStrength: { kind: "none" }, evidence: null }]),
       claims: [],
       sources: new Map(),
+      relevance: null,
       transcript: "live",
       model: "m",
       sourceCount: 0,

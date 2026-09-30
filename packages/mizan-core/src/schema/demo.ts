@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { GradeBasis } from "./record.ts"
 import { Verdict, VerdictReason } from "./verdict.ts"
 
 /**
@@ -46,6 +47,9 @@ import { Verdict, VerdictReason } from "./verdict.ts"
 
 export const DEMO_QUESTION_SET_VERSION = 1
 
+/** Bumped when the anchors file's shape changes. Recorded in the file itself. */
+export const DEMO_ANCHOR_SET_VERSION = 1
+
 /**
  * What one claim of one demo question is DECLARED to produce.
  *
@@ -80,9 +84,80 @@ export const DemoQuestion = Schema.Struct({
    * implementation detail of the transcript that happens to sit beside it.
    */
   query: Schema.String,
+  /**
+   * The `data/eval/demo-anchors.json` ids this question's corpus rows are rebuilt from.
+   *
+   * Required and non-empty, because MIZ-101 makes the demo attest its own corpus before it prints
+   * anything, and attestation is only meaningful against a corpus the repository can rebuild with
+   * no network. `bun run demo` therefore constructs a small snapshot from exactly these anchors
+   * rather than opening the 81 MB `data/corpus.db`: the demo's claim is "the badge was computed",
+   * and a claim that cannot be checked in ten seconds on a laptop is a claim nobody will check.
+   *
+   * Every anchor id must be present in the anchors file and every record the expectations cite
+   * must come from one of them — `apps/cli/src/demo.ts` checks both, so a demo question cannot
+   * quietly start depending on a record the committed anchors no longer contain.
+   */
+  anchorIds: Schema.Array(Schema.String),
   expectations: Schema.Array(DemoExpectation),
 })
 export type DemoQuestion = Schema.Schema.Type<typeof DemoQuestion>
+
+/**
+ * `data/eval/demo-anchors.json` — the handful of licensed corpus rows the demo is rebuilt from.
+ *
+ * Separate from `DemoQuestionSet` because it is a different kind of thing: this file carries THIRD
+ * PARTY text (Qur'an and hadith, reproduced under each collection's own licence with attribution
+ * intact), while the question set carries synthetic strings invented for this repository. Keeping
+ * them apart means the licence notice sits on the file it governs, and means deleting the demo
+ * cannot be mistaken for deleting someone's licensed text.
+ *
+ * `textHash` is what makes the file tamper-evident, and it is the hash of `textDisplay` — the
+ * `CorpusRecordMeta` convention from `schema/record.ts`, deliberately reused so the field has one
+ * definition in the repository. Editing a single diacritic here changes that hash, and the demo
+ * refuses to attest — a fingerprint mismatch and a non-zero exit, rather than a demo that quietly
+ * verifies a span the upstream source no longer says (AGENTS.md section 3, fail closed). What the
+ * hash does *not* do on its own is prove that `textMatch` is the fold of `textDisplay`; that is
+ * the second, independent check described below.
+ */
+/**
+ * The stored and folded forms of one anchor's text.
+ *
+ * Both are committed on purpose, and the pair is what makes the demo attestable. `textMatch` is
+ * stored rather than re-derived because the demo must be able to build its snapshot in one pass
+ * without importing the fold table into a third composition root — and a stored fold that nobody
+ * checks is exactly the fixture weakness `data/eval/*.json` avoids. So `textMatch` is declared
+ * OPTIONAL here and the demo re-derives it with the real `normalizeForMatch` and fails closed on
+  * a disagreement: the stored copy is a convenience, the re-derived one is the authority, and the
+  * two exist to detect a tampered file rather than to be trusted in place of it.
+ *
+ * This is also the one place a `textMatch` may be committed outside the snapshot, and the
+ * narrowness is the point — it is a matching key next to the text it was derived from, in a file
+ * whose whole purpose is rebuildable-corpus attestation, and it is never rendered (AGENTS.md
+ * section 15's "render `textDisplay`, compare `textMatch`" still holds).
+ */
+export const DemoAnchor = Schema.Struct({
+  /** The `collection:number` this row is. Also the key the demo looks it up by. */
+  anchorId: Schema.String,
+  recordId: Schema.String,
+  collection: Schema.String,
+  number: Schema.NullOr(Schema.String),
+  /** The source text, verbatim. Never rewritten, and the only text any surface renders. */
+  textDisplay: Schema.String,
+  /** The fold of `textDisplay`, committed but re-derived and checked by the demo. */
+  textMatch: Schema.optional(Schema.String),
+  translation: Schema.optional(Schema.String),
+  sourceUrl: Schema.String,
+  license: Schema.String,
+  licenseUrl: Schema.String,
+  attribution: Schema.String,
+  grade: Schema.NullOr(Schema.String),
+  gradeApplicable: Schema.Boolean,
+  gradeSource: Schema.String,
+  gradeBasis: GradeBasis,
+  /** SHA-256 of `textDisplay`, from the shared `toRecordMeta` convention. */
+  textHash: Schema.String,
+})
+export type DemoAnchor = Schema.Schema.Type<typeof DemoAnchor>
 
 /**
  * The header fields are required for the reason `EvalSet` requires them: they are what make the
@@ -90,6 +165,19 @@ export type DemoQuestion = Schema.Schema.Type<typeof DemoQuestion>
  * where its expectations came from would leave a judge unable to tell a hand-adjudicated
  * expectation from one that merely recorded whatever the verifier last did.
  */
+export const DemoAnchorSet = Schema.Struct({
+  schemaVersion: Schema.Number,
+  set: Schema.String,
+  purpose: Schema.String,
+  generatedBy: Schema.String,
+  regenerateWith: Schema.String,
+  determinism: Schema.String,
+  licenceNotice: Schema.String,
+  /** The `collection:number` ids, so a reader can see coverage without walking the array. */
+  anchorIds: Schema.Array(Schema.String),
+  anchors: Schema.Array(DemoAnchor),
+})
+export type DemoAnchorSet = Schema.Schema.Type<typeof DemoAnchorSet>
 export const DemoQuestionSet = Schema.Struct({
   schemaVersion: Schema.Number,
   set: Schema.String,

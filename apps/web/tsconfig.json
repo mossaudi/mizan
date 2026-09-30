@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "//": [
+    "Covers src, scripts and test, the same three entries apps/cli declares.",
+    "This is the compile-time half of Story 3's 'an unknown verdict never reaches the page':",
+    "test/page.test.ts carries a @ts-expect-error on an invented verdict, which reports an",
+    "UNUSED directive the moment Verdict widens to accept it. Nothing else typechecks these",
+    "files, so an include that dropped test/ would silently disarm that assertion."
+  ],
+  "include": [
+    "src/**/*.ts",
+    "scripts/**/*.ts",
+    "test/**/*.ts"
+  ]
+}

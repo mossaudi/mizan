@@ -76,8 +76,10 @@ What mizan actually ships is two disclosed modes, selected by `MIZAN_PROVIDER`:
   written to a trace, a log line or a ledger entry. It is not present in the repository, and
   `.env` is gitignored.
 * **`scripted`** — set explicitly. Answers come from the committed, deterministic transcript
-  (`data/transcript.json`) and are labelled `precomputed (deterministic)` in both stdout and the
-  trace, so a scripted answer can never be mistaken for a live one.
+  (`data/transcript.json`) and are labelled `PRECOMPUTED (deterministic replay)` on stdout and
+  `precomputed` in the trace, so a scripted answer can never be mistaken for a live one. The label
+  itself is one function, `transcriptLabel` in `@mizan/core`, and the CLI header, the static page
+  and `docs/demo-runbook.md` all print it rather than each holding a string.
 
 The competition's synthetic-data rule governs **data provenance**, not egress. We have no
 users, we ship a committed synthetic question set, and we persist no logs. Inference cost for
@@ -100,7 +102,12 @@ The third case is the one mizan refuses. A hosted run whose key **is** configure
 provider then **fails** records the failure in the trace and exits non-zero (degraded, or
 untrusted if the failure also cost it the ledger append). It does not quietly replay the
 transcript behind the operator's back. A key that exists plus an outage means something is
-wrong, and answering from a recording would hide exactly that.
+wrong, and answering from a recording would hide exactly that. It *offers* the next move —
+`fallback: unset MIZAN_LLM_API_KEY and run again; the header will read "PRECOMPUTED (deterministic
+replay)"` — which is a sentence about a route the operator chooses, not a substitution the program
+makes: the run that failed still exits non-zero with no claim, no badge and no answer. The full
+sequence, live first and the replay labelled second, is `docs/demo-runbook.md`, and a docs rule fails
+the build if the order or either label in it changes.
 
 ## 5. Grades are attributed, never asserted
 
@@ -157,7 +164,7 @@ bun run ingest          # rebuild the corpus from pinned URLs (or see "already p
 bun run verify:ledger   # verify the corpus hash chain, names the exact broken index
 bun run verify:runs     # verify the run chain: every trace unaltered, links and digests intact
 bun run check:docs      # assert every path/command/env-var/count claim in this document is real
-bun run ci              # typecheck + per-package tests + gates G-1..G-6
+bun run ci              # typecheck + per-package tests + gates G-1..G-7
 ```
 
 No credentials are needed for any of the above, and none of them touch the network except

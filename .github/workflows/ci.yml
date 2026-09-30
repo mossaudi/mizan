@@ -92,7 +92,7 @@ jobs:
         # before, so the chain that backs the central claim had no command a judge could run.
         run: bun run verify:runs
 
-      - name: Typecheck, tests and structural gates (G-1..G-6)
+      - name: Typecheck, tests and structural gates (G-1..G-7)
         run: bun run ci
 
       - name: Print the typecheck/test/gate summary

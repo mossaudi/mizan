@@ -48,14 +48,16 @@ export {
 export { resolveCitations, type ResolveProblem } from "./resolve.ts"
 
 /**
- * The query-path attestation check. Exported next to `readSnapshotMeta` rather than from
- * `ingest.ts` because this is the second reader of the attestation and the two must not drift:
- * `compareAttestations` decides whether a FRESH ingest matches the committed file, and
- * `attestSnapshot` decides whether an ALREADY-BUILT snapshot matches it. Different question,
- * same file, one decoder.
+ * The query-path attestation checks. Exported next to `readSnapshotMeta` rather than from
+ * `ingest.ts` because these are the readers of the attestation and the three of them must not drift:
+ * `compareAttestations` decides whether a FRESH ingest matches the committed file, `attestSnapshot`
+ * decides whether an ALREADY-BUILT snapshot matches it, and `attestSnapshotUnchanged` decides
+ * whether it stayed the same snapshot across a long read. Three questions, one file, one decoder.
  */
 export {
   attestSnapshot,
+  attestSnapshotUnchanged,
+  attestationUnreadable,
   describeAttestationProblem,
   type AttestationProblem,
   type SnapshotIdentity,
@@ -83,6 +85,6 @@ export {
   type LedgerPayload,
 } from "./ledger.ts"
 
-export { ADAPTERS, buildRegistryJsonl, runIngest, type IngestFailure, type IngestOptions, type IngestResult } from "./ingest.ts"
+export { ADAPTERS, buildRegistryJsonl, runIngest, type IngestFailure, type IngestOptions, type IngestProgress, type IngestResult } from "./ingest.ts"
 
 export { auditCommittedCorpus, formatAudit, type AuditFinding, type CommittedCorpus } from "./audit.ts"

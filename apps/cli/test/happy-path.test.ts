@@ -3,7 +3,7 @@ import { existsSync } from "node:fs"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { Database } from "bun:sqlite"
-import { isOk, type Claim, type Citation } from "@mizan/core"
+import { isOk, transcriptLabel, type Claim, type Citation } from "@mizan/core"
 import { hadithSearch, quranSearch } from "@mizan/retrieval"
 import { openSnapshot, readSnapshotMeta, resolveCitations } from "@mizan/corpus"
 import { runSpine, transcriptProvider, type RetrievedContext } from "@mizan/agent"
@@ -178,6 +178,29 @@ describe("the CLI's exit code tells a caller whether it got an answer", () => {
     expect(code).not.toBe(0)
     expect(output).toContain("model unavailable")
     // The forbidden surfaces, asserted so a future "helpful" fallback cannot sneak in.
+    expect(output).not.toContain("VERIFIED")
+    // Story 4: the offer must be true advice. This run has no key, so there is no live route to
+    // leave, and telling the operator to unset `MIZAN_LLM_API_KEY` would be naming a command that
+    // changes nothing — the fail-open shape wearing a helpful sentence (AGENTS.md §3).
+    expect(output).not.toContain("unset MIZAN_LLM_API_KEY")
+    expect(output).toContain("--list-questions")
+  }, 60_000)
+
+  test.skipIf(!CORPUS_PRESENT)("a configured provider that fails offers the labelled replay, and does not take it", async () => {
+    // The base URL is refused by the host allowlist before any socket is opened, so this exercises
+    // the keyed-failure branch with no network and no real credential in the environment.
+    const { code, output } = await spawnCli(QUESTION, {
+      MIZAN_PROVIDER: "hosted",
+      MIZAN_LLM_API_KEY: "sk-canary-not-a-real-key",
+      MIZAN_LLM_BASE_URL: "https://not-in-the-allowlist.example.com",
+    })
+    expect(code).not.toBe(0)
+    expect(output).toContain("model unavailable")
+    // The offer names the label the next run would print, and it is the shared one — the same
+    // string `transcriptLabel` gives the header, so the two cannot describe a mode differently.
+    expect(output).toContain(`the header will read "${transcriptLabel("precomputed")}"`)
+    // An offer, not a substitution: nothing was answered, and no key material is on screen.
+    expect(output).not.toContain("sk-canary")
     expect(output).not.toContain("VERIFIED")
   }, 60_000)
 

@@ -182,13 +182,17 @@ it provably contains nothing to leak.
 
 ## 14. Typecheck and tests are the gate; the gate is the deliverable
 
-**Rule.** `bun run ci` runs, per package: `tsc --noEmit`, then `bun test`, then the six
-structural gates G-1…G-6. Any failure exits non-zero and **names the failing package**.
+**Rule.** `bun run ci` runs, per package: `tsc --noEmit`, then `bun test`, then the seven
+structural gates G-1…G-7. Any failure exits non-zero and **names the failing package**.
 Every gate has a self-test with a planted violation that must fail.
 
 **Why.** A guard that cannot fail is not a guard. The differentiator in this project is
 not the verifier's code — it is a set of machine-checked invariants. Full CI must stay
 under 5 minutes; a flaky CI job is a defect, not noise.
+
+The gate count itself is a published claim, so it is machine-checked too: `GATE_IDS` in
+`packages/mizan-gate/src/run-gates.ts` is the only place the set is written down, and
+`docs-gates.ts` fails `bun run check:docs` when any file in the repository states a different one.
 
 ---
 

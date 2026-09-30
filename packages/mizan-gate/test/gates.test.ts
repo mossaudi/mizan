@@ -5,6 +5,7 @@ import { join, relative } from "node:path"
 import { isOk, type ClaimVerdict, type EvidenceRef } from "@mizan/core"
 import { stripComments } from "../src/strip-comments.ts"
 import type { SourceFile } from "../src/scan.ts"
+import { CODE_EXTENSIONS } from "../src/index.ts"
 import {
   checkContainmentOnly,
   checkDependencyIsolation,
@@ -16,12 +17,20 @@ import {
   checkNoDynamicEval,
   checkNoObfuscation,
   checkNoRawHtml,
-  checkNoSimilarity,
+checkNoSimilarity,
   checkOneConstructionSite,
   checkOneSchemaSite,
   checkVerdictIsolation,
   checkLicenceFields,
   assertNoFalseVerified,
+  checkVerdictPathClosure,
+  gateVerdictPathPurity,
+  checkAnchorModuleHasNoOpinion,
+  checkNoSimilarityOnPath,
+  checkNoAmbientAuthorityOnPath,
+  checkNoPercentKeyOnPath,
+  checkNoAppCodeOnPath,
+  checkDisplayPathPresent,
   findRepositoryRoot,
   findRoot,
   requireRepositoryRoot,
@@ -156,6 +165,15 @@ describe("G-2 no raw HTML", () => {
 
   test("planted: dangerouslySetInnerHTML is caught", () => {
     expect(rules(checkNoRawHtml([file("apps/web/src/q.tsx", "return <div dangerouslySetInnerHTML={{ __html: t }} />\n")]))).toHaveLength(1)
+  })
+
+  test("planted: a raw sink inside a shipped .html page is caught, not skipped as markup", () => {
+    const page = file("apps/web/index.html", '<div id="c"></div>\n<script>c.innerHTML = corpus</script>\n')
+    expect(rules(checkNoRawHtml([page]))).toEqual(["G-2.1 no-raw-html"])
+  })
+
+  test("the scan admits markup, so the committed page is inside every tree-wide gate", () => {
+    expect([...CODE_EXTENSIONS]).toContain(".html")
   })
 })
 
@@ -316,9 +334,129 @@ describe("G-6 no false verified", () => {
     expect(rules(checkNoComputedPercent([file("apps/cli/src/score.ts", "percent: score * 100,\n")]))).toEqual(["G-6.3 no-computed-percent"])
   })
 
-  test("planted: an ad-hoc match strength is caught", () => {
+test("planted: an ad-hoc match strength is caught", () => {
     const findings = checkNoAdHocMatchStrength([file("apps/cli/src/bad.ts", "matchStrength: computeScore(a, b),\n")])
     expect(rules(findings)).toEqual(["G-6.4 no-ad-hoc-match-strength"])
+  })
+})
+
+/**
+ * A fixture tree whose closure equals VERDICT_PATH exactly. The bodies are trivial and
+ * deliberately contain none of the banned tokens, so every OTHER rule sees a clean tree
+ * and the closure self-tests measure the closure alone.
+ *
+ * Hoisted to module scope because both the G-6.5 and the G-7 describe blocks build on it.
+ */
+const exactPath = (over: Partial<Record<string, string>> = {}): SourceFile[] => {
+  const defaults: Record<string, string> = {
+    "packages/mizan-verify/src/verify.ts": [
+      'import { a } from "./steps/anchor.ts"',
+      'import { c } from "./steps/citations.ts"',
+      'import { x } from "./steps/coerce.ts"',
+      'import { n } from "./steps/containment.ts"',
+      "export const all = a + c + x + n",
+    ].join("\n"),
+    "packages/mizan-verify/src/steps/anchor.ts": "export const a = 1",
+    "packages/mizan-verify/src/steps/citations.ts": "export const c = 2",
+    "packages/mizan-verify/src/steps/coerce.ts": "export const x = 3",
+    "packages/mizan-verify/src/steps/containment.ts": "export const n = 4",
+  }
+  const merged = { ...defaults, ...over }
+  return Object.entries(merged).map(([path, text]) => file(path, `${text}\n`))
+}
+
+describe("G-6.5 verdict path closure", () => {
+  test("clean: a closure that equals VERDICT_PATH passes", () => {
+    expect(checkVerdictPathClosure(exactPath())).toEqual([])
+  })
+
+  test("planted: an undeclared module reachable from verify.ts is caught", () => {
+    const files = exactPath({
+      "packages/mizan-verify/src/verify.ts": [
+        'import { a } from "./steps/anchor.ts"',
+        'import { r } from "./steps/rank.ts"',
+        "export const all = r + a",
+      ].join("\n"),
+      "packages/mizan-verify/src/steps/rank.ts": "export const r = 0",
+    })
+    // The rule reports both directions at once: the undeclared file on the path, and the
+    // three declared files that are no longer reachable. The important finding is the first.
+    const findings = checkVerdictPathClosure(files)
+    expect(findings.some((finding) => finding.path === "packages/mizan-verify/src/steps/rank.ts")).toBe(true)
+    expect(rules(findings)).toContain("G-6.5 verdict-path-closure")
+  })
+
+  test("planted: a stale VERDICT_PATH entry that is no longer reachable is caught", () => {
+    const files = exactPath({
+      "packages/mizan-verify/src/verify.ts": [
+        'import { a } from "./steps/anchor.ts"',
+        // coerce.ts remains in VERDICT_PATH but nothing reaches it any more.
+        "export const all = a",
+      ].join("\n"),
+    })
+    expect(checkVerdictPathClosure(files).some((finding) => finding.path === "packages/mizan-verify/src/steps/coerce.ts")).toBe(true)
+  })
+})
+
+describe("G-7 verdict path purity", () => {
+  /** The same exact-PATH fixture, plus every declared display module. */
+  const pureTree = (over: Partial<Record<string, string>> = {}): SourceFile[] => {
+    const base = exactPath()
+    const displayDefaults: Record<string, string> = {
+      "apps/cli/src/render.ts": "export const render = true",
+      "apps/cli/src/correction.ts": "export const correction = true",
+      "apps/cli/src/relevance.ts": "export const relevance = true",
+      "apps/web/src/page.ts": "export const page = true",
+    }
+    const declared = Object.entries(displayDefaults).map(([path, text]) =>
+      file(path, over[path] ?? text),
+    )
+    return [...base, ...declared]
+      .map((source) => file(source.path, over[source.path] ?? source.text))
+      .concat(
+        Object.entries(over)
+          .filter(([path]) => !base.some((s) => s.path === path) && !(path in displayDefaults))
+          .map(([path, text]) => file(path, `${text}\n`)),
+      )
+  }
+
+  test("clean: a pure path passes every G-7 rule", () => {
+    expect(gateVerdictPathPurity(pureTree())).toEqual([])
+  })
+
+  test("planted: the anchor module naming an outcome is caught", () => {
+    const files = pureTree({ "packages/mizan-verify/src/steps/anchor.ts": 'export const outcome = { verdict: "verified" }\n' })
+    expect(rules(checkAnchorModuleHasNoOpinion(files))).toEqual(["G-7.1 anchor-module-has-no-opinion"])
+  })
+
+  test("planted: a similarity mechanism on the path is caught", () => {
+    const files = pureTree({ "packages/mizan-verify/src/steps/anchor.ts": "export const similarityScore = 0.9\n" })
+    expect(rules(checkNoSimilarityOnPath(files))).toEqual(["G-7.2 no-similarity-on-path"])
+  })
+
+  test("planted: ambient authority on the path is caught, including in a display module", () => {
+    const files = pureTree({ "apps/cli/src/render.ts": "export const now = Date.now()\n" })
+    expect(rules(checkNoAmbientAuthorityOnPath(files))).toEqual(["G-7.3 no-ambient-authority-on-path"])
+  })
+
+  test("planted: a percentage-shaped property key on the path is caught", () => {
+    const files = pureTree({ "packages/mizan-verify/src/steps/coerce.ts": "export const shape = { confidence: 0.9 }\n" })
+    expect(rules(checkNoPercentKeyOnPath(files))).toEqual(["G-7.4 no-percent-key-on-path"])
+  })
+
+  test("planted: application code reachable from the verdict path is caught", () => {
+    const files = pureTree({
+      "packages/mizan-verify/src/verify.ts": [
+        'import { banner } from "../../../apps/cli/src/render.ts"',
+        "export const all = banner",
+      ].join("\n"),
+    })
+    expect(rules(checkNoAppCodeOnPath(files))).toEqual(["G-7.5 no-app-code-on-path"])
+  })
+
+  test("planted: a renamed display module strips the display rules from scope", () => {
+    const files = pureTree({}).filter((source) => source.path !== "apps/cli/src/render.ts")
+    expect(rules(checkDisplayPathPresent(files))).toEqual(["G-7.6 display-path-present"])
   })
 })
 
@@ -393,9 +531,15 @@ describe("the gate must not be able to pass by looking at nothing", () => {
     if (root === null) return
     // A root read off the shell satisfies a null check and a manifest check equally well, and
     // that is precisely the regression: the walk is the property under test, so it is asserted
-    // directly. `process.cwd()` is rejected outright, and the relative path back to this test
-    // file must climb out of the root, which a self-rooted or descendant answer cannot do.
-    expect(root).not.toBe(process.cwd())
+    // directly. The wrong answer is pinned as this package's own directory — the exact value a
+    // `process.cwd()` root yields when the CLI is invoked from `packages/mizan-gate` — and the
+    // relative path back to this test file must climb out of the root, which a self-rooted or
+    // descendant answer cannot do. Pinning the wrong answer rather than the shell's position is
+    // deliberate: `process.cwd()` is only a *proxy* for the bug, so asserting against it tests
+    // the working directory the suite happened to be invoked from (and fails when that
+    // directory is legitimately the root) instead of the walk. The pinned value is the actual
+    // failure, and it is false from every directory.
+    expect(root).not.toBe(join(import.meta.dir, "..", ".."))
     expect(relative(import.meta.dir, root).startsWith("..")).toBe(true)
     // The root is identified by the workspace marker in its own manifest — NOT by the checkout
     // happening to be *called* "mizan". A submission cloned into `mizan-submission`, `team-42`

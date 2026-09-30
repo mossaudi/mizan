@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mizan — the badge is computed, not asserted</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: ui-sans-serif, system-ui, sans-serif; line-height: 1.55; margin: 0 auto; max-width: 54rem; padding: 2rem 1.25rem; }
+h1 { font-size: 1.75rem; margin: 0 0 0.25rem; }
+h2 { font-size: 1.1rem; margin: 2rem 0 0.5rem; }
+.lede { margin-top: 0; }
+.mode { border: 1px solid rgba(128,128,128,0.5); padding: 0.4rem 0.6rem; }
+.mode-label { font-weight: 700; letter-spacing: 0.04em; }
+.mode-note { opacity: 0.85; }
+ul { list-style: none; padding: 0; }
+li { margin: 0.6rem 0; }
+.badge { font-weight: 700; letter-spacing: 0.04em; }
+li .badge { display: inline-block; min-width: 10.5rem; }
+article.example { border-top: 1px solid rgba(128,128,128,0.4); margin-top: 1.25rem; padding-top: 1rem; }
+.label { display: inline-block; min-width: 4.5rem; font-weight: 600; }
+pre { font-size: 0.95rem; margin: 0.25rem 0 0.75rem; overflow-wrap: anywhere; white-space: pre-wrap; }
+.note { font-size: 0.85rem; opacity: 0.85; }
+</style>
+</head>
+<body>
+<main>
+<h1>mizan</h1>
+    <p class="lede">Every badge mizan shows is computed by strict normalised containment against a committed corpus, not asserted by a model. The three lines below are the only verdicts the verifier can emit; there is no fourth state and no default badge.</p>
+    <p class="mode">
+      <span class="label">transcript</span>
+      <span class="mode-label">PRECOMPUTED (deterministic replay)</span>
+      <span class="mode-note">the answers and quotations are replayed from a committed transcript; every badge below was computed by the verifier against the committed corpus on this run, live or replayed alike.</span>
+    </p>
+    <h2>The three badges</h2>
+    <ul>
+    <li>
+      <span class="badge">VERIFIED</span>
+      <span>the quoted span is contained in the record the claim cites, after deterministic folding.</span>
+    </li>
+    <li>
+      <span class="badge">UNVERIFIABLE</span>
+      <span>mizan cannot decide: no citation, an unresolvable identifier, an empty quote, a paraphrase, a timeout or malformed model output.</span>
+    </li>
+    <li>
+      <span class="badge">REJECTED</span>
+      <span>the citation resolved to a real record and that record does not contain the quote.</span>
+    </li>
+    </ul>
+    <h2>Worked example</h2>
+    <p class="note">Rendered at build time from the committed fixture <code>apps/web/fixtures/page.json</code>. The verdicts in it were computed by <code>bun run demo</code> and are re-checked against <code>data/demo-questions.json</code> by this package’s tests. The second quotation is published synthetic test data from <code>data/eval/redteam-fabricated.json</code>: it is not hadith and it asserts nothing about anyone’s religion.</p>
+    <article class="example">
+      <p>
+        <span class="badge">VERIFIED</span>
+        <span>ikhlas-1 — exact_containment</span>
+      </p>
+      <p><span class="label">ask</span>What does the Qur&#39;an say about the oneness of God?</p>
+      <p><span class="label">answer</span>The Qur&#39;an states the oneness of God directly and without qualification. Surah al-Ikhlas opens by commanding the Prophet to say that He is one, and the surah then denies any likeness to Him.</p>
+      <p class="note">quoted — model text, inserted as characters</p>
+      <pre dir="auto">قُلْ هُوَ ٱللَّهُ أَحَدٌ</pre>
+      <p><span class="label">source</span>quran 6222</p>
+      <p class="note">record — corpus text, inserted as characters</p>
+      <pre dir="auto">بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ قُلْ هُوَ ٱللَّهُ أَحَدٌ</pre>
+    </article>
+    <article class="example">
+      <p>
+        <span class="badge">REJECTED</span>
+        <span>knowledge-fading-1 — quote_absent_at_cited_id</span>
+      </p>
+      <p><span class="label">ask</span>What does the hadith say about the end of the world and knowledge diminishing?</p>
+      <p><span class="label">answer</span>A well-known report on the signs of the Hour holds that the world draws near while knowledge diminishes, tribulations surface, and people grow stingy and careless in speech. It is cited here to Sunan Abi Dawud 4255.</p>
+      <p class="note">quoted — model text, inserted as characters</p>
+      <pre dir="auto">يَتَقَارَبُ الزَّمَانُ وَيَنْقُصُ الْفِقْهُ وَتَظْهَرُ الْفِتَنُ وَيُلْقَى الشُّحُّ وَيَكْثُرُ الْهَرْجُ</pre>
+      <p><span class="label">source</span>abudawud 4255</p>
+      <p class="note">record — corpus text, inserted as characters</p>
+      <pre dir="auto">حَدَّثَنَا أَحْمَدُ بْنُ صَالِحٍ، حَدَّثَنَا عَنْبَسَةُ، حَدَّثَنِي يُونُسُ، عَنِ ابْنِ شِهَابٍ، قَالَ حَدَّثَنِي حُمَيْدُ بْنُ عَبْدِ الرَّحْمَنِ، أَنَّ أَبَا هُرَيْرَةَ، قَالَ قَالَ رَسُولُ اللَّهِ صلى الله عليه وسلم ‏&quot;‏ يَتَقَارَبُ الزَّمَانُ وَيَنْقُصُ الْعِلْمُ وَتَظْهَرُ الْفِتَنُ وَيُلْقَى الشُّحُّ وَيَكْثُرُ الْهَرْجُ ‏&quot;‏ ‏.‏ قِيلَ يَا رَسُولَ اللَّهِ أَيَّةُ هُوَ قَالَ ‏&quot;‏ الْقَتْلُ الْقَتْلُ ‏&quot;‏ ‏.‏</pre>
+    </article>
+    <h2>This page makes no request</h2>
+    <p class="note">No script, no stylesheet link, no image, no font, no fetch. It renders from <code>file://</code> with zero network access, so what you are reading is the committed bytes and nothing else. Run <code>bun run demo</code> for the full report, which prints each source’s URL and the snapshot hash beside every badge.</p>
+  </main>
+</body>
+</html>

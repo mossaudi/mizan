@@ -1,4 +1,4 @@
-import { findMatchingLines, productionFiles, type Finding, type SourceFile } from "../scan.ts"
+import { findMatchingLines, importClosure, productionFiles, type Finding, type SourceFile } from "../scan.ts"
 import type { ClaimVerdict } from "@mizan/core"
 
 /**
@@ -19,10 +19,43 @@ import type { ClaimVerdict } from "@mizan/core"
  *    similarity score into `MatchStrength` — the CWE-345 hole wearing a decimal point.
  *  - **G-6.4 no ad-hoc match strength.** `matchStrength:` must be one of the two constants
  *    or a schema literal, never a value computed at the call site.
+ *  - **G-6.5 the verdict path is exactly this list.** The transitive relative-import closure of
+ *    `verify.ts` must EQUAL `VERDICT_PATH`. Equal, not be a subset: a helper smuggled into the
+ *    decision path is a violation, and so is an entry in the list that is no longer reachable,
+ *    because a list nobody prunes is a list that has stopped describing anything.
  *
  * `assertNoFalseVerified` is the dynamic half: a pure invariant checker the CLI, the CI job
  * and the tests can all run over any verdict array, including a forged one.
  */
+
+/** The entry point whose closure is the decision path. Everything a verdict depends on. */
+export const VERDICT_PATH_ENTRY = "packages/mizan-verify/src/verify.ts"
+
+/**
+ * The transitive relative-import closure of `verify.ts`, by hand, as data.
+ *
+ * ## Why this is worth a rule
+ *
+ * G-6.1 to G-6.4 each forbid one *shape* inside a file. None of them notices a new MODULE
+ * arriving next to the decision and being imported by it: a `rank.ts` in the verifier, or a
+ * `steps/score.ts`, would pass all four and sit on the exact path that produces `verified`.
+ * A file-list allowlist is the only thing that notices, and it notices by review — every
+ * addition to this array is a diff somebody has to argue for.
+ *
+ * ## Why it is equality and not containment
+ *
+ * Both directions are real failures. A file in the closure that is not listed is an undeclared
+ * dependency on the verdict path. A listed file that is NOT in the closure is a stale entry,
+ * and a stale entry is how an allowlist quietly becomes decorative: someone reads it, believes
+ * `steps/foo.ts` is protected, and moves the protection somewhere else. Both are reported.
+ */
+export const VERDICT_PATH = [
+  VERDICT_PATH_ENTRY,
+  "packages/mizan-verify/src/steps/anchor.ts",
+  "packages/mizan-verify/src/steps/citations.ts",
+  "packages/mizan-verify/src/steps/coerce.ts",
+  "packages/mizan-verify/src/steps/containment.ts",
+] as const
 
 /** The only file allowed to write a `verified` verdict, and one of the two allowed to mention a percent. */
 export const VERDICT_CONSTRUCTION_SITES = ["packages/mizan-verify/src/verify.ts"] as const
@@ -111,11 +144,49 @@ export const assertNoFalseVerified = (verdicts: readonly ClaimVerdict[]): readon
   return violations
 }
 
+/**
+ * G-6.5 — the import closure of `verify.ts` is exactly `VERDICT_PATH`.
+ *
+ * A structural rule, so its findings are synthesised rather than located on a line: there is
+ * no offending line in a stale entry and none in a closure that grew, only a name in one set
+ * that is not in the other. `line: 1` and the path as the excerpt is the honest rendering.
+ */
+export const checkVerdictPathClosure = (files: readonly SourceFile[]): readonly Finding[] => {
+  const closure = importClosure(productionFiles(files), VERDICT_PATH_ENTRY)
+  const reachable = new Set(closure.map((file) => file.path))
+  const findings: Finding[] = []
+
+  for (const file of closure) {
+    if (inAny(file.path, VERDICT_PATH)) continue
+    findings.push({
+      gate: "G-6",
+      rule: "G-6.5 verdict-path-closure",
+      path: file.path,
+      line: 1,
+      excerpt: `${file.path} is on the verdict path but is not in VERDICT_PATH. Declare it or unlink it.`,
+    })
+  }
+
+  for (const path of VERDICT_PATH) {
+    if (reachable.has(path)) continue
+    findings.push({
+      gate: "G-6",
+      rule: "G-6.5 verdict-path-closure",
+      path,
+      line: 1,
+      excerpt: `${path} is declared in VERDICT_PATH but is no longer reachable from ${VERDICT_PATH_ENTRY}. Remove the stale entry.`,
+    })
+  }
+
+  return findings
+}
+
 export const gateNoFalseVerified = (files: readonly SourceFile[]): readonly Finding[] => [
   ...checkOneConstructionSite(files),
   ...checkOneSchemaSite(files),
   ...checkNoComputedPercent(files),
   ...checkNoAdHocMatchStrength(files),
+  ...checkVerdictPathClosure(files),
 ]
 
 export * as G6 from "./g6-no-false-verified.ts"

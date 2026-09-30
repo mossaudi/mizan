@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "set": "golden",
   "title": "Golden normalization and verification set",
   "purpose": "200 cases over 13 classes: four renderings of a correct quotation that must all verify, then the ways a text stops being a quotation, then the two citation shapes that make a verdict impossible rather than wrong. Run against the real resolver and the real verifier; nothing is mocked.",
@@ -7,16 +7,6 @@
   "regenerateWith": "bun run build:eval",
   "determinism": "Same snapshot in, byte-identical files out. Every selection is ordered (records by id, collections by name, classes by the table order in plan.ts) and no clock, locale or randomness is consulted.",
   "expectationSource": "Hand-adjudicated in scripts/eval/plan.ts from the documented behaviour of the fold table. Never observed from @mizan/verify: a set whose expectations were recorded from the code under test is a regression test of the code against itself.",
-  "knownDivergence": {
-    "id": "paraphrase-rejected-not-unverifiable",
-    "affectsClasses": [
-      "elide_middle"
-    ],
-    "storyRequires": "unverifiable",
-    "procedureDelivers": "rejected",
-    "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-    "whoDecides": "team lead — this changes the product's most safety-sensitive label"
-  },
   "digitFacts": {
     "asciiDigitOccurrences": 19,
     "recordsContainingDigits": 4,
@@ -37,8 +27,8 @@
   },
   "verdictCounts": {
     "verified": 94,
-    "rejected": 66,
-    "unverifiable": 40
+    "unverifiable": 66,
+    "rejected": 40
   },
   "anchorCount": 56,
   "licenceNotice": "Quoted spans are real source text, reproduced verbatim under each collection's own licence and attribution, as recorded per anchor. Fabricated spans (classes one_word_changed, two_word_changed, letter_transposed, digit_substituted, word_inserted, injection_appended) and elided spans are synthetic test data. They are not hadith, they assert nothing, and no case may be cited as a source. Qur'an text is under no-derivatives terms and is reproduced without modification.",
@@ -900,8 +890,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "abudawud:1",
-      "divergence": null
+      "anchorId": "abudawud:1"
     },
     {
       "id": "golden-002",
@@ -918,8 +907,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "abudawud:10",
-      "divergence": null
+      "anchorId": "abudawud:10"
     },
     {
       "id": "golden-003",
@@ -936,8 +924,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "abudawud:100",
-      "divergence": null
+      "anchorId": "abudawud:100"
     },
     {
       "id": "golden-004",
@@ -954,8 +941,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "abudawud:1000",
-      "divergence": null
+      "anchorId": "abudawud:1000"
     },
     {
       "id": "golden-005",
@@ -972,8 +958,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "abudawud:1001",
-      "divergence": null
+      "anchorId": "abudawud:1001"
     },
     {
       "id": "golden-006",
@@ -990,8 +975,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "ibnmajah:1",
-      "divergence": null
+      "anchorId": "ibnmajah:1"
     },
     {
       "id": "golden-007",
@@ -1008,8 +992,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "ibnmajah:10",
-      "divergence": null
+      "anchorId": "ibnmajah:10"
     },
     {
       "id": "golden-008",
@@ -1026,8 +1009,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "ibnmajah:100",
-      "divergence": null
+      "anchorId": "ibnmajah:100"
     },
     {
       "id": "golden-009",
@@ -1044,8 +1026,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "ibnmajah:1002",
-      "divergence": null
+      "anchorId": "ibnmajah:1002"
     },
     {
       "id": "golden-010",
@@ -1062,8 +1043,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "ibnmajah:1003",
-      "divergence": null
+      "anchorId": "ibnmajah:1003"
     },
     {
       "id": "golden-011",
@@ -1080,8 +1060,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "malik:1",
-      "divergence": null
+      "anchorId": "malik:1"
     },
     {
       "id": "golden-012",
@@ -1098,8 +1077,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "malik:10",
-      "divergence": null
+      "anchorId": "malik:10"
     },
     {
       "id": "golden-013",
@@ -1116,8 +1094,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "malik:100",
-      "divergence": null
+      "anchorId": "malik:100"
     },
     {
       "id": "golden-014",
@@ -1134,8 +1111,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "malik:1000",
-      "divergence": null
+      "anchorId": "malik:1000"
     },
     {
       "id": "golden-015",
@@ -1152,8 +1128,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "malik:1002",
-      "divergence": null
+      "anchorId": "malik:1002"
     },
     {
       "id": "golden-016",
@@ -1170,8 +1145,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "nasai:1",
-      "divergence": null
+      "anchorId": "nasai:1"
     },
     {
       "id": "golden-017",
@@ -1188,8 +1162,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "nasai:10",
-      "divergence": null
+      "anchorId": "nasai:10"
     },
     {
       "id": "golden-018",
@@ -1206,8 +1179,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "nasai:100",
-      "divergence": null
+      "anchorId": "nasai:100"
     },
     {
       "id": "golden-019",
@@ -1224,8 +1196,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "nasai:1000",
-      "divergence": null
+      "anchorId": "nasai:1000"
     },
     {
       "id": "golden-020",
@@ -1242,8 +1213,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "nasai:1001",
-      "divergence": null
+      "anchorId": "nasai:1001"
     },
     {
       "id": "golden-021",
@@ -1260,8 +1230,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "quran:10",
-      "divergence": null
+      "anchorId": "quran:10"
     },
     {
       "id": "golden-022",
@@ -1278,8 +1247,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "quran:100",
-      "divergence": null
+      "anchorId": "quran:100"
     },
     {
       "id": "golden-023",
@@ -1296,8 +1264,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "quran:1000",
-      "divergence": null
+      "anchorId": "quran:1000"
     },
     {
       "id": "golden-024",
@@ -1314,8 +1281,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "quran:1001",
-      "divergence": null
+      "anchorId": "quran:1001"
     },
     {
       "id": "golden-025",
@@ -1332,8 +1298,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "quran:1002",
-      "divergence": null
+      "anchorId": "quran:1002"
     },
     {
       "id": "golden-026",
@@ -1350,8 +1315,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "tirmidhi:1",
-      "divergence": null
+      "anchorId": "tirmidhi:1"
     },
     {
       "id": "golden-027",
@@ -1368,8 +1332,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "tirmidhi:10",
-      "divergence": null
+      "anchorId": "tirmidhi:10"
     },
     {
       "id": "golden-028",
@@ -1386,8 +1349,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "tirmidhi:100",
-      "divergence": null
+      "anchorId": "tirmidhi:100"
     },
     {
       "id": "golden-029",
@@ -1404,8 +1366,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "tirmidhi:1000",
-      "divergence": null
+      "anchorId": "tirmidhi:1000"
     },
     {
       "id": "golden-030",
@@ -1422,8 +1383,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "The quote is a literal span of the cited record, so it is contained in it by definition.",
-      "anchorId": "tirmidhi:1001",
-      "divergence": null
+      "anchorId": "tirmidhi:1001"
     },
     {
       "id": "golden-031",
@@ -1440,8 +1400,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "abudawud:1",
-      "divergence": null
+      "anchorId": "abudawud:1"
     },
     {
       "id": "golden-032",
@@ -1458,8 +1417,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "abudawud:10",
-      "divergence": null
+      "anchorId": "abudawud:10"
     },
     {
       "id": "golden-033",
@@ -1476,8 +1434,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "abudawud:100",
-      "divergence": null
+      "anchorId": "abudawud:100"
     },
     {
       "id": "golden-034",
@@ -1494,8 +1451,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "abudawud:1000",
-      "divergence": null
+      "anchorId": "abudawud:1000"
     },
     {
       "id": "golden-035",
@@ -1512,8 +1468,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "abudawud:1001",
-      "divergence": null
+      "anchorId": "abudawud:1001"
     },
     {
       "id": "golden-036",
@@ -1530,8 +1485,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "ibnmajah:1",
-      "divergence": null
+      "anchorId": "ibnmajah:1"
     },
     {
       "id": "golden-037",
@@ -1548,8 +1502,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "ibnmajah:10",
-      "divergence": null
+      "anchorId": "ibnmajah:10"
     },
     {
       "id": "golden-038",
@@ -1566,8 +1519,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "ibnmajah:100",
-      "divergence": null
+      "anchorId": "ibnmajah:100"
     },
     {
       "id": "golden-039",
@@ -1584,8 +1536,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "ibnmajah:1002",
-      "divergence": null
+      "anchorId": "ibnmajah:1002"
     },
     {
       "id": "golden-040",
@@ -1602,8 +1553,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "ibnmajah:1003",
-      "divergence": null
+      "anchorId": "ibnmajah:1003"
     },
     {
       "id": "golden-041",
@@ -1620,8 +1570,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "malik:1",
-      "divergence": null
+      "anchorId": "malik:1"
     },
     {
       "id": "golden-042",
@@ -1638,8 +1587,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "malik:10",
-      "divergence": null
+      "anchorId": "malik:10"
     },
     {
       "id": "golden-043",
@@ -1656,8 +1604,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "malik:100",
-      "divergence": null
+      "anchorId": "malik:100"
     },
     {
       "id": "golden-044",
@@ -1674,8 +1621,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "malik:1000",
-      "divergence": null
+      "anchorId": "malik:1000"
     },
     {
       "id": "golden-045",
@@ -1692,8 +1638,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "malik:1002",
-      "divergence": null
+      "anchorId": "malik:1002"
     },
     {
       "id": "golden-046",
@@ -1710,8 +1655,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "nasai:1",
-      "divergence": null
+      "anchorId": "nasai:1"
     },
     {
       "id": "golden-047",
@@ -1728,8 +1672,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "nasai:10",
-      "divergence": null
+      "anchorId": "nasai:10"
     },
     {
       "id": "golden-048",
@@ -1746,8 +1689,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "nasai:100",
-      "divergence": null
+      "anchorId": "nasai:100"
     },
     {
       "id": "golden-049",
@@ -1764,8 +1706,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "nasai:1000",
-      "divergence": null
+      "anchorId": "nasai:1000"
     },
     {
       "id": "golden-050",
@@ -1782,8 +1723,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "nasai:1001",
-      "divergence": null
+      "anchorId": "nasai:1001"
     },
     {
       "id": "golden-051",
@@ -1800,8 +1740,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "quran:10",
-      "divergence": null
+      "anchorId": "quran:10"
     },
     {
       "id": "golden-052",
@@ -1818,8 +1757,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "quran:100",
-      "divergence": null
+      "anchorId": "quran:100"
     },
     {
       "id": "golden-053",
@@ -1836,8 +1774,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "quran:1000",
-      "divergence": null
+      "anchorId": "quran:1000"
     },
     {
       "id": "golden-054",
@@ -1854,8 +1791,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "quran:1001",
-      "divergence": null
+      "anchorId": "quran:1001"
     },
     {
       "id": "golden-055",
@@ -1872,8 +1808,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "quran:1002",
-      "divergence": null
+      "anchorId": "quran:1002"
     },
     {
       "id": "golden-056",
@@ -1890,8 +1825,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "tirmidhi:1",
-      "divergence": null
+      "anchorId": "tirmidhi:1"
     },
     {
       "id": "golden-057",
@@ -1908,8 +1842,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "tirmidhi:10",
-      "divergence": null
+      "anchorId": "tirmidhi:10"
     },
     {
       "id": "golden-058",
@@ -1926,8 +1859,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "tirmidhi:100",
-      "divergence": null
+      "anchorId": "tirmidhi:100"
     },
     {
       "id": "golden-059",
@@ -1944,8 +1876,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "tirmidhi:1000",
-      "divergence": null
+      "anchorId": "tirmidhi:1000"
     },
     {
       "id": "golden-060",
@@ -1962,8 +1893,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 6 of the fold strips every combining mark, so the bare letter skeleton is the span's own fold key.",
-      "anchorId": "tirmidhi:1001",
-      "divergence": null
+      "anchorId": "tirmidhi:1001"
     },
     {
       "id": "golden-061",
@@ -1980,8 +1910,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "abudawud:1",
-      "divergence": null
+      "anchorId": "abudawud:1"
     },
     {
       "id": "golden-062",
@@ -1998,8 +1927,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "abudawud:10",
-      "divergence": null
+      "anchorId": "abudawud:10"
     },
     {
       "id": "golden-063",
@@ -2016,8 +1944,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "abudawud:100",
-      "divergence": null
+      "anchorId": "abudawud:100"
     },
     {
       "id": "golden-064",
@@ -2034,8 +1961,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "abudawud:1000",
-      "divergence": null
+      "anchorId": "abudawud:1000"
     },
     {
       "id": "golden-065",
@@ -2052,8 +1978,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "abudawud:1001",
-      "divergence": null
+      "anchorId": "abudawud:1001"
     },
     {
       "id": "golden-066",
@@ -2070,8 +1995,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "ibnmajah:1",
-      "divergence": null
+      "anchorId": "ibnmajah:1"
     },
     {
       "id": "golden-067",
@@ -2088,8 +2012,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "ibnmajah:10",
-      "divergence": null
+      "anchorId": "ibnmajah:10"
     },
     {
       "id": "golden-068",
@@ -2106,8 +2029,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "ibnmajah:100",
-      "divergence": null
+      "anchorId": "ibnmajah:100"
     },
     {
       "id": "golden-069",
@@ -2124,8 +2046,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "ibnmajah:1002",
-      "divergence": null
+      "anchorId": "ibnmajah:1002"
     },
     {
       "id": "golden-070",
@@ -2142,8 +2063,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "ibnmajah:1003",
-      "divergence": null
+      "anchorId": "ibnmajah:1003"
     },
     {
       "id": "golden-071",
@@ -2160,8 +2080,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "malik:1",
-      "divergence": null
+      "anchorId": "malik:1"
     },
     {
       "id": "golden-072",
@@ -2178,8 +2097,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "malik:10",
-      "divergence": null
+      "anchorId": "malik:10"
     },
     {
       "id": "golden-073",
@@ -2196,8 +2114,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "malik:100",
-      "divergence": null
+      "anchorId": "malik:100"
     },
     {
       "id": "golden-074",
@@ -2214,8 +2131,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "malik:1000",
-      "divergence": null
+      "anchorId": "malik:1000"
     },
     {
       "id": "golden-075",
@@ -2232,8 +2148,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "malik:1002",
-      "divergence": null
+      "anchorId": "malik:1002"
     },
     {
       "id": "golden-076",
@@ -2250,8 +2165,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "nasai:1",
-      "divergence": null
+      "anchorId": "nasai:1"
     },
     {
       "id": "golden-077",
@@ -2268,8 +2182,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "nasai:10",
-      "divergence": null
+      "anchorId": "nasai:10"
     },
     {
       "id": "golden-078",
@@ -2286,8 +2199,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "nasai:100",
-      "divergence": null
+      "anchorId": "nasai:100"
     },
     {
       "id": "golden-079",
@@ -2304,8 +2216,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "nasai:1000",
-      "divergence": null
+      "anchorId": "nasai:1000"
     },
     {
       "id": "golden-080",
@@ -2322,8 +2233,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "nasai:1001",
-      "divergence": null
+      "anchorId": "nasai:1001"
     },
     {
       "id": "golden-081",
@@ -2340,8 +2250,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "quran:10",
-      "divergence": null
+      "anchorId": "quran:10"
     },
     {
       "id": "golden-082",
@@ -2358,8 +2267,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "quran:100",
-      "divergence": null
+      "anchorId": "quran:100"
     },
     {
       "id": "golden-083",
@@ -2376,8 +2284,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "quran:1000",
-      "divergence": null
+      "anchorId": "quran:1000"
     },
     {
       "id": "golden-084",
@@ -2394,8 +2301,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "quran:1001",
-      "divergence": null
+      "anchorId": "quran:1001"
     },
     {
       "id": "golden-085",
@@ -2412,8 +2318,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "quran:1002",
-      "divergence": null
+      "anchorId": "quran:1002"
     },
     {
       "id": "golden-086",
@@ -2430,8 +2335,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "tirmidhi:1",
-      "divergence": null
+      "anchorId": "tirmidhi:1"
     },
     {
       "id": "golden-087",
@@ -2448,8 +2352,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "tirmidhi:10",
-      "divergence": null
+      "anchorId": "tirmidhi:10"
     },
     {
       "id": "golden-088",
@@ -2466,8 +2369,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "tirmidhi:100",
-      "divergence": null
+      "anchorId": "tirmidhi:100"
     },
     {
       "id": "golden-089",
@@ -2484,8 +2386,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "tirmidhi:1000",
-      "divergence": null
+      "anchorId": "tirmidhi:1000"
     },
     {
       "id": "golden-090",
@@ -2502,8 +2403,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stages 5 and 8 remove tatweel and collapse whitespace runs, so elongation and doubled spaces fold away.",
-      "anchorId": "tirmidhi:1001",
-      "divergence": null
+      "anchorId": "tirmidhi:1001"
     },
     {
       "id": "golden-091",
@@ -2520,8 +2420,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 3 folds Arabic-Indic digits to ASCII, so ٤ and 4 are the same character to the containment key.",
-      "anchorId": "abudawud:281",
-      "divergence": null
+      "anchorId": "abudawud:281"
     },
     {
       "id": "golden-092",
@@ -2538,8 +2437,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 3 folds Arabic-Indic digits to ASCII, so ٤ and 4 are the same character to the containment key.",
-      "anchorId": "abudawud:281",
-      "divergence": null
+      "anchorId": "abudawud:281"
     },
     {
       "id": "golden-093",
@@ -2556,8 +2454,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 3 folds Arabic-Indic digits to ASCII, so ٤ and 4 are the same character to the containment key.",
-      "anchorId": "abudawud:281",
-      "divergence": null
+      "anchorId": "abudawud:281"
     },
     {
       "id": "golden-094",
@@ -2574,8 +2471,7 @@
       "expectedVerdict": "verified",
       "expectedReason": "exact_containment",
       "expectedRationale": "Stage 3 folds Arabic-Indic digits to ASCII, so ٤ and 4 are the same character to the containment key.",
-      "anchorId": "abudawud:281",
-      "divergence": null
+      "anchorId": "abudawud:281"
     },
     {
       "id": "golden-095",
@@ -2589,19 +2485,19 @@
         "grade": null,
         "raw": "abudawud:1"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "abudawud:1",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "أَنَّ النَّبِيَّ صلى الله",
+      "adjudication": {
+        "caseId": "golden-095",
+        "anchor": "abudawud:1",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -2616,19 +2512,19 @@
         "grade": null,
         "raw": "abudawud:10"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "abudawud:10",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "قَالَ نَهَى رَسُولُ اللَّهِ صلى",
+      "adjudication": {
+        "caseId": "golden-096",
+        "anchor": "abudawud:10",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -2643,19 +2539,19 @@
         "grade": null,
         "raw": "abudawud:100"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "abudawud:100",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "قَالَ جَاءَنَا رَسُولُ اللَّهِ صلى",
+      "adjudication": {
+        "caseId": "golden-097",
+        "anchor": "abudawud:100",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -2670,19 +2566,19 @@
         "grade": null,
         "raw": "abudawud:1000"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "abudawud:1000",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "قَالَ دَخَلَ عَلَيْنَا رَسُولُ اللَّهِ",
+      "adjudication": {
+        "caseId": "golden-098",
+        "anchor": "abudawud:1000",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -2697,19 +2593,19 @@
         "grade": null,
         "raw": "abudawud:1001"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "abudawud:1001",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "قَالَ أَمَرَنَا النَّبِيُّ صلى الله",
+      "adjudication": {
+        "caseId": "golden-099",
+        "anchor": "abudawud:1001",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -2724,19 +2620,19 @@
         "grade": null,
         "raw": "ibnmajah:1"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "ibnmajah:1",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "حَدَّثَنَا شَرِيكٌ عَنِ الأَعْمَشِ",
+      "adjudication": {
+        "caseId": "golden-100",
+        "anchor": "ibnmajah:1",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -2751,19 +2647,19 @@
         "grade": null,
         "raw": "ibnmajah:10"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "ibnmajah:10",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "لاَ يَزَالُ طَائِفَةٌ مِنْ أُمَّتِي",
+      "adjudication": {
+        "caseId": "golden-101",
+        "anchor": "ibnmajah:10",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -2778,19 +2674,19 @@
         "grade": null,
         "raw": "ibnmajah:100"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "ibnmajah:100",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "أَبُو بَكْرٍ وَعُمَرُ سَيِّدَا كُهُولِ",
+      "adjudication": {
+        "caseId": "golden-102",
+        "anchor": "ibnmajah:100",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -2805,19 +2701,19 @@
         "grade": null,
         "raw": "ibnmajah:1002"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "ibnmajah:1002",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "بَيْنَ السَّوَارِي عَلَى عَهْدِ رَسُولِ",
+      "adjudication": {
+        "caseId": "golden-103",
+        "anchor": "ibnmajah:1002",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -2832,19 +2728,19 @@
         "grade": null,
         "raw": "ibnmajah:1003"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "ibnmajah:1003",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "عَلِيِّ بْنِ شَيْبَانَ - وَكَانَ",
+      "adjudication": {
+        "caseId": "golden-104",
+        "anchor": "ibnmajah:1003",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -2859,19 +2755,19 @@
         "grade": null,
         "raw": "malik:1"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "malik:1",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "أَخَّرَ الصَّلاَةَ يَوْمًا فَدَخَلَ عَلَيْهِ",
+      "adjudication": {
+        "caseId": "golden-105",
+        "anchor": "malik:1",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -2886,19 +2782,19 @@
         "grade": null,
         "raw": "malik:10"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "malik:10",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "أَنَّهُ قَالَ كُنَّا نُصَلِّي الْعَصْرَ",
+      "adjudication": {
+        "caseId": "golden-106",
+        "anchor": "malik:10",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -2913,19 +2809,19 @@
         "grade": null,
         "raw": "malik:100"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "malik:100",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "كَانَ إِذَا اغْتَسَلَ مِنَ الْجَنَابَةِ",
+      "adjudication": {
+        "caseId": "golden-107",
+        "anchor": "malik:100",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -2940,19 +2836,19 @@
         "grade": null,
         "raw": "malik:1000"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "malik:1000",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "أَنَّهُ قَالَ الْغَزْوُ غَزْوَانِ فَغَزْوٌ",
+      "adjudication": {
+        "caseId": "golden-108",
+        "anchor": "malik:1000",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -2967,19 +2863,19 @@
         "grade": null,
         "raw": "malik:1002"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "malik:1002",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "أَنَّ رَسُولَ اللَّهِ صلى الله",
+      "adjudication": {
+        "caseId": "golden-109",
+        "anchor": "malik:1002",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -2994,19 +2890,19 @@
         "grade": null,
         "raw": "nasai:1"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "nasai:1",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "إِذَا اسْتَيْقَظَ أَحَدُكُمْ مِنْ نَوْمِهِ",
+      "adjudication": {
+        "caseId": "golden-110",
+        "anchor": "nasai:1",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -3021,19 +2917,19 @@
         "grade": null,
         "raw": "nasai:10"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "nasai:10",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "خَمْسٌ مِنَ الْفِطْرَةِ قَصُّ",
+      "adjudication": {
+        "caseId": "golden-111",
+        "anchor": "nasai:10",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -3048,19 +2944,19 @@
         "grade": null,
         "raw": "nasai:100"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "nasai:100",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "سَالِمٌ سَبَلاَنُ قَالَ وَكَانَتْ عَائِشَةُ",
+      "adjudication": {
+        "caseId": "golden-112",
+        "anchor": "nasai:100",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -3075,19 +2971,19 @@
         "grade": null,
         "raw": "nasai:1000"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "nasai:1000",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "قَالَ صَلَّيْتُ مَعَ رَسُولِ اللَّهِ",
+      "adjudication": {
+        "caseId": "golden-113",
+        "anchor": "nasai:1000",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -3102,19 +2998,19 @@
         "grade": null,
         "raw": "nasai:1001"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "nasai:1001",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "قَالَ كَانَ رَسُولُ اللَّهِ صلى",
+      "adjudication": {
+        "caseId": "golden-114",
+        "anchor": "nasai:1001",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -3129,19 +3025,19 @@
         "grade": null,
         "raw": "quran:10"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "quran:10",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "ٱلَّذِينَ يُؤْمِنُونَ بِٱلْغَيْبِ وَيُقِيمُونَ",
+      "adjudication": {
+        "caseId": "golden-115",
+        "anchor": "quran:10",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -3156,19 +3052,19 @@
         "grade": null,
         "raw": "quran:100"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "quran:100",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "وَإِذْ أَخَذْنَا مِيثَٰقَكُمْ وَرَفَعْنَا فَوْقَكُمُ",
+      "adjudication": {
+        "caseId": "golden-116",
+        "anchor": "quran:100",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -3183,19 +3079,19 @@
         "grade": null,
         "raw": "quran:1000"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "quran:1000",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "وَبَيْنَهُمَا حِجَابٌ وَعَلَى ٱلْأَعْرَافِ رِجَالٌ",
+      "adjudication": {
+        "caseId": "golden-117",
+        "anchor": "quran:1000",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -3210,19 +3106,19 @@
         "grade": null,
         "raw": "quran:1001"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "quran:1001",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "وَإِذَا صُرِفَتْ أَبْصَٰرُهُمْ تِلْقَآءَ أَصْحَٰبِ",
+      "adjudication": {
+        "caseId": "golden-118",
+        "anchor": "quran:1001",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -3237,19 +3133,19 @@
         "grade": null,
         "raw": "quran:1002"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "quran:1002",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "وَنَادَىٰٓ أَصْحَٰبُ ٱلْأَعْرَافِ رِجَالًا يَعْرِفُونَهُم",
+      "adjudication": {
+        "caseId": "golden-119",
+        "anchor": "quran:1002",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -3264,19 +3160,19 @@
         "grade": null,
         "raw": "tirmidhi:1"
       },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
+      "expectedVerdict": "unverifiable",
+      "expectedReason": "no_matching_evidence",
+      "expectedRationale": "An elided span drops words and inserts an ellipsis, which no fold stage removes, so it is not a substring and containment cannot confirm it. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it. What remains is nevertheless the source's own wording rather than an assertion the source does not make, so accusing the citation of misquotation would be wrong: the honest verdict is that the evidence is incomplete.",
       "anchorId": "tirmidhi:1",
-      "divergence": {
-        "id": "paraphrase-rejected-not-unverifiable",
-        "affectsClasses": [
-          "elide_middle"
-        ],
-        "storyRequires": "unverifiable",
-        "procedureDelivers": "rejected",
-        "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-        "whoDecides": "team lead — this changes the product's most safety-sensitive label"
+      "anchorText": "وَأَبُو الْمَلِيحِ بْنُ أُسَامَةَ اسْمُهُ",
+      "adjudication": {
+        "caseId": "golden-120",
+        "anchor": "tirmidhi:1",
+        "adjudicatedVerdict": "unverifiable",
+        "adjudicatedReason": "no_matching_evidence",
+        "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
       }
     },
     {
@@ -3294,8 +3190,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:10",
-      "divergence": null
+      "anchorId": "abudawud:10"
     },
     {
       "id": "golden-122",
@@ -3312,8 +3207,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:100",
-      "divergence": null
+      "anchorId": "abudawud:100"
     },
     {
       "id": "golden-123",
@@ -3330,8 +3224,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:1000",
-      "divergence": null
+      "anchorId": "abudawud:1000"
     },
     {
       "id": "golden-124",
@@ -3348,8 +3241,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:1002",
-      "divergence": null
+      "anchorId": "abudawud:1002"
     },
     {
       "id": "golden-125",
@@ -3366,8 +3258,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:281",
-      "divergence": null
+      "anchorId": "abudawud:281"
     },
     {
       "id": "golden-126",
@@ -3384,8 +3275,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:286",
-      "divergence": null
+      "anchorId": "abudawud:286"
     },
     {
       "id": "golden-127",
@@ -3402,8 +3292,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:287",
-      "divergence": null
+      "anchorId": "abudawud:287"
     },
     {
       "id": "golden-128",
@@ -3420,8 +3309,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "ibnmajah:1003",
-      "divergence": null
+      "anchorId": "ibnmajah:1003"
     },
     {
       "id": "golden-129",
@@ -3438,8 +3326,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:2164",
-      "divergence": null
+      "anchorId": "abudawud:2164"
     },
     {
       "id": "golden-130",
@@ -3456,8 +3343,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:2885",
-      "divergence": null
+      "anchorId": "abudawud:2885"
     },
     {
       "id": "golden-131",
@@ -3474,8 +3360,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:3625",
-      "divergence": null
+      "anchorId": "abudawud:3625"
     },
     {
       "id": "golden-132",
@@ -3492,8 +3377,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:3641",
-      "divergence": null
+      "anchorId": "abudawud:3641"
     },
     {
       "id": "golden-133",
@@ -3510,8 +3394,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:1141",
-      "divergence": null
+      "anchorId": "abudawud:1141"
     },
     {
       "id": "golden-134",
@@ -3528,8 +3411,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:1143",
-      "divergence": null
+      "anchorId": "abudawud:1143"
     },
     {
       "id": "golden-135",
@@ -3546,8 +3428,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:1144",
-      "divergence": null
+      "anchorId": "abudawud:1144"
     },
     {
       "id": "golden-136",
@@ -3564,8 +3445,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:1159",
-      "divergence": null
+      "anchorId": "abudawud:1159"
     },
     {
       "id": "golden-137",
@@ -3582,8 +3462,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:1008",
-      "divergence": null
+      "anchorId": "abudawud:1008"
     },
     {
       "id": "golden-138",
@@ -3600,8 +3479,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:1023",
-      "divergence": null
+      "anchorId": "abudawud:1023"
     },
     {
       "id": "golden-139",
@@ -3618,8 +3496,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:1045",
-      "divergence": null
+      "anchorId": "abudawud:1045"
     },
     {
       "id": "golden-140",
@@ -3636,8 +3513,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:1051",
-      "divergence": null
+      "anchorId": "abudawud:1051"
     },
     {
       "id": "golden-141",
@@ -3654,8 +3530,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:1131",
-      "divergence": null
+      "anchorId": "abudawud:1131"
     },
     {
       "id": "golden-142",
@@ -3672,8 +3547,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:12",
-      "divergence": null
+      "anchorId": "abudawud:12"
     },
     {
       "id": "golden-143",
@@ -3690,8 +3564,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:1327",
-      "divergence": null
+      "anchorId": "abudawud:1327"
     },
     {
       "id": "golden-144",
@@ -3708,8 +3581,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:1397",
-      "divergence": null
+      "anchorId": "abudawud:1397"
     },
     {
       "id": "golden-145",
@@ -3726,8 +3598,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:1556",
-      "divergence": null
+      "anchorId": "abudawud:1556"
     },
     {
       "id": "golden-146",
@@ -3744,8 +3615,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:1567",
-      "divergence": null
+      "anchorId": "abudawud:1567"
     },
     {
       "id": "golden-147",
@@ -3762,8 +3632,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:1625",
-      "divergence": null
+      "anchorId": "abudawud:1625"
     },
     {
       "id": "golden-148",
@@ -3780,8 +3649,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:1958",
-      "divergence": null
+      "anchorId": "abudawud:1958"
     },
     {
       "id": "golden-149",
@@ -3798,8 +3666,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:1094",
-      "divergence": null
+      "anchorId": "abudawud:1094"
     },
     {
       "id": "golden-150",
@@ -3816,8 +3683,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
-      "anchorId": "abudawud:1101",
-      "divergence": null
+      "anchorId": "abudawud:1101"
     },
     {
       "id": "golden-151",
@@ -3834,8 +3700,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "A real span with an English instruction appended. The span before the comma is genuine and the whole string is not, which is the corpus-poisoning shape (R17).",
-      "anchorId": "abudawud:1",
-      "divergence": null
+      "anchorId": "abudawud:1"
     },
     {
       "id": "golden-152",
@@ -3852,8 +3717,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "A real span with an English instruction appended. The span before the comma is genuine and the whole string is not, which is the corpus-poisoning shape (R17).",
-      "anchorId": "abudawud:10",
-      "divergence": null
+      "anchorId": "abudawud:10"
     },
     {
       "id": "golden-153",
@@ -3870,8 +3734,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "A real span with an English instruction appended. The span before the comma is genuine and the whole string is not, which is the corpus-poisoning shape (R17).",
-      "anchorId": "abudawud:100",
-      "divergence": null
+      "anchorId": "abudawud:100"
     },
     {
       "id": "golden-154",
@@ -3888,8 +3751,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "A real span with an English instruction appended. The span before the comma is genuine and the whole string is not, which is the corpus-poisoning shape (R17).",
-      "anchorId": "abudawud:1000",
-      "divergence": null
+      "anchorId": "abudawud:1000"
     },
     {
       "id": "golden-155",
@@ -3906,8 +3768,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "A real span with an English instruction appended. The span before the comma is genuine and the whole string is not, which is the corpus-poisoning shape (R17).",
-      "anchorId": "abudawud:1001",
-      "divergence": null
+      "anchorId": "abudawud:1001"
     },
     {
       "id": "golden-156",
@@ -3924,8 +3785,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "A real span with an English instruction appended. The span before the comma is genuine and the whole string is not, which is the corpus-poisoning shape (R17).",
-      "anchorId": "ibnmajah:1",
-      "divergence": null
+      "anchorId": "ibnmajah:1"
     },
     {
       "id": "golden-157",
@@ -3942,8 +3802,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "A real span with an English instruction appended. The span before the comma is genuine and the whole string is not, which is the corpus-poisoning shape (R17).",
-      "anchorId": "ibnmajah:10",
-      "divergence": null
+      "anchorId": "ibnmajah:10"
     },
     {
       "id": "golden-158",
@@ -3960,8 +3819,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "A real span with an English instruction appended. The span before the comma is genuine and the whole string is not, which is the corpus-poisoning shape (R17).",
-      "anchorId": "ibnmajah:100",
-      "divergence": null
+      "anchorId": "ibnmajah:100"
     },
     {
       "id": "golden-159",
@@ -3978,8 +3836,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "A real span with an English instruction appended. The span before the comma is genuine and the whole string is not, which is the corpus-poisoning shape (R17).",
-      "anchorId": "ibnmajah:1002",
-      "divergence": null
+      "anchorId": "ibnmajah:1002"
     },
     {
       "id": "golden-160",
@@ -3996,8 +3853,7 @@
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "A real span with an English instruction appended. The span before the comma is genuine and the whole string is not, which is the corpus-poisoning shape (R17).",
-      "anchorId": "ibnmajah:1003",
-      "divergence": null
+      "anchorId": "ibnmajah:1003"
     },
     {
       "id": "golden-161",
@@ -4014,8 +3870,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "identifier_unresolved",
       "expectedRationale": "The cited number does not exist in that collection, so there is no record to compare against and nothing may be accused.",
-      "anchorId": "abudawud:1",
-      "divergence": null
+      "anchorId": "abudawud:1"
     },
     {
       "id": "golden-162",
@@ -4032,8 +3887,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "identifier_unresolved",
       "expectedRationale": "The cited number does not exist in that collection, so there is no record to compare against and nothing may be accused.",
-      "anchorId": "abudawud:10",
-      "divergence": null
+      "anchorId": "abudawud:10"
     },
     {
       "id": "golden-163",
@@ -4050,8 +3904,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "identifier_unresolved",
       "expectedRationale": "The cited number does not exist in that collection, so there is no record to compare against and nothing may be accused.",
-      "anchorId": "abudawud:100",
-      "divergence": null
+      "anchorId": "abudawud:100"
     },
     {
       "id": "golden-164",
@@ -4068,8 +3921,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "identifier_unresolved",
       "expectedRationale": "The cited number does not exist in that collection, so there is no record to compare against and nothing may be accused.",
-      "anchorId": "abudawud:1000",
-      "divergence": null
+      "anchorId": "abudawud:1000"
     },
     {
       "id": "golden-165",
@@ -4086,8 +3938,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "identifier_unresolved",
       "expectedRationale": "The cited number does not exist in that collection, so there is no record to compare against and nothing may be accused.",
-      "anchorId": "abudawud:1001",
-      "divergence": null
+      "anchorId": "abudawud:1001"
     },
     {
       "id": "golden-166",
@@ -4104,8 +3955,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "identifier_unresolved",
       "expectedRationale": "The cited number does not exist in that collection, so there is no record to compare against and nothing may be accused.",
-      "anchorId": "ibnmajah:1",
-      "divergence": null
+      "anchorId": "ibnmajah:1"
     },
     {
       "id": "golden-167",
@@ -4122,8 +3972,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "identifier_unresolved",
       "expectedRationale": "The cited number does not exist in that collection, so there is no record to compare against and nothing may be accused.",
-      "anchorId": "ibnmajah:10",
-      "divergence": null
+      "anchorId": "ibnmajah:10"
     },
     {
       "id": "golden-168",
@@ -4140,8 +3989,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "identifier_unresolved",
       "expectedRationale": "The cited number does not exist in that collection, so there is no record to compare against and nothing may be accused.",
-      "anchorId": "ibnmajah:100",
-      "divergence": null
+      "anchorId": "ibnmajah:100"
     },
     {
       "id": "golden-169",
@@ -4158,8 +4006,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "identifier_unresolved",
       "expectedRationale": "The cited number does not exist in that collection, so there is no record to compare against and nothing may be accused.",
-      "anchorId": "ibnmajah:1002",
-      "divergence": null
+      "anchorId": "ibnmajah:1002"
     },
     {
       "id": "golden-170",
@@ -4176,8 +4023,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "identifier_unresolved",
       "expectedRationale": "The cited number does not exist in that collection, so there is no record to compare against and nothing may be accused.",
-      "anchorId": "ibnmajah:1003",
-      "divergence": null
+      "anchorId": "ibnmajah:1003"
     },
     {
       "id": "golden-171",
@@ -4194,8 +4040,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "identifier_unresolved",
       "expectedRationale": "The cited number does not exist in that collection, so there is no record to compare against and nothing may be accused.",
-      "anchorId": "malik:1",
-      "divergence": null
+      "anchorId": "malik:1"
     },
     {
       "id": "golden-172",
@@ -4212,8 +4057,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "identifier_unresolved",
       "expectedRationale": "The cited number does not exist in that collection, so there is no record to compare against and nothing may be accused.",
-      "anchorId": "malik:10",
-      "divergence": null
+      "anchorId": "malik:10"
     },
     {
       "id": "golden-173",
@@ -4230,8 +4074,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "identifier_unresolved",
       "expectedRationale": "The cited number does not exist in that collection, so there is no record to compare against and nothing may be accused.",
-      "anchorId": "malik:100",
-      "divergence": null
+      "anchorId": "malik:100"
     },
     {
       "id": "golden-174",
@@ -4248,8 +4091,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "identifier_unresolved",
       "expectedRationale": "The cited number does not exist in that collection, so there is no record to compare against and nothing may be accused.",
-      "anchorId": "malik:1000",
-      "divergence": null
+      "anchorId": "malik:1000"
     },
     {
       "id": "golden-175",
@@ -4266,8 +4108,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "identifier_unresolved",
       "expectedRationale": "The cited number does not exist in that collection, so there is no record to compare against and nothing may be accused.",
-      "anchorId": "malik:1002",
-      "divergence": null
+      "anchorId": "malik:1002"
     },
     {
       "id": "golden-176",
@@ -4284,8 +4125,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "identifier_unresolved",
       "expectedRationale": "The cited number does not exist in that collection, so there is no record to compare against and nothing may be accused.",
-      "anchorId": "nasai:1",
-      "divergence": null
+      "anchorId": "nasai:1"
     },
     {
       "id": "golden-177",
@@ -4302,8 +4142,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "identifier_unresolved",
       "expectedRationale": "The cited number does not exist in that collection, so there is no record to compare against and nothing may be accused.",
-      "anchorId": "nasai:10",
-      "divergence": null
+      "anchorId": "nasai:10"
     },
     {
       "id": "golden-178",
@@ -4320,8 +4159,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "identifier_unresolved",
       "expectedRationale": "The cited number does not exist in that collection, so there is no record to compare against and nothing may be accused.",
-      "anchorId": "nasai:100",
-      "divergence": null
+      "anchorId": "nasai:100"
     },
     {
       "id": "golden-179",
@@ -4338,8 +4176,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "identifier_unresolved",
       "expectedRationale": "The cited number does not exist in that collection, so there is no record to compare against and nothing may be accused.",
-      "anchorId": "nasai:1000",
-      "divergence": null
+      "anchorId": "nasai:1000"
     },
     {
       "id": "golden-180",
@@ -4356,8 +4193,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "identifier_unresolved",
       "expectedRationale": "The cited number does not exist in that collection, so there is no record to compare against and nothing may be accused.",
-      "anchorId": "nasai:1001",
-      "divergence": null
+      "anchorId": "nasai:1001"
     },
     {
       "id": "golden-181",
@@ -4374,8 +4210,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "collection_ambiguous",
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
-      "anchorId": "abudawud:1",
-      "divergence": null
+      "anchorId": "abudawud:1"
     },
     {
       "id": "golden-182",
@@ -4392,8 +4227,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "collection_ambiguous",
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
-      "anchorId": "ibnmajah:1",
-      "divergence": null
+      "anchorId": "ibnmajah:1"
     },
     {
       "id": "golden-183",
@@ -4410,8 +4244,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "collection_ambiguous",
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
-      "anchorId": "malik:1",
-      "divergence": null
+      "anchorId": "malik:1"
     },
     {
       "id": "golden-184",
@@ -4428,8 +4261,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "collection_ambiguous",
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
-      "anchorId": "nasai:1",
-      "divergence": null
+      "anchorId": "nasai:1"
     },
     {
       "id": "golden-185",
@@ -4446,8 +4278,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "collection_ambiguous",
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
-      "anchorId": "tirmidhi:1",
-      "divergence": null
+      "anchorId": "tirmidhi:1"
     },
     {
       "id": "golden-186",
@@ -4464,8 +4295,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "collection_ambiguous",
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
-      "anchorId": "malik:1",
-      "divergence": null
+      "anchorId": "malik:1"
     },
     {
       "id": "golden-187",
@@ -4482,8 +4312,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "collection_ambiguous",
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
-      "anchorId": "nasai:1",
-      "divergence": null
+      "anchorId": "nasai:1"
     },
     {
       "id": "golden-188",
@@ -4500,8 +4329,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "collection_ambiguous",
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
-      "anchorId": "tirmidhi:1",
-      "divergence": null
+      "anchorId": "tirmidhi:1"
     },
     {
       "id": "golden-189",
@@ -4518,8 +4346,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "collection_ambiguous",
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
-      "anchorId": "malik:1",
-      "divergence": null
+      "anchorId": "malik:1"
     },
     {
       "id": "golden-190",
@@ -4536,8 +4363,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "collection_ambiguous",
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
-      "anchorId": "nasai:1",
-      "divergence": null
+      "anchorId": "nasai:1"
     },
     {
       "id": "golden-191",
@@ -4554,8 +4380,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "collection_ambiguous",
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
-      "anchorId": "tirmidhi:1",
-      "divergence": null
+      "anchorId": "tirmidhi:1"
     },
     {
       "id": "golden-192",
@@ -4572,8 +4397,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "collection_ambiguous",
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
-      "anchorId": "malik:1",
-      "divergence": null
+      "anchorId": "malik:1"
     },
     {
       "id": "golden-193",
@@ -4590,8 +4414,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "collection_ambiguous",
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
-      "anchorId": "nasai:1",
-      "divergence": null
+      "anchorId": "nasai:1"
     },
     {
       "id": "golden-194",
@@ -4608,8 +4431,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "collection_ambiguous",
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
-      "anchorId": "tirmidhi:1",
-      "divergence": null
+      "anchorId": "tirmidhi:1"
     },
     {
       "id": "golden-195",
@@ -4626,8 +4448,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "collection_ambiguous",
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
-      "anchorId": "malik:1",
-      "divergence": null
+      "anchorId": "malik:1"
     },
     {
       "id": "golden-196",
@@ -4644,8 +4465,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "collection_ambiguous",
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
-      "anchorId": "tirmidhi:1",
-      "divergence": null
+      "anchorId": "tirmidhi:1"
     },
     {
       "id": "golden-197",
@@ -4662,8 +4482,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "collection_ambiguous",
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
-      "anchorId": "malik:1",
-      "divergence": null
+      "anchorId": "malik:1"
     },
     {
       "id": "golden-198",
@@ -4680,8 +4499,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "collection_ambiguous",
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
-      "anchorId": "malik:1",
-      "divergence": null
+      "anchorId": "malik:1"
     },
     {
       "id": "golden-199",
@@ -4698,8 +4516,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "collection_ambiguous",
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
-      "anchorId": "malik:1",
-      "divergence": null
+      "anchorId": "malik:1"
     },
     {
       "id": "golden-200",
@@ -4716,8 +4533,7 @@
       "expectedVerdict": "unverifiable",
       "expectedReason": "collection_ambiguous",
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
-      "anchorId": "malik:1",
-      "divergence": null
+      "anchorId": "malik:1"
     }
   ]
 }

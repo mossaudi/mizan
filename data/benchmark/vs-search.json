@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "preRegisteredHypothesis": "On the 40-case red-team set, a plain FTS5 top-k search returns the cited record at rank 1 for a substantial majority of fabrications, and mizan's detection rate exceeds it by a margin that is not explainable by abstention.",
+  "corpusFingerprint": "7b3b66fbca7fb9df471b49524f31409391addea87f8d0f262d84f7812a48240d",
+  "corpusRecordCount": 27234,
+  "setName": "redteam-fabricated",
+  "caseCount": 40,
+  "systemDetectionRate": 1,
+  "systemAgreementRate": 1,
+  "systemAbstentionRate": 0,
+  "baselineTop1HitRate": 0.65,
+  "delta": 0.35,
+  "falseVerifiedCount": 0,
+  "systemArmSource": "executed-verifier",
+  "declaration": {
+    "strategy": "fts5-bm25",
+    "column": "textMatch",
+    "collectionFilter": false,
+    "usesGoldRecordId": false,
+    "k": 1,
+    "rerunBudget": 0
+  }
+}

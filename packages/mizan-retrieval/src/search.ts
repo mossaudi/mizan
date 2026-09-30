@@ -1,8 +1,8 @@
 import type { Database } from "bun:sqlite"
-import { isOk, ok, type Result, type RetrievalError } from "@mizan/core"
+import { isOk, ok, QURAN_COLLECTION, type Result, type RetrievalError } from "@mizan/core"
 import { fuse, type FusedHit, type RankedList } from "./rrf.ts"
 import { broadExpression, phraseExpression, prefixExpression, prepareQuery } from "./query.ts"
-import type { Query, RankedChunk, SearchResult } from "./schema.ts"
+import type { CorpusScope, Query, RankedChunk, SearchResult } from "./schema.ts"
 
 /**
  * The two lexical rankers and their fusion.
@@ -31,18 +31,34 @@ const cleanLimit = (limit: number | undefined): number => {
 }
 
 /**
+ * The scope predicate, in one place.
+ *
+ * `bm25Order` interpolates this SQL, so the string is assembled from a closed union and never
+ * from caller input — the only bound value is `QURAN_COLLECTION`, which is a constant from
+ * `@mizan/core`. `hadith` is written as an exclusion rather than a list of slugs so that a
+ * hadith collection added tomorrow is searchable without a code change, and so the two scopes
+ * cannot drift apart: they are the same comparison, read in opposite directions.
+ */
+const scopeSql = (scope: CorpusScope): { readonly predicate: string; readonly bindings: readonly string[] } => {
+  if (scope === "any") return { predicate: "1 = 1", bindings: [] }
+  if (scope === "quran") return { predicate: "r.collection = ?", bindings: [QURAN_COLLECTION] }
+  return { predicate: "r.collection <> ?", bindings: [QURAN_COLLECTION] }
+}
+
+/**
  * The recall pass: the OR of the query tokens, ranked by FTS5's BM25.
  *
  * `bm25()` returns NEGATIVE numbers, more negative meaning a better match, so ascending order is
  * best-first. Only the ordering is consumed — the magnitude is never compared across rankers.
  */
-export const bm25Order = (db: Database, expression: string, collection: string | undefined, take: number): readonly string[] => {
+export const bm25Order = (db: Database, expression: string, scope: CorpusScope | undefined, take: number): readonly string[] => {
+  const filter = scopeSql(scope ?? "any")
   const sql = `SELECT f.recordId AS id FROM records_fts f JOIN records r ON r.id = f.recordId
-     WHERE records_fts MATCH ? AND (? IS NULL OR r.collection = ?)
+     WHERE records_fts MATCH ? AND (${filter.predicate})
      ORDER BY bm25(records_fts) ASC, f.recordId ASC LIMIT ?`
-  const bindings: [string, string | null, string | null, number] = [expression, collection ?? null, collection ?? null, take]
+  const bindings: [string, ...string[], number] = [expression, ...filter.bindings, take]
   return db
-    .query<FtsRow, [string, string | null, string | null, number]>(sql)
+    .query<FtsRow, (string | number)[]>(sql)
     .all(...bindings)
     .map((row) => row.id)
 }
@@ -144,7 +160,7 @@ export const search = (db: Database, query: Query): Result<SearchResult, Retriev
 
   const lists: RankedList[] = []
   for (const pass of passes) {
-    const ids = bm25Order(db, pass.expression, query.collection, RECENT)
+    const ids = bm25Order(db, pass.expression, query.scope, RECENT)
     if (ids.length > 0) lists.push({ name: pass.name, ids })
   }
 

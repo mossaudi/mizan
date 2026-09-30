@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "set": "redteam",
   "title": "Red-team set: fabrications that must never verify",
   "purpose": "Every case is a fabrication of a real corpus span. A single `verified` here is a false positive on invented religious text, which is the failure this repository exists to prevent, so the gate is exactly zero rather than the golden set's accuracy bar.",
@@ -7,16 +7,6 @@
   "regenerateWith": "bun run build:eval",
   "determinism": "Same snapshot in, byte-identical files out. Every selection is ordered (records by id, collections by name, classes by the table order in plan.ts) and no clock, locale or randomness is consulted.",
   "expectationSource": "Hand-adjudicated in scripts/eval/plan.ts from the documented behaviour of the fold table. Never observed from @mizan/verify: a set whose expectations were recorded from the code under test is a regression test of the code against itself.",
-  "knownDivergence": {
-    "id": "paraphrase-rejected-not-unverifiable",
-    "affectsClasses": [
-      "elide_middle"
-    ],
-    "storyRequires": "unverifiable",
-    "procedureDelivers": "rejected",
-    "why": "Step 5 of the six-step procedure routes a resolved identifier whose record lacks the quote to `rejected`, and `rejected` is the only verdict that positively asserts the cited record does not contain the text. Telling a paraphrase apart from a fabrication would require a similarity threshold, which is the CWE-345 fabrication-acceptance hole ADR-03 exists to close. The two requirements cannot both hold; the mechanism was kept and the divergence recorded.",
-    "whoDecides": "team lead — this changes the product's most safety-sensitive label"
-  },
   "digitFacts": {
     "asciiDigitOccurrences": 19,
     "recordsContainingDigits": 4,
@@ -505,7 +495,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
       "anchorId": "abudawud:1003",
-      "divergence": null
+      "anchorText": "الصَّوْتِ لِلذِّكْرِ حِينَ يَنْصَرِفُ النَّاسُ مِنَ الْمَكْتُوبَةِ كَانَ",
+      "adjudication": {
+        "caseId": "redteam-001",
+        "anchor": "abudawud:1003",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-002",
@@ -523,7 +522,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
       "anchorId": "abudawud:1008",
-      "divergence": null
+      "anchorText": "اللَّهِ صلى الله عليه وسلم إِحْدَى صَلاَتَىِ الْعَشِيِّ",
+      "adjudication": {
+        "caseId": "redteam-002",
+        "anchor": "abudawud:1008",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-003",
@@ -541,7 +549,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
       "anchorId": "ibnmajah:1060",
-      "divergence": null
+      "anchorText": "فَأَسْبِغِ الْوُضُوءَ ثُمَّ اسْتَقْبِلِ الْقِبْلَةَ",
+      "adjudication": {
+        "caseId": "redteam-003",
+        "anchor": "ibnmajah:1060",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-004",
@@ -559,7 +576,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
       "anchorId": "ibnmajah:1065",
-      "divergence": null
+      "anchorText": "سَأَلْتُ عُمَرَ بْنَ الْخَطَّابِ قُلْتُ لَيْسَ عَلَيْكُمْ جُنَاحٌ",
+      "adjudication": {
+        "caseId": "redteam-004",
+        "anchor": "ibnmajah:1065",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-005",
@@ -577,7 +603,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
       "anchorId": "abudawud:4255",
-      "divergence": null
+      "anchorText": "وَتَظْهَرُ الْفِتَنُ وَيُلْقَى الشُّحُّ وَيَكْثُرُ الْهَرْجُ",
+      "adjudication": {
+        "caseId": "redteam-005",
+        "anchor": "abudawud:4255",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-006",
@@ -595,7 +630,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
       "anchorId": "abudawud:4445",
-      "divergence": null
+      "anchorText": "الرَّجْمَ فَافْتَدَيْتُ مِنْهُ بِمِائَةِ شَاةٍ وَبِجَارِيَةٍ لِي ثُمَّ",
+      "adjudication": {
+        "caseId": "redteam-006",
+        "anchor": "abudawud:4445",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-007",
@@ -613,7 +657,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
       "anchorId": "abudawud:1664",
-      "divergence": null
+      "anchorText": "أَلاَ أُخْبِرُكَ بِخَيْرِ مَا يَكْنِزُ الْمَرْءُ",
+      "adjudication": {
+        "caseId": "redteam-007",
+        "anchor": "abudawud:1664",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-008",
@@ -631,7 +684,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
       "anchorId": "abudawud:1685",
-      "divergence": null
+      "anchorText": "مِنْ بَيْتِ زَوْجِهَا غَيْرَ مُفْسِدَةٍ كَانَ لَهَا أَجْرُ",
+      "adjudication": {
+        "caseId": "redteam-008",
+        "anchor": "abudawud:1685",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-009",
@@ -649,7 +711,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
       "anchorId": "abudawud:1076",
-      "divergence": null
+      "anchorText": "رَأَى حُلَّةً سِيَرَاءَ - يَعْنِي تُبَاعُ عِنْدَ بَابِ",
+      "adjudication": {
+        "caseId": "redteam-009",
+        "anchor": "abudawud:1076",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-010",
@@ -667,7 +738,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
       "anchorId": "abudawud:1079",
-      "divergence": null
+      "anchorText": "رَسُولَ اللَّهِ صلى الله عليه وسلم نَهَى عَنِ",
+      "adjudication": {
+        "caseId": "redteam-010",
+        "anchor": "abudawud:1079",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-011",
@@ -685,7 +765,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
       "anchorId": "abudawud:1471",
-      "divergence": null
+      "anchorText": "أَبُو لُبَابَةَ فَاتَّبَعْنَاهُ حَتَّى دَخَلَ بَيْتَهُ فَدَخَلْنَا عَلَيْهِ",
+      "adjudication": {
+        "caseId": "redteam-011",
+        "anchor": "abudawud:1471",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-012",
@@ -703,7 +792,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The hardest case in either set: one word of twelve differs, and the other eleven are verbatim. The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
       "anchorId": "abudawud:1733",
-      "divergence": null
+      "anchorText": "إِنَّهُ لَيْسَ لَكَ حَجٌّ فَقَالَ ابْنُ عُمَرَ أَلَيْسَ",
+      "adjudication": {
+        "caseId": "redteam-012",
+        "anchor": "abudawud:1733",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-013",
@@ -721,7 +819,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
       "anchorId": "ibnmajah:1203",
-      "divergence": null
+      "anchorText": "إِبْرَاهِيمُ وَالْوَهْمُ مِنِّي - فَقِيلَ لَهُ يَا",
+      "adjudication": {
+        "caseId": "redteam-013",
+        "anchor": "ibnmajah:1203",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-014",
@@ -739,7 +846,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
       "anchorId": "ibnmajah:1213",
-      "divergence": null
+      "anchorText": "فَقَالَ لَهُ رَجُلٌ يُقَالُ لَهُ ذُو الْيَدَيْنِ يَا",
+      "adjudication": {
+        "caseId": "redteam-014",
+        "anchor": "ibnmajah:1213",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-015",
@@ -757,7 +873,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
       "anchorId": "ibnmajah:1214",
-      "divergence": null
+      "anchorText": "رَجُلٌ طَوِيلُ الْيَدَيْنِ يُسَمَّى ذَا الْيَدَيْنِ فَقَالَ يَا",
+      "adjudication": {
+        "caseId": "redteam-015",
+        "anchor": "ibnmajah:1214",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-016",
@@ -775,7 +900,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
       "anchorId": "ibnmajah:1215",
-      "divergence": null
+      "anchorText": "الْحُجْرَةَ فَقَامَ الْخِرْبَاقُ رَجُلٌ بَسِيطُ الْيَدَيْنِ فَنَادَى يَا",
+      "adjudication": {
+        "caseId": "redteam-016",
+        "anchor": "ibnmajah:1215",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-017",
@@ -793,7 +927,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
       "anchorId": "ibnmajah:860",
-      "divergence": null
+      "anchorText": "اللَّهِ ـ صلى الله عليه وسلم ـ يَرْفَعُ",
+      "adjudication": {
+        "caseId": "redteam-017",
+        "anchor": "ibnmajah:860",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-018",
@@ -811,7 +954,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
       "anchorId": "ibnmajah:881",
-      "divergence": null
+      "anchorText": "اللَّهِ ـ صلى الله عليه وسلم ـ فَحَضَرْتُ",
+      "adjudication": {
+        "caseId": "redteam-018",
+        "anchor": "ibnmajah:881",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-019",
@@ -829,7 +981,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
       "anchorId": "ibnmajah:903",
-      "divergence": null
+      "anchorText": "اللَّهِ هَذَا السَّلاَمُ عَلَيْكَ قَدْ عَرَفْنَاهُ فَكَيْفَ",
+      "adjudication": {
+        "caseId": "redteam-019",
+        "anchor": "ibnmajah:903",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-020",
@@ -847,7 +1008,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "The fold removes diacritics, tatweel and digit-form noise; it never rewrites, adds or removes a letter. A quote differing from the source in any letter is therefore not a substring of it.",
       "anchorId": "ibnmajah:905",
-      "divergence": null
+      "anchorText": "عَلَيْكَ فَكَيْفَ نُصَلِّي عَلَيْكَ فَقَالَ",
+      "adjudication": {
+        "caseId": "redteam-020",
+        "anchor": "ibnmajah:905",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-021",
@@ -865,7 +1035,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "Swapping two adjacent letters reorders the string. An edit-distance metric would call that one edit; containment calls it a different string.",
       "anchorId": "abudawud:1",
-      "divergence": null
+      "anchorText": "صلى الله عليه وسلم كَانَ إِذَا ذَهَبَ الْمَذْهَبَ",
+      "adjudication": {
+        "caseId": "redteam-021",
+        "anchor": "abudawud:1",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-022",
@@ -883,7 +1062,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "Swapping two adjacent letters reorders the string. An edit-distance metric would call that one edit; containment calls it a different string.",
       "anchorId": "abudawud:10",
-      "divergence": null
+      "anchorText": "نَهَى رَسُولُ اللَّهِ صلى الله عليه وسلم أَنْ",
+      "adjudication": {
+        "caseId": "redteam-022",
+        "anchor": "abudawud:10",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-023",
@@ -901,7 +1089,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "Swapping two adjacent letters reorders the string. An edit-distance metric would call that one edit; containment calls it a different string.",
       "anchorId": "abudawud:100",
-      "divergence": null
+      "anchorText": "جَاءَنَا رَسُولُ اللَّهِ صلى الله عليه وسلم فَأَخْرَجْنَا",
+      "adjudication": {
+        "caseId": "redteam-023",
+        "anchor": "abudawud:100",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-024",
@@ -919,7 +1116,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "Swapping two adjacent letters reorders the string. An edit-distance metric would call that one edit; containment calls it a different string.",
       "anchorId": "abudawud:1000",
-      "divergence": null
+      "anchorText": "دَخَلَ عَلَيْنَا رَسُولُ اللَّهِ صلى الله عليه وسلم",
+      "adjudication": {
+        "caseId": "redteam-024",
+        "anchor": "abudawud:1000",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-025",
@@ -937,7 +1143,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "Swapping two adjacent letters reorders the string. An edit-distance metric would call that one edit; containment calls it a different string.",
       "anchorId": "abudawud:1001",
-      "divergence": null
+      "anchorText": "أَمَرَنَا النَّبِيُّ صلى الله عليه وسلم أَنْ نَرُدَّ",
+      "adjudication": {
+        "caseId": "redteam-025",
+        "anchor": "abudawud:1001",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-026",
@@ -955,7 +1170,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "Swapping two adjacent letters reorders the string. An edit-distance metric would call that one edit; containment calls it a different string.",
       "anchorId": "ibnmajah:1",
-      "divergence": null
+      "anchorText": "عَنِ الأَعْمَشِ عَنْ أَبِي صَالِحٍ عَنْ أَبِي هُرَيْرَةَ",
+      "adjudication": {
+        "caseId": "redteam-026",
+        "anchor": "ibnmajah:1",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-027",
@@ -973,7 +1197,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "Swapping two adjacent letters reorders the string. An edit-distance metric would call that one edit; containment calls it a different string.",
       "anchorId": "ibnmajah:10",
-      "divergence": null
+      "anchorText": "يَزَالُ طَائِفَةٌ مِنْ أُمَّتِي عَلَى الْحَقِّ مَنْصُورِينَ لاَ",
+      "adjudication": {
+        "caseId": "redteam-027",
+        "anchor": "ibnmajah:10",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-028",
@@ -991,7 +1224,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "Swapping two adjacent letters reorders the string. An edit-distance metric would call that one edit; containment calls it a different string.",
       "anchorId": "ibnmajah:100",
-      "divergence": null
+      "anchorText": "أَهْلِ الْجَنَّةِ مِنَ الأَوَّلِينَ وَالآخِرِينَ إِلاَّ النَّبِيِّينَ",
+      "adjudication": {
+        "caseId": "redteam-028",
+        "anchor": "ibnmajah:100",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-029",
@@ -1009,7 +1251,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "Stage 3 folds the two DIGIT FORMS together but never changes a digit's value, so 3 is not 4.",
       "anchorId": "abudawud:281",
-      "divergence": null
+      "anchorText": "مَوْلَى بَنِي هَاشِمٍ وَطَلْقُ بْنُ حَبِيبٍ عَنِ ابْنِ",
+      "adjudication": {
+        "caseId": "redteam-029",
+        "anchor": "abudawud:281",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-030",
@@ -1027,7 +1278,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "Stage 3 folds the two DIGIT FORMS together but never changes a digit's value, so 3 is not 4.",
       "anchorId": "abudawud:281",
-      "divergence": null
+      "anchorText": "وَكَذَلِكَ رَوَاهُ مَعْقِلٌ الْخَثْعَمِيُّ عَنْ عَلِيٍّ رَضِيَ اللَّهُ",
+      "adjudication": {
+        "caseId": "redteam-030",
+        "anchor": "abudawud:281",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-031",
@@ -1045,7 +1305,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "Stage 3 folds the two DIGIT FORMS together but never changes a digit's value, so 3 is not 4.",
       "anchorId": "malik:1290",
-      "divergence": null
+      "anchorText": "إِذَا بِيعَتْ. لِأَنَّ ذلِكَ غَرَرٌ. لاَ يُدْرَى أَذَكَرٌ",
+      "adjudication": {
+        "caseId": "redteam-031",
+        "anchor": "malik:1290",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-032",
@@ -1063,7 +1332,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "Stage 3 folds the two DIGIT FORMS together but never changes a digit's value, so 3 is not 4.",
       "anchorId": "malik:1290",
-      "divergence": null
+      "anchorText": "بِيعَتْ. لِأَنَّ ذلِكَ غَرَرٌ. لاَ يُدْرَى أَذَكَرٌ هُوَ",
+      "adjudication": {
+        "caseId": "redteam-032",
+        "anchor": "malik:1290",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-033",
@@ -1081,7 +1359,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "An inserted word lengthens the span, and containment is exact and contiguous.",
       "anchorId": "abudawud:1",
-      "divergence": null
+      "anchorText": "النَّبِيَّ صلى الله عليه وسلم كَانَ إِذَا ذَهَبَ",
+      "adjudication": {
+        "caseId": "redteam-033",
+        "anchor": "abudawud:1",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-034",
@@ -1099,7 +1386,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "An inserted word lengthens the span, and containment is exact and contiguous.",
       "anchorId": "abudawud:10",
-      "divergence": null
+      "anchorText": "نَهَى رَسُولُ اللَّهِ صلى الله عليه وسلم أَنْ",
+      "adjudication": {
+        "caseId": "redteam-034",
+        "anchor": "abudawud:10",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-035",
@@ -1117,7 +1413,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "An inserted word lengthens the span, and containment is exact and contiguous.",
       "anchorId": "abudawud:100",
-      "divergence": null
+      "anchorText": "جَاءَنَا رَسُولُ اللَّهِ صلى الله عليه وسلم فَأَخْرَجْنَا",
+      "adjudication": {
+        "caseId": "redteam-035",
+        "anchor": "abudawud:100",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-036",
@@ -1135,7 +1440,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "An inserted word lengthens the span, and containment is exact and contiguous.",
       "anchorId": "abudawud:1000",
-      "divergence": null
+      "anchorText": "دَخَلَ عَلَيْنَا رَسُولُ اللَّهِ صلى الله عليه وسلم",
+      "adjudication": {
+        "caseId": "redteam-036",
+        "anchor": "abudawud:1000",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-037",
@@ -1153,7 +1467,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "An inserted word lengthens the span, and containment is exact and contiguous.",
       "anchorId": "abudawud:1001",
-      "divergence": null
+      "anchorText": "أَمَرَنَا النَّبِيُّ صلى الله عليه وسلم أَنْ نَرُدَّ",
+      "adjudication": {
+        "caseId": "redteam-037",
+        "anchor": "abudawud:1001",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-038",
@@ -1171,7 +1494,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "An inserted word lengthens the span, and containment is exact and contiguous.",
       "anchorId": "ibnmajah:1",
-      "divergence": null
+      "anchorText": "شَرِيكٌ عَنِ الأَعْمَشِ عَنْ أَبِي صَالِحٍ عَنْ أَبِي",
+      "adjudication": {
+        "caseId": "redteam-038",
+        "anchor": "ibnmajah:1",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-039",
@@ -1189,7 +1521,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "An inserted word lengthens the span, and containment is exact and contiguous.",
       "anchorId": "ibnmajah:10",
-      "divergence": null
+      "anchorText": "يَزَالُ طَائِفَةٌ مِنْ أُمَّتِي عَلَى الْحَقِّ مَنْصُورِينَ لاَ",
+      "adjudication": {
+        "caseId": "redteam-039",
+        "anchor": "ibnmajah:10",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     },
     {
       "id": "redteam-040",
@@ -1207,7 +1548,16 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "An inserted word lengthens the span, and containment is exact and contiguous.",
       "anchorId": "ibnmajah:100",
-      "divergence": null
+      "anchorText": "وَ بَكْرٍ وَعُمَرُ سَيِّدَا كُهُولِ أَهْلِ الْجَنَّةِ مِنَ",
+      "adjudication": {
+        "caseId": "redteam-040",
+        "anchor": "ibnmajah:100",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     }
   ]
 }

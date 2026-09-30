@@ -1,0 +1,25 @@
+{
+  "name": "@mizan/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "The static product surface: one framework-free page that renders the three badges as DOM text nodes from the shared verdict map. No bundler, no UI framework, no client runtime, no network - ADR-C3.",
+  "main": "./src/page.ts",
+  "exports": {
+    ".": "./src/page.ts"
+  },
+  "scripts": {
+    "build": "bun run scripts/build-page.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@mizan/core": "workspace:*",
+    "effect": "4.0.0-beta.83"
+  },
+  "devDependencies": {
+    "@types/bun": "1.1.14",
+    "typescript": "5.6.3"
+  }
+}

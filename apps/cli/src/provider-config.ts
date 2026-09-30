@@ -1,7 +1,16 @@
-import { existsSync } from "node:fs"
-import { readFile } from "node:fs/promises"
 import { err, isErr, ok, type Result } from "@mizan/core"
-import { hostedProvider, transcriptProvider, type Provider, type TranscriptEntry, type Transport } from "@mizan/agent"
+import { hostedProvider, transcriptProvider, type Provider, type Transport } from "@mizan/agent"
+import { readTranscript } from "./transcript-file.ts"
+
+/**
+ * Re-exported, not re-declared.
+ *
+ * `TRANSCRIPT_RELATIVE` and `readTranscript` live in `./transcript-file.ts` because the demo replays
+ * the transcript and must not be able to reach this module to do it — see that file's header. They
+ * are re-exported here so `main.ts` and every existing caller keep one import site and there is
+ * still exactly one definition of each (AGENTS.md section 17).
+ */
+export { readTranscript, TRANSCRIPT_RELATIVE } from "./transcript-file.ts"
 
 /**
  * Choosing a provider, and refusing to invent one.
@@ -139,31 +148,9 @@ export const resolveProviderEndpoint = (base: string): Result<string, string> =>
   return ok(`${withoutTrailingSlash}/${PROVIDER_CHAT_PATH}`)
 }
 
-const readTranscript = async (path: string): Promise<readonly TranscriptEntry[] | null> => {
-  if (!existsSync(path)) return null
-  try {
-    const parsed = JSON.parse(await readFile(path, "utf8")) as unknown
-    if (typeof parsed !== "object" || parsed === null) return null
-    const entries = (parsed as { readonly entries?: unknown }).entries
-    if (!Array.isArray(entries)) return null
-    // Narrowed by shape, not trusted: a transcript is a committed file, and a malformed entry
-    // would otherwise surface as a confusing decode error deep inside a replay. Anything that
-    // is not an entry with a usable stage and question hash is dropped, and a file that ends
-    // up empty simply means "no model configured".
-    return entries.filter((entry): entry is TranscriptEntry => {
-      if (typeof entry !== "object" || entry === null) return false
-      const candidate = entry as { readonly stage?: unknown; readonly questionHash?: unknown }
-      if (candidate.stage !== "decompose" && candidate.stage !== "answer") return false
-      return typeof candidate.questionHash === "string" && candidate.questionHash.length > 0
-    })
-  } catch {
-    // A corrupt transcript is not a crash: it is the same "there is no model" state.
-    return null
-  }
-}
-
 /**
  * The one outbound call, allowlisted and bounded.
+
  *
  * `redirect: "error"` for the same reason the corpus client uses it: a redirect is the standard
  * way to walk past a host allowlist, and no model API we talk to needs one.
@@ -234,6 +221,19 @@ const resolveScripted = async (root: string, transcriptRelative: string): Promis
       `Run \`bun run ask --list-questions\` to see what this build can replay.`,
   )
 }
+
+/**
+ * Whether a credential is configured in this environment right now.
+ *
+ * Exported for one caller, and the reason is a correctness one rather than a convenience one:
+ * `main.ts` offers the replay when a *configured* provider fails, and that offer is only true
+ * advice while a key exists. Telling a keyless run to "unset `MIZAN_LLM_API_KEY`" names a route
+ * that cannot succeed — it is already unset — so the same honest-sounding sentence is false advice
+ * in exactly the state a judge is most likely to be in. The check lives here because this module
+ * already owns `readEnv`, and a second reader of `process.env` would be a second source of truth
+ * for what "configured" means.
+ */
+export const providerKeyConfigured = (): boolean => readEnv(ENV_API_KEY) !== null
 
 /**
  * Resolve the provider for this run. Never throws, never invents a model.

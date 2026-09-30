@@ -1,6 +1,34 @@
 import { Schema } from "effect"
 
 /**
+ * Which part of the corpus a search may look in.
+ *
+ * ## Why this replaced a `collection` filter, and what that bug was
+ *
+ * `Query` used to carry `collection?: string`, and `hadithSearch` passed `"hadith"` — a string
+ * that names no collection, because `collection` holds a per-source slug (`abudawud`, `nasai`,
+ * `tirmidhi`) and hadith is a family of books rather than one. So the filter matched zero of the
+ * corpus's 27 234 rows: hadith retrieval returned nothing, ever, and every hadith question
+ * degraded to `no sources found` while the tool reported having run. Nothing failed loudly,
+ * which is the worst way for it to fail.
+ *
+ * The fix is not `"hadith"` written down differently, and it is not a hardcoded list of the
+ * five hadith slugs — that list would be the same class of assumption, one release behind the
+ * data. The two parts of this corpus are the Qur'an and everything else, so that is what the
+ * scope names, and `QURAN_COLLECTION` from `@mizan/core` is the single place the boundary is
+ * written. A new hadith book is searchable the moment it is ingested.
+ *
+ * `any` exists for the unscoped case: `bm25Order` and the fusion tests use it, and it is what a
+ * `Query` with no scope means.
+ */
+export const CorpusScope = Schema.Union([
+  Schema.Literal("quran"),
+  Schema.Literal("hadith"),
+  Schema.Literal("any"),
+])
+export type CorpusScope = Schema.Schema.Type<typeof CorpusScope>
+
+/**
  * The retrieval contract.
  *
  * One `Query` shape for all three tools, so every boundary decode goes through one contract and
@@ -9,7 +37,8 @@ import { Schema } from "effect"
 export const Query = Schema.Struct({
   text: Schema.String,
   limit: Schema.optional(Schema.Number),
-  collection: Schema.optional(Schema.String),
+  /** Absent means `any`. See `CorpusScope` for why this is not a collection name. */
+  scope: Schema.optional(CorpusScope),
 })
 export type Query = Schema.Schema.Type<typeof Query>
 

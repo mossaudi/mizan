@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "set": "demo-anchors",
+  "purpose": "The records `bun run demo` rebuilds its corpus from, so the demo can attest its own snapshot in seconds with no ingest and no network. Sliced from the committed snapshot by apps/cli/scripts/make-transcript.ts.",
+  "generatedBy": "apps/cli/scripts/make-transcript.ts",
+  "regenerateWith": "bun run make:transcript",
+  "determinism": "Same snapshot in, byte-identical file out. The anchor order is the question order and no clock or randomness is consulted. textHash is the SHA-256 of textDisplay, per the shared toRecordMeta convention, so an edit to the diacritics of a committed row is detectable; textMatch is separately re-derived with the current fold table by apps/cli/src/demo.ts, which refuses to attest a file where the two disagree.",
+  "licenceNotice": "This file contains third-party source text — Qur'an and hadith — reproduced verbatim under each collection's own licence with its attribution and grade exactly as the source dataset asserts them. mizan states no grade of its own and asserts no ruling. The two questions in data/demo-questions.json are synthetic and are not hadith.",
+  "anchorIds": [
+    "quran:6222",
+    "abudawud:4255"
+  ],
+  "anchors": [
+    {
+      "anchorId": "quran:6222",
+      "recordId": "quran:6222",
+      "collection": "quran",
+      "number": "6222",
+      "textDisplay": "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ قُلْ هُوَ ٱللَّهُ أَحَدٌ",
+      "textMatch": "بسم الله الرحمن الرحيم قل هو الله احد",
+      "sourceUrl": "https://tanzil.net/pub/download/index.php?quranType=uthmani&outType=txt&agree=true",
+      "license": "Tanzil Terms of Use — free for non-commercial redistribution provided it is distributed unmodified and marked as Tanzil",
+      "licenseUrl": "https://tanzil.net/res/terms-of-use",
+      "attribution": "Qur'an text: Tanzil (tanzil.net), distributed unmodified under the Tanzil terms of use",
+      "grade": null,
+      "gradeApplicable": false,
+      "gradeSource": "tanzil/quran-uthmani",
+      "gradeBasis": "none",
+      "textHash": "65ab18f07109d84090950d7bce5ebd842a5be184d829de92e661796c6c111cd7"
+    },
+    {
+      "anchorId": "abudawud:4255",
+      "recordId": "abudawud:4255",
+      "collection": "abudawud",
+      "number": "4255",
+      "textDisplay": "حَدَّثَنَا أَحْمَدُ بْنُ صَالِحٍ، حَدَّثَنَا عَنْبَسَةُ، حَدَّثَنِي يُونُسُ، عَنِ ابْنِ شِهَابٍ، قَالَ حَدَّثَنِي حُمَيْدُ بْنُ عَبْدِ الرَّحْمَنِ، أَنَّ أَبَا هُرَيْرَةَ، قَالَ قَالَ رَسُولُ اللَّهِ صلى الله عليه وسلم ‏\"‏ يَتَقَارَبُ الزَّمَانُ وَيَنْقُصُ الْعِلْمُ وَتَظْهَرُ الْفِتَنُ وَيُلْقَى الشُّحُّ وَيَكْثُرُ الْهَرْجُ ‏\"‏ ‏.‏ قِيلَ يَا رَسُولَ اللَّهِ أَيَّةُ هُوَ قَالَ ‏\"‏ الْقَتْلُ الْقَتْلُ ‏\"‏ ‏.‏",
+      "textMatch": "حدثنا احمد بن صالح، حدثنا عنبسه، حدثني يونس، عن ابن شهاب، قال حدثني حميد بن عبد الرحمن، ان ابا هريره، قال قال رسول الله صلي الله عليه وسلم \" يتقارب الزمان وينقص العلم وتظهر الفتن ويلقي الشح ويكثر الهرج \" . قيل يا رسول الله ايه هو قال \" القتل القتل \" .",
+      "sourceUrl": "https://sunnah.com/abudawud:4255",
+      "license": "Dataset card: license \"other\", license_name \"mixed-per-row-pd-arabic-and-reference\"",
+      "licenseUrl": "https://huggingface.co/datasets/quranlab/hadith",
+      "attribution": "Hadith text and grades: QuranLab (quranlab/hadith on Hugging Face), Arabic matn public domain per the dataset card",
+      "grade": "Sahih / Sahih / Sahih Muslim (157 After 2672)",
+      "gradeApplicable": true,
+      "gradeSource": "quranlab/hadith",
+      "gradeBasis": "row",
+      "textHash": "cfd4fbd3fa4c7565324d98f6c59efb636d543ee65b2dfbf5b1589eb34a501d61"
+    }
+  ]
+}

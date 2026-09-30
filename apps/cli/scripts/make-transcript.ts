@@ -1,14 +1,20 @@
 import { Database } from "bun:sqlite"
+import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import {
+  DEMO_ANCHOR_SET_VERSION,
   DEMO_QUESTION_SET_VERSION,
   decodeOrFail,
   decodeSync,
   EvalSet,
   isOk,
+  normalizeForMatch,
+  toRecordMeta,
   type Answer,
   type Claim,
   type Citation,
+  type CorpusRecord,
+  type DemoAnchorSet,
   type DemoQuestion,
   type DemoQuestionSet,
   type EvalCase,
@@ -58,6 +64,7 @@ const CORPUS = "data/corpus.db"
 const REDTEAM = "data/eval/redteam-fabricated.json"
 const TRANSCRIPT_OUT = "data/transcript.json"
 const DEMO_OUT = "data/demo-questions.json"
+const DEMO_ANCHORS_OUT = "data/eval/demo-anchors.json"
 
 const PROVIDER = "precomputed-transcript"
 const MODEL = "transcript-v1"
@@ -144,6 +151,9 @@ const must = (condition: boolean, message: string): void => {
   if (!condition) throw new Error(`make:transcript — ${message}`)
 }
 
+/** SHA-256, hex. The hash convention is `toRecordMeta`'s, so this only supplies the function. */
+const sha256Hex = (value: string): string => createHash("sha256").update(value, "utf8").digest("hex")
+
 /** The published fabrication, read out of the red-team set rather than minted here. */
 const readFabrication = async (): Promise<EvalCase> => {
   const decoded = decodeOrFail(decodeSync(EvalSet), JSON.parse(await readFile(REDTEAM, "utf8")) as unknown, REDTEAM)
@@ -162,6 +172,109 @@ const displayText = (db: Database, id: string): string => {
   const row = db.query<{ readonly textDisplay: string }, [string]>("SELECT textDisplay FROM records WHERE id = ?").get(id)
   if (row === null || row === undefined) throw new Error(`make:transcript — ${id} is not in ${CORPUS}. Run \`bun run ingest\` first.`)
   return row.textDisplay
+}
+
+/**
+ * A snapshot row exactly as SQLite returns it, which is *not* a `CorpusRecord`.
+ *
+ * Two columns disagree with the record type, and both disagreements used to be hidden by a type
+ * annotation on the query: `gradeApplicable` is a SQLite `0`/`1` integer rather than a boolean,
+ * and `translation` is `NULL` rather than an absent key. Returning the row labelled
+ * `CorpusRecord` put `"gradeApplicable": 0` and `"translation": null` into the committed
+ * anchors file, and neither value passes the `DemoAnchor` schema — a file that was published
+ * invalid and stayed invalid precisely because no reader decoded it. A type annotation on a
+ * database row is an assertion; this one was false, and it took a decoder to find out.
+ */
+type SnapshotRow = Omit<CorpusRecord, "gradeApplicable" | "translation"> & {
+  readonly gradeApplicable: number
+  readonly translation: string | null
+}
+
+/** The same two conversions `resolve.ts` performs, so a row means one thing in this repository. */
+const toRecord = (row: SnapshotRow): CorpusRecord => ({
+  ...row,
+  gradeApplicable: row.gradeApplicable === 1,
+  translation: row.translation ?? undefined,
+})
+
+/**
+ * The whole record row, for the demo anchors file.
+ *
+ * A named column list rather than `SELECT *`: this artefact is committed third-party text, and a
+ * column added to the snapshot table later would otherwise be copied into a licence-governed file
+ * without anyone deciding it should be.
+ */
+const recordRow = (db: Database, id: string): CorpusRecord => {
+  const row = db
+    .query<SnapshotRow, [string]>(
+      "SELECT id, collection, number, grade, gradeApplicable, gradeSource, gradeBasis, attribution, license, licenseUrl, sourceUrl, textDisplay, textMatch, translation FROM records WHERE id = ?",
+    )
+    .get(id)
+  if (row === null || row === undefined) throw new Error(`make:transcript — ${id} is not in ${CORPUS}. Run \`bun run ingest\` first.`)
+  return toRecord(row)
+}
+
+/**
+ * The demo's own corpus slice — the records the two demo questions cite.
+ *
+ * MIZ-101 requires the demo to attest its corpus before it prints a verdict, and attestation is
+ * only meaningful against a corpus a reader can rebuild. So the demo does not open the 81 MB
+ * snapshot: it builds a snapshot from these rows at run time and attests that instead. `bun run
+ * demo` therefore needs no `bun run ingest` first, which is the difference between a demo a judge
+ * can actually run and one they cannot.
+ *
+ * The rows are sliced from the committed snapshot, never hand-typed. Each carries the hash of its
+ * own display text, so `apps/cli/src/demo.ts` can refuse to attest a file whose stored text has
+ * been edited.
+ */
+const demoAnchors = (db: Database, declarations: readonly Declaration[]): DemoAnchorSet => {
+  const anchors = declarations.map((entry) => {
+    const record = recordRow(db, entry.recordId)
+    /*
+     * `textMatch` is committed AND re-checkable: the demo re-derives it with the real fold and
+     * fails closed on a disagreement, so this copy is a tamper tripwire rather than a shortcut.
+     * Asserting it matches here as well means a mismatch is caught at GENERATION time with a
+     * named file, not only at demo time.
+     */
+    must(
+      record.textMatch === normalizeForMatch(record.textDisplay),
+      `${entry.recordId}: the snapshot's textMatch is not the fold of its textDisplay. Run \`bun run ingest\` before \`bun run make:transcript\`.`,
+    )
+    return {
+      anchorId: entry.recordId,
+      recordId: record.id,
+      collection: record.collection,
+      number: record.number,
+      textDisplay: record.textDisplay,
+      textMatch: record.textMatch,
+      ...(record.translation === undefined ? {} : { translation: record.translation }),
+      sourceUrl: record.sourceUrl,
+      license: record.license,
+      licenseUrl: record.licenseUrl,
+      attribution: record.attribution,
+      grade: record.grade,
+      gradeApplicable: record.gradeApplicable,
+      gradeSource: record.gradeSource,
+      gradeBasis: record.gradeBasis,
+      textHash: toRecordMeta(record, sha256Hex).textHash,
+    }
+  })
+  const seen = new Set(anchors.map((anchor) => anchor.anchorId))
+  must(seen.size === anchors.length, `demo anchors: two questions cite the same record (${[...seen].join(", ")})`)
+  return {
+    schemaVersion: DEMO_ANCHOR_SET_VERSION,
+    set: "demo-anchors",
+    purpose:
+      "The records `bun run demo` rebuilds its corpus from, so the demo can attest its own snapshot in seconds with no ingest and no network. Sliced from the committed snapshot by apps/cli/scripts/make-transcript.ts.",
+    generatedBy: "apps/cli/scripts/make-transcript.ts",
+    regenerateWith: "bun run make:transcript",
+    determinism:
+      "Same snapshot in, byte-identical file out. The anchor order is the question order and no clock or randomness is consulted. textHash is the SHA-256 of textDisplay, per the shared toRecordMeta convention, so an edit to the diacritics of a committed row is detectable; textMatch is separately re-derived with the current fold table by apps/cli/src/demo.ts, which refuses to attest a file where the two disagree.",
+    licenceNotice:
+      "This file contains third-party source text — Qur'an and hadith — reproduced verbatim under each collection's own licence with its attribution and grade exactly as the source dataset asserts them. mizan states no grade of its own and asserts no ruling. The two questions in data/demo-questions.json are synthetic and are not hadith.",
+    anchorIds: [...seen],
+    anchors,
+  }
 }
 
 /** Prove one declared outcome against the real corpus, or refuse to write it. */
@@ -210,6 +323,9 @@ const main = async (): Promise<void> => {
         question: entry.question,
         demonstrates: entry.demonstrates,
         query,
+        // The one record this question's corpus is rebuilt from. MIZ-101's demo builds its own
+        // snapshot, so a question must name the rows it needs or it cannot be attested.
+        anchorIds: [entry.recordId],
         expectations: [
           {
             claimId: entry.claimId,
@@ -248,9 +364,13 @@ const main = async (): Promise<void> => {
       questions,
     }
 
+    const anchors = demoAnchors(db, declared)
+
     await Bun.write(TRANSCRIPT_OUT, `${JSON.stringify({ entries }, null, 2)}\n`)
     await Bun.write(DEMO_OUT, `${JSON.stringify(set, null, 2)}\n`)
+    await Bun.write(DEMO_ANCHORS_OUT, `${JSON.stringify(anchors, null, 2)}\n`)
     console.log(`\nwrote ${TRANSCRIPT_OUT} (${entries.length} entries) and ${DEMO_OUT} (${set.questions.length} questions)`)
+    console.log(`wrote ${DEMO_ANCHORS_OUT} (${anchors.anchors.length} anchors)`)
   } finally {
     db.close()
   }

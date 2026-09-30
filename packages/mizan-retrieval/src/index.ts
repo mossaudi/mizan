@@ -23,6 +23,7 @@
  */
 
 export {
+  CorpusScope,
   Query,
   RankedChunk,
   RankingMode,

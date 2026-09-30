@@ -17,18 +17,23 @@ import type { Query, SearchResult } from "./schema.ts"
  */
 
 /**
- * The Qur'an-only tool. The collection is pinned so a question cannot silently span both corpora.
+ * The Qur'an-only tool. The scope is pinned so a question cannot silently span both corpora.
  *
  * `db` is `Database | null` rather than `Database` on purpose: "no snapshot is open" is a real,
  * expected state (a judge who cloned the repo has no `data/corpus.db` because it is gitignored),
  * and it deserves a typed refusal rather than a crash on `undefined`.
  */
 export const quranSearch = (db: Database | null, query: Query): Result<SearchResult, RetrievalError> =>
-  runTool(db, { ...query, collection: query.collection ?? "quran" })
+  runTool(db, { ...query, scope: query.scope ?? "quran" })
 
-/** The hadith-only tool, with the same reasoning. */
+/**
+ * The hadith-only tool, with the same reasoning — and the same pin, expressed as a scope rather
+ * than as a collection name. It used to pass `collection: "hadith"`, which names no collection
+ * in this corpus, so it matched nothing at all: hadith retrieval was dead in the only place it
+ * ever ran. `CorpusScope` in `schema.ts` has the full account.
+ */
 export const hadithSearch = (db: Database | null, query: Query): Result<SearchResult, RetrievalError> =>
-  runTool(db, { ...query, collection: query.collection ?? "hadith" })
+  runTool(db, { ...query, scope: query.scope ?? "hadith" })
 
 /**
  * There is no tafsir corpus, so this never returns a record.

@@ -1,0 +1,612 @@
+{
+  "schemaVersion": 1,
+  "set": "anchor-adjudication",
+  "title": "Hand-adjudicated ruling on the anchor cases",
+  "purpose": "66 cases: every fabrication in the red-team set, and every elision in the golden set. Each records what a person concluded the claim IS, which is the question the procedure cannot answer for itself. A ruling selects between two non-verified verdicts; it never confers `verified`, and no route to `verified` exists but strict normalized substring containment. See docs/anchor-protocol.md.",
+  "generatedBy": "scripts/build-eval-set.ts",
+  "regenerateWith": "bun run build:eval",
+  "expectationSource": "Hand-adjudicated in scripts/eval/adjudication.ts by a named person: two declared ruling families, each with one rationale applied to a declared list of case ids, and never observed from @mizan/verify. A ruling recorded by running the code it judges is a row that ratifies whatever the code already does, which is the exact pathology re-adjudication exists to prevent. The file is committed, so re-running the generator over a hand edit is a build failure rather than a silent overwrite.",
+  "determinism": "Same snapshot and same table in, byte-identical file out. The row order is the block order in adjudication.ts, no clock, locale or randomness is consulted, and each row's anchor is stamped from its case's citation rather than restated by the table.",
+  "decidedCount": 66,
+  "undecidedCount": 0,
+  "redTeamMovement": {
+    "rejectedToUnverifiable": 40,
+    "falseVerifiedDelta": 0
+  },
+  "decisions": [
+    {
+      "caseId": "redteam-001",
+      "anchor": "abudawud:1003",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-002",
+      "anchor": "abudawud:1008",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-003",
+      "anchor": "ibnmajah:1060",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-004",
+      "anchor": "ibnmajah:1065",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-005",
+      "anchor": "abudawud:4255",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-006",
+      "anchor": "abudawud:4445",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-007",
+      "anchor": "abudawud:1664",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-008",
+      "anchor": "abudawud:1685",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-009",
+      "anchor": "abudawud:1076",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-010",
+      "anchor": "abudawud:1079",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-011",
+      "anchor": "abudawud:1471",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-012",
+      "anchor": "abudawud:1733",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-013",
+      "anchor": "ibnmajah:1203",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-014",
+      "anchor": "ibnmajah:1213",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-015",
+      "anchor": "ibnmajah:1214",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-016",
+      "anchor": "ibnmajah:1215",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-017",
+      "anchor": "ibnmajah:860",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-018",
+      "anchor": "ibnmajah:881",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-019",
+      "anchor": "ibnmajah:903",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-020",
+      "anchor": "ibnmajah:905",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-021",
+      "anchor": "abudawud:1",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-022",
+      "anchor": "abudawud:10",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-023",
+      "anchor": "abudawud:100",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-024",
+      "anchor": "abudawud:1000",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-025",
+      "anchor": "abudawud:1001",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-026",
+      "anchor": "ibnmajah:1",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-027",
+      "anchor": "ibnmajah:10",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-028",
+      "anchor": "ibnmajah:100",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-029",
+      "anchor": "abudawud:281",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-030",
+      "anchor": "abudawud:281",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-031",
+      "anchor": "malik:1290",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-032",
+      "anchor": "malik:1290",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-033",
+      "anchor": "abudawud:1",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-034",
+      "anchor": "abudawud:10",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-035",
+      "anchor": "abudawud:100",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-036",
+      "anchor": "abudawud:1000",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-037",
+      "anchor": "abudawud:1001",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-038",
+      "anchor": "ibnmajah:1",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-039",
+      "anchor": "ibnmajah:10",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "redteam-040",
+      "anchor": "ibnmajah:100",
+      "adjudicatedVerdict": "rejected",
+      "adjudicatedReason": "quote_absent_at_cited_id",
+      "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-095",
+      "anchor": "abudawud:1",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-096",
+      "anchor": "abudawud:10",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-097",
+      "anchor": "abudawud:100",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-098",
+      "anchor": "abudawud:1000",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-099",
+      "anchor": "abudawud:1001",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-100",
+      "anchor": "ibnmajah:1",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-101",
+      "anchor": "ibnmajah:10",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-102",
+      "anchor": "ibnmajah:100",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-103",
+      "anchor": "ibnmajah:1002",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-104",
+      "anchor": "ibnmajah:1003",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-105",
+      "anchor": "malik:1",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-106",
+      "anchor": "malik:10",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-107",
+      "anchor": "malik:100",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-108",
+      "anchor": "malik:1000",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-109",
+      "anchor": "malik:1002",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-110",
+      "anchor": "nasai:1",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-111",
+      "anchor": "nasai:10",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-112",
+      "anchor": "nasai:100",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-113",
+      "anchor": "nasai:1000",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-114",
+      "anchor": "nasai:1001",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-115",
+      "anchor": "quran:10",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-116",
+      "anchor": "quran:100",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-117",
+      "anchor": "quran:1000",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-118",
+      "anchor": "quran:1001",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-119",
+      "anchor": "quran:1002",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    },
+    {
+      "caseId": "golden-120",
+      "anchor": "tirmidhi:1",
+      "adjudicatedVerdict": "unverifiable",
+      "adjudicatedReason": "no_matching_evidence",
+      "rationale": "A human read this quote against its cited source and found it faithful in substance while not being a contiguous quotation of it: text was elided, and what remains is the source's own wording rather than an assertion the source does not make. Re-rendering is not misquotation, so `rejected` would accuse a correct answer of lying; nor is a non-contiguous rendering a claim containment can confirm, so `verified` is unavailable. The honest verdict is that we cannot decide on this evidence. This ruling decides the question a human must decide — what the claim IS — and does not by itself change what the procedure returns; MIZ-106 lands the locator that makes the two agree. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+      "decidedBy": "mizan team lead (architecture review)",
+      "decidedOn": "2026-09-28"
+    }
+  ]
+}
