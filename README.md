@@ -274,10 +274,20 @@ packages/
 ```
 
 `apps/web/index.html` is a **committed build output**: open it from disk and it makes no
-request, carries no script and renders corpus text as characters. It is regenerated with
-`bun run build:web` from `apps/web/fixtures/page.json`, and `bun test` in `apps/web` fails if
-the committed bytes differ from a fresh render or if any field in that fixture differs from
-`data/demo-questions.json`, `data/transcript.json` or `data/eval/demo-anchors.json`.
+request, carries no script and renders corpus text as characters. `bun run build` regenerates it from
+`apps/web/fixtures/page.json`, and `bun test` in `apps/web` fails if the committed bytes differ from
+a fresh render or if any field in that fixture differs from `data/demo-questions.json`,
+`data/transcript.json` or `data/eval/demo-anchors.json`.
+
+`bun run build` is the whole build surface here, and that is a fact about this repository rather than
+a gap in it. There is no bundler and no compiler output — the typecheck CI runs is `tsc --noEmit` — so
+the page is the only artefact a build has to produce, and it is hermetic: one committed fixture, no
+socket, no corpus, and byte-identical output on every run. The committed artefacts that *do* need the
+snapshot are reached through their own named commands instead — `bun run build:eval` for the two eval
+sets and `bun run make:transcript` for the replay — because both open `data/corpus.db`, which
+`bun run ingest` produces and this repository deliberately does not ship. Putting them behind
+`bun run build` would turn the build red on a correct fresh checkout, which is how a build command
+ends up deleted rather than fixed.
 
 ### The six-step procedure
 

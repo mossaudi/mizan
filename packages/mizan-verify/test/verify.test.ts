@@ -29,7 +29,13 @@ import {
  * The order of these tests is the order of the six-step procedure, and the middle of them is
  * where religious safety actually lives: the difference between `rejected` (the source exists
  * and does not contain the quote — the model misquoted) and `unverifiable` (we cannot tell).
- * Calling a faithful paraphrase "rejected" accuses a correct answer of lying.
+ *
+ * Calling a faithful paraphrase `rejected` accuses a correct answer of lying, which is the reason
+ * the adjudicated spans exist. Containment alone cannot draw that line — telling a paraphrase from
+ * a fabrication is the similarity measurement ADR-03 forbids — so here a paraphrase with no span
+ * still lands on `rejected`: the arm is opt-in, and a case nobody ruled on gets none. The flip for
+ * the 26 adjudicated cases is asserted where the arm is exercised, in `apps/cli/test/anchor.test.ts`
+ * and `apps/cli/test/adjudicated-elisions.test.ts`.
  */
 
 const resolved = (citation: ReturnType<typeof cite>, records: readonly typeof BUKHARI_1[], ambiguous = false): ResolvedCitation => ({
@@ -157,7 +163,7 @@ describe("step 5 — the only route to rejected, and the reason it is not a wide
     expect(report.claims[0]?.matchStrength).toEqual({ kind: "none" })
   })
 
-  test("a faithful PARAPHRASE is rejected rather than verified, and never softened to unverifiable", () => {
+  test("an ANCHORLESS paraphrase is rejected: the arm that says unverifiable runs only where a person ruled", () => {
     const report = only({
       claims: [claim("c1", PARAPHRASE, [cite("bukhari", "1")])],
       evidence: [resolved(cite("bukhari", "1"), [BUKHARI_1])],

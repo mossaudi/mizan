@@ -18,6 +18,7 @@
     "test": "bun run scripts/root-test-refuses.ts",
     "ingest": "bun run scripts/ingest.ts",
     "ingest:check": "bun run scripts/ingest.ts --check",
+    "build": "bun run build:web",
     "build:eval": "bun run scripts/build-eval-set.ts",
     "make:transcript": "bun run apps/cli/scripts/make-transcript.ts",
     "build:web": "bun run apps/web/scripts/build-page.ts",

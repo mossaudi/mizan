@@ -115,5 +115,6 @@ each.
 > never asked of a model.
 
 Which is also the sentence `bun run ci` exists to keep true: gate **G-1** fails the build if
-`packages/mizan-verify` ever grows a dependency beyond `@mizan/core`, and a fourth `GATE_IDS` entry
-cannot be added without `docs-gates.ts` agreeing with whatever number the documents state.
+`packages/mizan-verify` ever grows a dependency beyond `@mizan/core`, and no gate can join the
+`GATE_IDS` table without `docs-gates.ts` failing every document that states a different number — the
+table is the only place the set is written down, so this sentence deliberately does not count them.
