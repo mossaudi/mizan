@@ -121,22 +121,26 @@ const globPrefix = (token: string): string | null => {
 const withoutComments = (text: string): string => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "")
 
 /**
- * R1: every backticked repository path in a document must exist on disk.
+ * R1: every backticked repository path in a document must exist on disk, or be a declared
+ * generated artefact.
  *
- * @param exists injected so the rule is testable without a filesystem, and so the caller decides
- *   how to resolve a path (the CI shim joins it to the repository root).
+ * @param inRepository injected so the rule is testable without a filesystem, and so the caller
+ *   decides what "belongs to this repository" means — the CI shim answers `existsSync(join(root,
+ *   path))` OR "`.gitignore` declares it generated", because a reproducible artefact the repository
+ *   ships the rule for is a true claim on a clean clone. See `docs-generated.ts` for why that is the
+ *   fail-closed direction and not a loophole.
  */
-export const checkBacktickedPaths = (text: string, file: string, exists: (path: string) => boolean): readonly DocsClaim[] => {
+export const checkBacktickedPaths = (text: string, file: string, inRepository: (path: string) => boolean): readonly DocsClaim[] => {
   const claims: DocsClaim[] = []
   for (const [, token] of text.matchAll(BACKTICKED)) {
     if (token === undefined || !looksLikePath(token)) continue
     const globbed = globPrefix(token)
     if (globbed !== null) {
-      if (exists(globbed)) continue
+      if (inRepository(globbed)) continue
       claims.push(claim("missing-path", file, `\`${token}\` names files in \`${globbed}\`, which does not exist in this repository`))
       continue
     }
-    if (exists(token)) continue
+    if (inRepository(token)) continue
     claims.push(claim("missing-path", file, `\`${token}\` does not exist in this repository`))
   }
   return claims

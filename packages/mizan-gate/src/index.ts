@@ -24,10 +24,11 @@ export {
   type DocsClaim,
   type DocsRule,
 } from "./docs-claims.ts"
-export { runDocsClaimChecks, AUDITED_DOCUMENTS, BENCHMARK_ARTEFACT, DEMO_RUNBOOK, REQUIRED_DOCUMENTS, ATTESTATION, ENV_EXAMPLE, GOLDEN_EVAL, PROVIDER_SOURCE, REDTEAM_EVAL, REGISTRY, VALUE_PROOF, type DocsCheckResult } from "./docs-check.ts"
+export { runDocsClaimChecks, AUDITED_DOCUMENTS, BENCHMARK_ARTEFACT, DEMO_RUNBOOK, GITIGNORE, REQUIRED_DOCUMENTS, ATTESTATION, ENV_EXAMPLE, GOLDEN_EVAL, PROVIDER_SOURCE, REDTEAM_EVAL, REGISTRY, VALUE_PROOF, type DocsCheckResult } from "./docs-check.ts"
 export { checkAnswerQualityClaim, checkBenchmarkClaimUnbacked, ANSWER_QUALITY_PHRASES, groupFigure, type StatedBenchmark } from "./docs-value.ts"
 export { ADR_DIRECTORY, ADR_PATTERN, checkAdrCitationUnresolved, checkAdrDocument } from "./docs-adr.ts"
 export { ABSENT_COLLECTION, CORPUS_SURFACE_EXTENSIONS, CORPUS_SURFACE_ROOTS, RENOUNCED, checkCorpusAbsenceUnstated } from "./docs-corpus.ts"
+export { isDeclaredGenerated } from "./docs-generated.ts"
 export { checkRunbookOrder, KEYED_LIVE_PATH, REPLAY_PATH } from "./docs-runbook.ts"
 export { checkGateCountClaim, extractGateCountClaims, GATE_CLAIM_EXCLUDES, GATE_CLAIM_EXTENSIONS, type GateCountClaim } from "./docs-gates.ts"
 export { checkSnapshotArithmetic } from "./docs-snapshot.ts"

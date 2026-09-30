@@ -11,7 +11,8 @@
   ],
   "scripts": {
     "ci": "bun run scripts/ci.ts",
-    "ci:typecheck": "bun run scripts/ci.ts --only=typecheck",
+    "typecheck": "bun run scripts/ci.ts --only=typecheck",
+    "ci:typecheck": "bun run typecheck",
     "ci:test": "bun run scripts/ci.ts --only=test",
     "ci:gates": "bun run scripts/ci.ts --only=gates",
     "test": "bun run scripts/root-test-refuses.ts",

@@ -15,6 +15,7 @@ import { checkLiveProviderClaim } from "./docs-egress.ts"
 import { checkAnswerQualityClaim, checkBenchmarkClaimUnbacked, type StatedBenchmark } from "./docs-value.ts"
 import { ADR_DIRECTORY, checkAdrCitationUnresolved, checkAdrDocument } from "./docs-adr.ts"
 import { checkCorpusAbsenceUnstated } from "./docs-corpus.ts"
+import { isDeclaredGenerated } from "./docs-generated.ts"
 import { checkRunbookOrder } from "./docs-runbook.ts"
 import { collectCorpusSurfaces } from "./docs-surfaces.ts"
 import { GATE_IDS } from "./run-gates.ts"
@@ -23,7 +24,7 @@ import { byPath, collectSourceFilesSync, productionFiles, underPrefix, type Sour
 /**
  * D-1's runner: the IO half, so the rules in `docs-claims.ts`, `docs-gates.ts`,
  * `docs-snapshot.ts`, `docs-artifacts.ts`, `docs-egress.ts`, `docs-value.ts`, `docs-adr.ts`,
- * `docs-corpus.ts` and `docs-runbook.ts` stay pure and testable.
+ * `docs-corpus.ts`, `docs-generated.ts` and `docs-runbook.ts` stay pure and testable.
  *
  * Split the same way `g4-gitleaks.ts` is: the decision is a function of contents, the reading is
  * a function of the filesystem, and only this file knows where the repository is.
@@ -39,6 +40,8 @@ export const REDTEAM_EVAL = "data/eval/redteam-fabricated.json"
 export const BENCHMARK_ARTEFACT = "data/benchmark/vs-search.json"
 export const VALUE_PROOF = "docs/value-proof.md"
 export const DEMO_RUNBOOK = "docs/demo-runbook.md"
+/** The declaration R1 consults before calling a documented path missing. Audited, never scanned. */
+export const GITIGNORE = ".gitignore"
 
 /** The product source trees R7 reads for an outbound request. */
 const SOURCE_ROOTS = ["apps", "packages"] as const
@@ -176,12 +179,22 @@ const adrIdentifiers = (root: string): ReadonlySet<string> => {
 export const runDocsClaimChecks = (root: string): DocsCheckResult => {
   const claims: DocsClaim[] = []
   const checked: string[] = []
-  const exists = (relative: string): boolean => existsSync(join(root, relative))
   // Every input is listed once even when two rules read it, so the report cannot imply an artefact
   // was audited twice.
   const audited = (relative: string): void => {
     if (!checked.includes(relative)) checked.push(relative)
   }
+
+  // A path a document names belongs to this repository if it is on disk, OR if `.gitignore`
+  // declares it a generated artefact. Both halves are needed and the second is the one that was
+  // missing: `bun run check:docs` is the first step in `ci.yml`, and on a clean clone it used to
+  // exit 1 over `data/corpus.db` — a file the repository builds with `bun run ingest` and
+  // deliberately does not ship. `.gitignore` is read rather than a list in this file so there is
+  // one authority for what is generated (AGENTS.md section 17); see `docs-generated.ts`.
+  const gitignore = readIfPresent(root, GITIGNORE)
+  if (gitignore !== null) audited(GITIGNORE)
+  const generated = isDeclaredGenerated(gitignore ?? "")
+  const inRepository = (relative: string): boolean => existsSync(join(root, relative)) || generated(relative)
 
   const envExample = readIfPresent(root, ENV_EXAMPLE)
   const provider = readIfPresent(root, PROVIDER_SOURCE)
@@ -223,7 +236,7 @@ export const runDocsClaimChecks = (root: string): DocsCheckResult => {
       continue
     }
     audited(document)
-    claims.push(...checkBacktickedPaths(text, document, exists))
+    claims.push(...checkBacktickedPaths(text, document, inRepository))
 
     if (scripts !== null) claims.push(...checkDocumentedScripts(text, document, scripts))
     claims.push(...checkEvalBreadth(text, document, evalSets))
