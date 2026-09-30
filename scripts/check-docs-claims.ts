@@ -20,8 +20,8 @@ import { requireRepositoryRoot, runDocsClaimChecks, type AuditTier, type DocsChe
  * ## The report is a claim too, and it is checked like one
  *
  * This script used to print one flat "27 files audited" over a list whose entries had received
- * very different treatment: five judge-facing documents ran the full rule set, fourteen corpus
- * surfaces received exactly one rule, and six artefacts were read only as the authority a rule
+ * very different treatment: six judge-facing documents ran the full rule set, fourteen corpus
+ * surfaces received exactly one rule, and seven artefacts were read only as the authority a rule
  * judges a document against. A tool whose whole purpose is to stop the repository overstating
  * coverage was overstating its own, and a judge skimming the output would have taken that at face
  * value. So the counts are reported per tier and every listed file carries the tier it was read at

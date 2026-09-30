@@ -93,6 +93,17 @@ out/
 *.tsbuildinfo
 *.log
 
+# python. `submission/make_deck.py` is a tracked SOURCE file and stays tracked; what is ignored is
+# CPython's own build output. `make_deck.cpython-314.pyc` was tracked until now, swept in by
+# Story 1's blanket "commit the entire working tree" rather than by any story: it is a
+# CPython-version-specific binary, unreviewable in a diff, and every interpreter that runs the
+# deck generates a different one. `docs-surfaces.ts` already special-cased `__pycache__` when walking
+# documents, so the tool knew the directory was noise while git was shipping it.
+# Both patterns are needed: the directory rule covers `__pycache__/`, the extension rule covers a
+# `.pyc` written anywhere else (which is where a `py_compile` run puts one).
+__pycache__/
+*.py[cod]
+
 # OS cruft. desktop.ini and ehthumbs.db are here because CI runs
 # windows-latest and a Windows clone would otherwise commit them.
 .DS_Store

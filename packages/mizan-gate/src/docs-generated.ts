@@ -29,7 +29,10 @@
  * genuinely ignores may be reported. It can never remove one, because every pattern that IS read is
  * a literal gitignore rule, so a path excused here is one git excuses too. That is the fail-closed
  * direction (AGENTS.md section 3): the failure mode of this approximation is a red build naming a
- * generated file, never a green build over a path that does not exist.
+ * generated file. A gitignored path that is absent from a fresh clone is green here BY DESIGN —
+ * that is the defect this module exists to fix, since `data/corpus.db` is one such path — so the
+ * narrower invariant that actually holds is the one above: a tracked path is never excused, because
+ * git does not excuse it either.
  *
  * Anchoring is git's own rule — a pattern containing a slash is relative to the directory holding
  * the `.gitignore`, one without a slash matches at any depth — and the LAST matching pattern wins,

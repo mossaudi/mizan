@@ -46,13 +46,33 @@ The decision imposes these requirements, and each is checked rather than trusted
   written inside an attribute value is invisible to it too.
   `packages/mizan-gate/test/gates.test.ts` measures the boundary rather than asserting it: a sink
   API inside a `<script>` body is caught, and an injected `<script>`, an inline `on*=` handler, a
-  `javascript:` URL and an `<iframe>` are all missed. An injected element in the committed page is
-  therefore caught by `apps/web/test/page.test.ts` — the byte-identity assertion against
-  `renderPage(fixture)`, plus the element-level assertions over the committed bytes and the
-  no-network assertions — and by nothing else. Widening `CODE_EXTENSIONS` was kept because those
-  tests read the file, not because a gate scans it for markup. Matching *elements* (`<script`,
-  `<iframe`, `<object`, `<embed`, `on\w+=`, `javascript:`) would be a new `GATE_IDS` entry, and so
-  a change to a published claim; that is a decision for the next ADR, not a consequence of this one.
+  `javascript:` URL, an `<iframe>` and a `<meta http-equiv="refresh">` redirect are all missed.
+- **The page's own control has two halves, and they are not equally general.**
+  *Byte-identity* — the committed `index.html` equals a fresh `renderPage(fixture)` — is the general
+  one: it catches ANY hand edit to the file, whatever shape, because the edit is then not what the
+  renderer produces. *Shape assertions* over the committed bytes (`INJECTABLE_ELEMENT`,
+  `INLINE_HANDLER`, `JAVASCRIPT_URL`, `META_REFRESH`) are the specific one, and they are a **named,
+  tested list, not a proof of anything**: they assert that the shapes listed are absent, and every
+  entry of that list is planted by the arming test so the list cannot rot into matching nothing.
+  - An inline handler is matched only if it is expressed the way `INLINE_HANDLER` expresses it, which
+    is why that pattern consumes quoted attribute values as units
+    (`<div data-x=">" onmouseover="alert(1)">` is a live handler, and a `[^>]*` class misses it).
+    **Residual gap 1: an unterminated quote**, which no browser needs to accept.
+  - A `<meta http-equiv="refresh">` redirects the page without executing a line of script, uses
+    neither `src` nor `href`, and needs no entry in `INJECTABLE_TAGS` — the page ships its own
+    `<meta charset>` and `<meta name="viewport">`, so a bare-name rule for `meta` would red the
+    committed bytes. The rule names the redirect instead.
+    **Residual gap 2: a `http-equiv` value that is neither quoted nor `refresh`** (for example
+    `http-equiv="Refresh"` split across a character reference, or a `content` value a browser treats
+    as a URL where the token reads as something else) — again bounded by byte-identity.
+
+  Both residuals are bounded by the same control, which is the general one: a hand edit that introduced
+  either shape would not be what `renderPage(fixture)` produces, so byte-identity fails first and
+  the gap is unreachable in the artefact as shipped. Neither half is a gate. Widening
+  `CODE_EXTENSIONS` was kept because those tests read the file, not because a gate scans it for
+  markup. Matching *elements* (`<script`, `<iframe`, `<object`, `<embed`, `on\w+=`, `javascript:`,
+  `http-equiv`) would be a new `GATE_IDS` entry, and so a change to a published claim; that is a
+  decision for the next ADR, not a consequence of this one.
 - **The provider mode is shared, not restated.** The page prints `transcriptLabel(fixture.transcript)`
   from `@mizan/core` — the same function `apps/cli/src/render.ts` calls — so a replay reads
   `PRECOMPUTED (deterministic replay)` in a browser and in a terminal by construction rather than by

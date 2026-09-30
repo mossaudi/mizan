@@ -38,6 +38,12 @@ const modeNoteOf = (page: string): string => page.match(/class="mode-note">([^<]
 /**
  * The tags an attacker reaches for and the page never legitimately emits.
  *
+ * Bare names rather than `<script`-shaped literals, because `INJECTABLE_ELEMENT` matches
+ * case-insensitively and a substring list cannot: HTML tag names are case-insensitive, so
+ * `<SCRIPT>alert(1)</SCRIPT>` executes in a browser while `not.toContain("<script")` does not see
+ * it. A lowercase literal list is a list that quietly misses the capitalisation a person actually
+ * types, and the arming test below now plants both spellings of every entry so that cannot return.
+ *
  * `style` and `div` are absent on purpose: the page ships its own stylesheet, so asserting they
  * are absent would either fail on correct output or force a narrowing that hides a real tag.
  *
@@ -45,24 +51,63 @@ const modeNoteOf = (page: string): string => page.match(/class="mode-note">([^<]
  * with a payload planted in it, and the committed `index.html` a judge opens. The second is the
  * one that ships.
  */
-const INJECTABLE_TAGS = ["<script", "<img", "<svg", "<iframe", "<object", "<embed", "<b>", "<a ", "<a>"] as const
+const INJECTABLE_TAGS = ["script", "img", "svg", "iframe", "object", "embed", "b", "a"] as const
 
 /**
- * The two injection shapes a tag list cannot express.
+ * An opening tag for any name on the list, in any case.
  *
- * An event handler and a `javascript:` URL are attributes, not elements, so `<script` and friends
- * never see them — and both are what a hand edit or a compromised build step would reach for in a
+ * The `(?=[\s/>])` lookahead is what makes a name complete rather than a prefix: without it, the
+ * `a` entry would fire on the page's own `<article>` and on any `<abbr>`-shaped tag, which is the
+ * kind of false positive that gets a real rule deleted rather than fixed.
+ */
+const INJECTABLE_ELEMENT = new RegExp(`<\\s*(?:${INJECTABLE_TAGS.join("|")})(?=[\\s/>])`, "i")
+
+/**
+ * The two injection shapes an element matcher cannot express.
+ *
+ * An event handler and a `javascript:` URL are attributes, not elements, so `INJECTABLE_ELEMENT`
+ * never sees them — and both are what a hand edit or a compromised build step would reach for in a
  * page that has no script element to hide in. `on` plus a word boundary is the whole of the HTML
  * handler set, so the pattern is exact rather than a list that grows with every new attribute.
+ *
+ * ## Why quoted attribute values are consumed as units
+ *
+ * A `>` inside a quoted attribute value does NOT close the tag, so `[^>]*` stops at it and every
+ * handler placed after such an attribute was invisible: `<div data-x=">" onmouseover="alert(1)">`
+ * passed every assertion in `assertNoInjection` and executes on hover in the committed `file://`
+ * page. Consuming `"…"` and `'…'` as units is what makes the expression exact, which is the claim
+ * the previous one could not support.
+ *
+ * Note also what the character class forbids: `>` is excluded, so an unquoted run can never cross a
+ * tag boundary and a handler in one element cannot be matched by a `<` belonging to another. A
+ * quoted run *may* contain a `>`, which is the point; it is bounded by its own closing quote, so
+ * it cannot escape the tag either. An unterminated quote defeats the match — that is the fail-open
+ * direction, and byte-identity against `renderPage(fixture)` is what bounds it.
  */
-const INLINE_HANDLER = /<[a-z][^>]*\son[a-z]+\s*=/i
+const INLINE_HANDLER = /<(?:[^>"']|"[^"]*"|'[^']*')*\son[a-z]+\s*=/i
 const JAVASCRIPT_URL = /javascript:/i
+
+/**
+ * A `meta` refresh redirects the page without executing a line of script.
+ *
+ * `<meta http-equiv="refresh" content="0;url=//evil.example">` carries no `on*=` attribute, no
+ * `javascript:` URL and no element on `INJECTABLE_TAGS` — and `meta` CANNOT join that list, because
+ * `index.html` ships its own `<meta charset>` and `<meta name="viewport">`, so a bare-name rule for
+ * it would red the committed bytes. The redirect is named instead of the tag, which is why this rule
+ * exists rather than a tenth entry in the list above.
+ *
+ * The unquoted run is `(?:[^>"']|"[^"]*"|'[^']*')*` for the same reason `INLINE_HANDLER` uses it: a
+ * `>` inside a quoted value does not close the tag, so a `[^>]*` here would stop short of an
+ * `http-equiv` hidden behind `<meta title="a > b">` and miss the redirect it is written to catch.
+ */
+const META_REFRESH = /<meta(?:[^>"']|"[^"]*"|'[^']*')*\bhttp-equiv\s*=\s*["']?\s*refresh/i
 
 /** Every injection shape above, applied to one document. */
 const assertNoInjection = (page: string): void => {
-  for (const tag of INJECTABLE_TAGS) expect(page).not.toContain(tag)
+  expect(page).not.toMatch(INJECTABLE_ELEMENT)
   expect(page).not.toMatch(INLINE_HANDLER)
   expect(page).not.toMatch(JAVASCRIPT_URL)
+  expect(page).not.toMatch(META_REFRESH)
 }
 
 /* ------------------------------------------------------------------ AC1 — the badge comes from the map */
@@ -233,12 +278,51 @@ describe("the committed page", () => {
     // only way to know is to feed it what it forbids. Each entry below is planted, so a tag added
     // to `INJECTABLE_TAGS` and an expression narrowed into uselessness both fail here rather than
     // passing silently for the life of the file.
-    for (const tag of INJECTABLE_TAGS) expect(() => assertNoInjection(`<div>${tag}</div>`)).toThrow()
+    for (const tag of INJECTABLE_TAGS) {
+      expect(() => assertNoInjection(`<div><${tag}></${tag}></div>`)).toThrow()
+      // Every entry, in upper case as well. The lowercase-only list this replaced proved its own
+      // literals were non-empty and never that it was case-insensitive, so a matcher that lost the
+      // `i` flag would have gone on passing the line above forever. One uppercase plant for a
+      // single shape would not stop that recurring for the other seven entries.
+      expect(() => assertNoInjection(`<div><${tag.toUpperCase()}></${tag.toUpperCase()}></div>`)).toThrow()
+    }
+    // The two payloads a hand edit reaches for, in the casing a person types when not thinking
+    // about the test that catches them.
+    expect(() => assertNoInjection("<SCRIPT>alert(1)</SCRIPT>")).toThrow()
+    expect(() => assertNoInjection("<IMG SRC=x ONERROR=alert(1)>")).toThrow()
     expect(() => assertNoInjection('<div onclick="x()">y</div>')).toThrow()
     expect(() => assertNoInjection('<div ONERROR="x()">y</div>')).toThrow()
     expect(() => assertNoInjection('<a href="javascript:x()">y</a>')).toThrow()
+    // The two escapes the character class in `INLINE_HANDLER` exists for. `[^>]*` stopped at the
+    // `>` inside the quoted value and both of these ran past every assertion above — a hover-to-
+    // execute payload in a shipped `file://` page, not a theoretical one. Each is planted here so a
+    // future simplification of that class back to `[^>]*` fails rather than passing quietly.
+    expect(() => assertNoInjection('<div data-x=">" onmouseover="alert(1)">y</div>')).toThrow()
+    expect(() => assertNoInjection('<div title="a > b" onclick="alert(1)">y</div>')).toThrow()
+    expect(() => assertNoInjection("<div data-x='>' onmouseover='alert(1)'>y</div>")).toThrow()
+    // The redirect that needs no script at all. The URL is protocol-relative and the attribute is
+    // neither `src` nor `href`, so both the no-network suite and the three patterns above pass it —
+    // and the page still ships its own `charset` and `viewport` metas, so `meta` cannot simply join
+    // `INJECTABLE_TAGS` to close the gap. Planted here because a rule nothing plants is a rule that
+    // can rot into matching nothing while the suite stays green.
+    expect(() => assertNoInjection('<meta http-equiv="refresh" content="0;url=//evil.example">')).toThrow()
+    // Upper case, single-quoted value, no quotes at all, and a `>` inside a quoted attribute before
+    // the `http-equiv` — the four spellings a `[^>]*` class would have let through.
+    expect(() => assertNoInjection('<META HTTP-EQUIV="REFRESH" CONTENT="0">')).toThrow()
+    expect(() => assertNoInjection("<meta http-equiv='refresh' content='0;url=//evil.example'>")).toThrow()
+    expect(() => assertNoInjection("<meta http-equiv=refresh content=0>")).toThrow()
+    expect(() => assertNoInjection('<meta title="a > b" http-equiv="refresh" content="0">')).toThrow()
+    // And the boundary the class draws: `>` is excluded from the unquoted run, so a handler-shaped
+    // word of ordinary prose — or a handler-shaped attribute on a LATER element — is unreachable.
+    expect(() => assertNoInjection('<div><p>only once</p><p class="x">on the one hand</p></div>')).not.toThrow()
+    // And the boundary `META_REFRESH` draws: the rule names the redirect, not the tag. A narrowing
+    // that reached for a bare `<meta` would red the page's own `<meta charset>` and
+    // `<meta name="viewport">`, so both are planted as the non-findings that keep the rule honest.
+    expect(() => assertNoInjection('<meta charset="utf-8">')).not.toThrow()
+    expect(() => assertNoInjection('<meta name="viewport" content="width=device-width">')).not.toThrow()
     // And the committed bytes are not rejected, so the guard is a check rather than a refusal
-    // that would fail for reasons unrelated to injection.
+    // that would fail for reasons unrelated to injection — this is also what proves the lookahead
+    // did not turn `<article>` and `<body>` into findings.
     expect(() => assertNoInjection(committedPage())).not.toThrow()
   })
 

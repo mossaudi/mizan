@@ -68,8 +68,14 @@ describe("the subset is chosen so that not understanding a pattern can only add 
   })
 
   test("a negated literal re-admits a path an earlier pattern ignored", () => {
-    const declared = isDeclaredGenerated(["data/keep/", "data/keep/this.json"].join("\n"))
-    expect(declared("data/keep/this.json")).toBe(true)
+    // The `!` is the whole point of this case, so it has to be in the input: two positive literals
+    // would exercise nothing a two-pattern ignore does not already exercise, and the branch that
+    // clears an earlier match would go unrun. Paired both ways, so neither the negation nor the
+    // pattern it is supposed to override can be removed without one of the two expectations going
+    // red.
+    const declared = isDeclaredGenerated(["data/keep/", "!data/keep/keep.json"].join("\n"))
+    expect(declared("data/keep/keep.json")).toBe(false)
+    expect(declared("data/keep/drop.json")).toBe(true)
   })
 
   test("a negation that follows an ignore wins, because the last matching pattern does", () => {

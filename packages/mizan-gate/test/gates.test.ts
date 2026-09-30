@@ -211,6 +211,7 @@ describe("G-2 on a shipped page: the measured boundary of the sink-token rules",
     ["an inline event handler, whose payload is a string body", '<div onclick="document.write(1)">x</div>\n'],
     ["a javascript: URL", '<a href="javascript:alert(1)">x</a>\n'],
     ["an iframe", '<iframe src="https://evil.example"></iframe>\n'],
+    ["a meta refresh redirect, which needs no script at all", '<meta http-equiv="refresh" content="0;url=//evil.example">\n'],
   ])("G-2 cannot see %s", (_label, text) => {
     // The blind spot, stated as an expectation rather than left to a reader's inference. If a
     // future rule closes it, this goes red and the ADR has to say so.

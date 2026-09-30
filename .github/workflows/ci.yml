@@ -87,9 +87,12 @@ jobs:
         run: bun run check:docs
 
       - name: Assert the run chain is intact (the badge's own audit trail)
-        # `verify:ledger` checks the CORPUS chain. This checks the RUN chain - the 274 entries
+        # `verify:ledger` checks the CORPUS chain. This checks the RUN chain - every committed entry
         # recording whether each run happened the way its trace says. Nothing invoked this audit
         # before, so the chain that backs the central claim had no command a judge could run.
+        # The count is deliberately absent: `data/runs.jsonl` is appended to by the demo suite, so
+        # a number printed here would be stale before the next release - the exact
+        # "the claim is asserted, not computed" defect this repository exists to argue against.
         run: bun run verify:runs
 
       - name: Typecheck, tests and structural gates (G-1..G-7)
