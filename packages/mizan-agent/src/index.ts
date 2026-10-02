@@ -25,6 +25,7 @@
 
 export {
   decodeAnswer,
+  failoverProvider,
   providerFailure,
   type GenerationRequest,
   type GenerationResult,
@@ -57,6 +58,14 @@ export {
 } from "./live.ts"
 
 export { entryKey, questionKey, transcriptOf, transcriptProvider, type TranscriptEntry, type TranscriptFile } from "./transcript.ts"
+
+export {
+  DEFAULT_OLLAMA_HOST,
+  DEFAULT_OLLAMA_MODEL,
+  OLLAMA_TIMEOUT_MS,
+  ollamaProvider,
+  type OllamaConfig,
+} from "./providers/ollama.ts"
 
 export {
   CACHE_CAPACITY,

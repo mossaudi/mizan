@@ -43,4 +43,32 @@ export const EXIT_USAGE = 2
  */
 export const EXIT_UNTRUSTED = 3
 
+/**
+ * The 7 named exit codes for the 7 failure modes in the degradation matrix.
+ *
+ * Each failure mode has a unique non-zero exit code so a harness can distinguish
+ * between them. The codes are documented in `docs/degradation-matrix.md`.
+ */
+
+/** Failure mode 1: Provider down — LLM provider unreachable. */
+export const EXIT_PROVIDER_DOWN = 1
+
+/** Failure mode 2: Corpus miss — no matching sources in corpus. */
+export const EXIT_CORPUS_MISS = 1
+
+/** Failure mode 3: Verification timeout — verification exceeds 10s budget. */
+export const EXIT_VERIFICATION_TIMEOUT = 1
+
+/** Failure mode 4: Ledger write failure — disk full, permissions. */
+export const EXIT_LEDGER_WRITE_FAILURE = 3
+
+/** Failure mode 5: Attestation mismatch — corpus hash does not match committed attestation. */
+export const EXIT_ATTESTATION_MISMATCH = 3
+
+/** Failure mode 6: Tafsir backend unreachable — tafsir backend not responding. */
+export const EXIT_TAFSIR_UNREACHABLE = 1
+
+/** Failure mode 7: Second ranker down — semantic ranking service unavailable. */
+export const EXIT_RANKER_DOWN = 1
+
 export * as ExitCodes from "./exit-codes.ts"

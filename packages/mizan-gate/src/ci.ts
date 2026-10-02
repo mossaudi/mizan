@@ -44,6 +44,23 @@ export type PackagePlan = {
   readonly dir: string
   /** Repo-relative, POSIX-separated. Stable across Windows and Linux. */
   readonly rel: string
+  /**
+   * Paths handed to `bun test` instead of the bare command. Empty for a workspace package.
+   *
+   * ## Why the repository-root plan needs this
+   *
+   * `bun test` walks from the current directory, so running it at the root collects every
+   * package's tests — and a package that fails to load is skipped without a word, which is the
+   * vacuous-green failure AGENTS.md section 8 forbids. But `scripts/` is outside every workspace
+   * glob, so before this field existed the root plan had no test check at all, and
+   * `scripts/verify-chain.test.ts` was typechecked on every CI run and executed on none. A guard
+   * that cannot fail is not a guard (section 14).
+   *
+   * Naming the directory keeps the run narrow in both directions: `bun test scripts` discovers
+   * only files under `scripts/`, so it cannot silently absorb a package, and a package's own plan
+   * keeps the bare command so its coverage is unchanged.
+   */
+  readonly testPaths?: readonly string[]
 }
 
 export type Toolchain = {
@@ -134,10 +151,14 @@ const runCommand = async (command: readonly string[], cwd: string, budgetMs: num
  * `bunx` is not used for the typecheck: an absolute `tsc` resolved by the caller means the
  * runner never downloads a compiler mid-build, and a build that can silently fetch a
  * different compiler version than the lockfile pins is not a reproducible build.
+ *
+ * `plan.testPaths` is appended after `test`, which is the only place it can go: it is a filter
+ * on discovery, and discovery is what section 8 is about. A plan that names no paths gets the
+ * bare command, so a workspace package's coverage is exactly what it was before.
  */
-export const checkCommand = (check: CheckName, tools: Toolchain): readonly string[] => {
+export const checkCommand = (check: CheckName, tools: Toolchain, plan?: PackagePlan): readonly string[] => {
   if (check === "typecheck") return [tools.tsc, "--noEmit", "-p", "."]
-  return [tools.bun, "test"]
+  return [tools.bun, "test", ...(plan?.testPaths ?? [])]
 }
 
 /**
@@ -173,7 +194,7 @@ export const CHECK_BUDGET_MS = 180_000
 const tail = (output: string, lines: number): string => output.split("\n").slice(-lines).join("\n")
 
 const runCheck = async (plan: PackagePlan, check: CheckName, tools: Toolchain): Promise<CheckOutcome> => {
-  const outcome = await runCommand(checkCommand(check, tools), plan.dir, CHECK_BUDGET_MS)
+  const outcome = await runCommand(checkCommand(check, tools, plan), plan.dir, CHECK_BUDGET_MS)
   if (outcome.code === 0) return { check, ok: true, detail: "ok" }
   const head = tail(outcome.output, 25)
   return { check, ok: false, detail: `exited ${outcome.code}${head.length > 0 ? `\n${head}` : " with no output"}` }
@@ -250,10 +271,11 @@ export const buildReport = (packages: readonly PackageOutcome[], gates: readonly
 /**
  * A directory that is checked, but not on the same terms as a workspace package.
  *
- * The repository-root `scripts/` directory holds the four entrypoints a developer and CI
- * actually invoke, and no package glob reaches it. It is typechecked but never tested, because
- * `bun test` at the root is the exact failure AGENTS.md section 8 forbids — so the check list
- * differs from a package's, and the reason has to be data rather than a comment.
+ * The repository-root `scripts/` directory holds the entrypoints a developer and CI actually
+ * invoke, and no package glob reaches it. It is both typechecked and tested, because the test
+ * half is scoped to the directory (`PackagePlan.testPaths`) rather than run bare from the root —
+ * the exact vacuous-green failure AGENTS.md section 8 forbids. The check list is therefore data
+ * rather than a comment, and `scripts/verify-chain.test.ts` is a guard that can fail.
  */
 export type ExtraPlan = {
   readonly plan: PackagePlan

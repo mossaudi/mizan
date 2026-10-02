@@ -17,7 +17,45 @@ either: a figure in the benchmark section that the committed artefact does not p
 audited document that asserts answer or retrieval quality.
 
 Every number printed below comes from a file committed to this repository, and each section names
-the file it came from.
+the file it came from. There is exactly one kind of exception and it is labelled as such: a figure
+another organisation measured is *cited* rather than asserted, it lives in
+`data/registry/external-claims.json`, and it carries the publishing organisation, a URL, the date it
+was retrieved and what it actually measures. `bun run check:docs` fails a cited figure that resolves
+to no registry entry, an entry missing any of those fields, and a registry figure printed anywhere
+below without a marker saying whose it is **on the line that prints it**. A marker one line away
+credits nothing — that is the whole of the rule, and the reason the paragraphs below wrap a figure
+together with its citation rather than separating them.
+
+Because this document promises that, it is also the one audited document held to it across its
+**whole body** rather than only inside a benchmark-titled section: every percentage printed anywhere
+above — not just in the table below — must resolve to a registry entry or to a **rate** this document
+attributes to a named `Artefact field` *on the line that states it*, and one that resolves to neither
+fails the build. The line is the unit for both paths, and it is the unit for a registry figure too: a
+cited figure is credited by a marker on its own line, never by one somewhere else in this file. So
+each rate below is stated once,
+in the table, and no percentage anywhere in this file may borrow a spelling credited there — which is
+why this paragraph names no figure of its own. A count is not a rate, so the `caseCount` and
+`corpusRecordCount` rows below may never be written as percentages, and a difference is printed in
+percentage points, never as one. The other five audited documents are not held to that promise,
+because none of them makes it; `ADR-C8` names the figures in them that this leaves unpoliced rather
+than leaving the limit implicit.
+
+## Why this exists rather than an answer
+
+The gap this product addresses is not that answers are wrong. It is that a citation attached to an
+answer is usually never checked. Across eight AI search tools asked to attribute a quoted passage to
+its source, **more than 60%** returned the wrong one (`external-claim:tow-miscited-share`), and an
+evaluation of seven LLMs over 800 questions found that
+**50%** of responses were not fully supported by the sources they cited (`external-claim:stanford-unsupported-share`),
+reaching **90%** under the strictest condition (`external-claim:stanford-unsupported-share-upper`).
+Both are measurements of other systems, on news and on medical text rather than on religious
+text, and neither is a measurement of mizan. They are here because they establish the shape of the
+problem: correctness and citation support are different questions, and the second one is the one
+nobody was asking.
+
+A search tool answers the first question. This repository does not answer questions at all, and its
+contribution is the second: a verdict computed per claim from a fail-closed procedure, with the
+failure rate published rather than asserted.
 
 ## The benchmark
 
@@ -29,15 +67,24 @@ Rerun that arm with `bun run benchmark:vs-search`. Its own `systemArmSource` fie
 fixture's expectations, which is the defect that used to make the detection rate a restatement of the
 input instead of a measurement.
 
-**What is checked here, and what is only reviewed.** The anti-tautology property has two halves and
-they are not equally enforced, so the headline number is stated at the width the code supports. The
+**What is checked here, and what is not.** The anti-tautology property has two halves and they are
+enforced differently, so the headline number is stated at the width the code supports. The
 `SystemArmSource` literal makes an artefact claiming `declared-expectations` unwritable, and that half
 is a compile error. The other half — that the executor cannot read the labels it would be restating —
-is **not** held by a gate: no structural scan rejects the token that would name them, and none is
-built for this cycle. It holds because `scripts/benchmark/system-arm.ts` receives a case whose type
-has no field a label could arrive in, and because that file is read. So the honest description is *an
-executed arm whose label-blindness is reviewed rather than checked* — narrower than "cannot be a
-tautology by construction", and the only claim the code makes.
+is now **checked**: `checkExecutorLabelBlindness` in
+`packages/mizan-gate/src/docs-benchmark.ts` scans `scripts/benchmark/system-arm.ts` for the identifiers
+that carry a verdict expectation, and `bun run check:docs` fails if one appears. The scan is scoped to
+that file on purpose, because `scripts/eval/` publishes the sets and holds the hand-adjudicated
+rulings, so a repository-wide ban would forbid the generator from expressing what a case is expected
+to be. It is a docs rule and not an eighth gate, because `GATE_IDS` is a count this repository
+publishes about itself.
+
+What no scan establishes is the half that has to be admitted rather than checked. The 40 cases are
+**self-authored**: they were written by this repository, so `systemDetectionRate` of 100.0% is
+consistent with a good verifier *and* with a set that was drawn from its own blind spots. There is no
+hold-out and no human-labelled ground truth, so the detection rate is not evidence of accuracy on
+fabrications this project did not think of. That is the weakest link in this document and it is stated
+here rather than in a footnote.
 
 | Artefact field | Figure |
 | --- | --- |
@@ -142,16 +189,48 @@ this repository on anyone's behalf.
 | Tafsir | no | no | yes | no | no | **deferred, disclosed** |
 | Externally run benchmark | yes (IslamicMMLU) | no | no | no | yes (norms) | **not yet claimed** |
 
+## Reproducing every figure above
+
+Six commands and two committed files. Each step below names what it proves and where the authority for
+the claim lives, so a reader can check one figure without reading the whole repository — and so a
+reviewer who *does* read the whole repository finds the same numbers this page prints.
+
+| # | Step | Command | What it establishes |
+| --- | --- | --- | --- |
+| 1 | The commit under test | `git rev-parse HEAD` | Every figure here is a property of a tree, not of the repository in general. Publish this SHA beside the figures; `attestation.json`'s `snapshotHash` is the matching corpus identity, so a re-ingest that produced different rows is detectable rather than silent. |
+| 2 | Build the corpus | `bun run ingest` | Fetches the sources, builds the snapshot and writes the registry. `data/corpus.db` and `data/registry/records.jsonl` are gitignored generated artefacts, so a fresh clone has neither and every record count above is re-derived rather than read. `bun run ingest:check` re-checks what is committed without refetching. |
+| 3 | The structural gates | `bun run ci:gates` | Every gate, each of which carries a self-test whose planted violation must fail — a guard that cannot fail is not a guard, which is the whole reason this step is on the page. |
+| 4 | The documentation itself | `bun run check:docs` | Reads this document, the other audited surfaces, the ADR set and the committed evidence, and fails the build when a claim disagrees with the repository. This is the step that checks the claims on this page, so it is also the step that would catch this page being wrong. |
+| 5 | The red-team counts | — (read two files) | `data/eval/redteam-fabricated.json` publishes `verdictCounts` `{"rejected": 40}` and `anchorCount` 30; `data/eval/adjudication.json` publishes `redTeamMovement.rejectedToUnverifiable` 40 and `falseVerifiedDelta` 0. `bun run build:eval` regenerates the set from the snapshot and the regenerated file is byte-identical for a given snapshot. |
+| 6 | Live versus replay | `docs/demo-runbook.md` | A keyed run prints `LIVE`; a run with no key prints `PRECOMPUTED (deterministic replay)`. The label covers the *generation* and nothing else — the badge below it is computed on that run either way, against the committed corpus. `bun run demo` gives a complete run on a clean checkout. |
+
+`bun run ci` runs steps 3 and 4 as part of the full per-package gate, and `bun test` is deliberately
+refused at the repository root: it globs every package's tests, a package that fails to load is skipped
+silently, and a green run there can mean "nothing was collected".
+
 ## What is not claimed
 
 - **No answer or retrieval quality claim, for anyone.** The generator is out of scope, so there is
   nothing to rank. The comparison above is about what a product ships.
 - **No third-party run yet.** The figures in this document are run by this repository over its own
   committed set. An arm run by anyone else is planned, not shipped, and is not claimed here.
-- **No corpus we do not hold.** The corpus is Qur'an plus the four Sunan and Muwatta; Bukhari and
-  Muslim are not ingested, and a licence-gated ingestion is planned rather than pretended.
+- **No corpus we do not hold, named honestly.** What is served is what
+  `attestation.json.collectionCounts` records: Qur'an, the four Sunan and Muwatta, 27,234 rows. That
+  record names six collections and Bukhari, Muslim and an-Nawawi are not among them, so none of the
+  three is served. All three are fetched — they are in `QURANLAB_COLLECTIONS`, so they are present in
+  the tree — and saying "not ingested" was wrong in a way that flattered us. The reason is not
+  licensing: the source is recorded `content-only`, redistribution is permitted and derived works are
+  restricted, and the commercial-use question is not established either way. It is grading. Our
+  registry records `gradeApplicable: true` for the whole source and every one of the 15,026 held-back
+  rows is a row whose dataset asserts no grade, so `quarantineReason` returns `missing_required_grade`
+  and a row the dataset declines to grade is held back rather than served with a grade we invented
+  (ADR-06, ADR-C9). **The 15,026 is a count of rows and nothing more:** the attestation carries no
+  per-collection breakdown of it, so no claim is made here or in the README about which collection any
+  held-back row came from, and the per-collection statement above is the served set read from the
+  attestation by name.
 - **No grade is ours.** A grade is stored exactly as its source dataset asserts it, with its source
   and basis, or as `null` when the dataset carries none (ADR-06).
 - **Deferred, not hidden.** A read-only API endpoint, an Arabic interface, multilingual breadth and
-  tafsir are not built. They are listed above as `deferred, disclosed` because an omission a judge
-  discovers is worse than one this document admits.
+  tafsir are not built. `tafsirLookup` returns a typed `unavailable` refusal rather than a fabricated
+  tafsir, and no multilingual UI is implemented. They are listed above as `deferred, disclosed`
+  because an omission a judge discovers is worse than one this document admits.

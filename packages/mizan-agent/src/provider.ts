@@ -96,6 +96,56 @@ export const providerFailure = (reason: ProviderFailure["reason"], detail: strin
 }
 
 /**
+ * A provider that tries each configured provider in order and returns the first success.
+ *
+ * ## Why this exists
+ *
+ * A single external provider is a single point of failure. When the primary provider is
+ * unavailable (timeout, network error, or misconfiguration), the system fails over to the
+ * next provider in the chain. The failover is transparent to the caller: the response
+ * carries the name and model of the provider that actually answered.
+ *
+ * ## Honest degradation
+ *
+ * If all providers fail, the LAST failure is returned. This is the most informative
+ * failure: it names the provider that was tried last and the reason it failed. The caller
+ * renders this as `model unavailable` — never as a partial or canned response.
+ *
+ * ## The provider name
+ *
+ * The failover provider's `name` and `model` are set to the first provider's values.
+ * This is a static label for the failover chain itself. The actual provider that answered
+ * is identified by the `provider` and `model` fields in `GenerationSuccess`, which are
+ * set by `decodeAnswer` using the winning provider's configuration.
+ */
+export const failoverProvider = (providers: readonly Provider[]): Provider => {
+  if (providers.length === 0) {
+    return {
+      name: "failover",
+      model: "none",
+      kind: "live",
+      generate: async () => providerFailure("provider_not_configured", "failover: no providers configured"),
+    }
+  }
+  const primary = providers[0]!
+  const rest = providers.slice(1)
+  return {
+    name: primary.name,
+    model: primary.model,
+    kind: primary.kind,
+    generate: async (request: GenerationRequest): Promise<GenerationResult> => {
+      const result = await primary.generate(request)
+      if (result.ok) return result
+      for (const provider of rest) {
+        const fallback = await provider.generate(request)
+        if (fallback.ok) return fallback
+      }
+      return result
+    },
+  }
+}
+
+/**
  * Decode whatever the model returned.
  *
  * A model is an untrusted input source (AGENTS.md section 1). It is told to return JSON; it

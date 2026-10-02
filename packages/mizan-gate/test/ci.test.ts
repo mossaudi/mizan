@@ -122,20 +122,30 @@ const planFor = (plans: readonly PackagePlan[], rel: string): PackagePlan => {
  * The fixture's packages are healthy; the only planted violation is in `scripts/`. That
  * asymmetry is the point: it is the exact shape of the bug that reached a green run, where
  * every package typecheck and every gate passed while the root entrypoints did not compile.
+ *
+ * A passing test file lives under `scripts/` because the plan is scoped with `testPaths`, so the
+ * test check has something real to collect — a directory with no tests would pass vacuously and
+ * would not distinguish "scoped correctly" from "collected nothing".
+ *
+ * `include` is pinned to `scripts/entry.ts` for the reason `makeWorkspace` documents: the fixture
+ * lives in a temp directory with no `node_modules`, so a `bun:test` import would report TS2307 — a
+ * real error, but not the one under test. Type resolution across `scripts/*.test.ts` is exercised
+ * against the actual repository by the run this file ends with.
  */
 const makeRootScriptWorkspace = async (options: { readonly broken: boolean }): Promise<{ readonly root: string; readonly cleanup: () => Promise<void> }> => {
   const { root, cleanup } = await makeWorkspace({ broken: "none" })
   const scripts = join(root, "scripts")
   await mkdir(scripts, { recursive: true })
-  await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { strict: true, noEmit: true, target: "esnext", module: "esnext", moduleResolution: "bundler", skipLibCheck: true }, include: ["scripts/**/*.ts"] }))
+  await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { strict: true, noEmit: true, target: "esnext", module: "esnext", moduleResolution: "bundler", skipLibCheck: true }, include: ["scripts/entry.ts"] }))
   await writeFile(join(scripts, "entry.ts"), options.broken ? 'export const broken: number = "not a number"\n' : "export const ok = 1\n")
+  await writeFile(join(scripts, "entry.test.ts"), 'import { expect, test } from "bun:test"\nimport { ok } from "./entry.ts"\ntest("the entrypoint loads", () => { expect(ok).toBe(1) })\n')
   return { root, cleanup }
 }
 
-/** `scripts/` as `runCi` receives it from the shim: typechecked, never tested. */
+/** `scripts/` as `runCi` receives it from the shim: typechecked, and tested SCOPED to itself. */
 const rootScriptsPlan = (root: string): ExtraPlan => ({
-  plan: { name: "@mizan/scripts", dir: root, rel: "scripts" },
-  checks: ["typecheck"],
+  plan: { name: "@mizan/scripts", dir: root, rel: "scripts", testPaths: ["scripts"] },
+  checks: ["typecheck", "test"],
 })
 
 describe("discoverPackages", () => {
@@ -181,6 +191,26 @@ describe("checkCommand", () => {
 
   test("the test check runs bun from the package directory", () => {
     expect(checkCommand("test", { bun: "/bun", tsc: "/tsc" })).toEqual(["/bun", "test"])
+  })
+
+  test("a plan that names test paths scopes discovery to them, so it cannot absorb a package", () => {
+    // The repository-root plan runs from the root, where a bare `bun test` walks every package and
+    // silently skips any that fails to load. Naming the directory is what keeps the root plan a
+    // guard rather than a vacuous-green risk (AGENTS.md sections 8 and 14).
+    const plan: PackagePlan = { name: "@mizan/scripts", dir: "/repo", rel: "scripts", testPaths: ["scripts"] }
+    expect(checkCommand("test", { bun: "/bun", tsc: "/tsc" }, plan)).toEqual(["/bun", "test", "scripts"])
+  })
+
+  test("a plan with no test paths gets the bare command, so package coverage is unchanged", () => {
+    const plan: PackagePlan = { name: "@mizan/core", dir: "/repo/packages/mizan-core", rel: "packages/mizan-core" }
+    expect(checkCommand("test", { bun: "/bun", tsc: "/tsc" }, plan)).toEqual(["/bun", "test"])
+  })
+
+  test("testPaths never reach the typecheck command", () => {
+    // They are a discovery filter, not an input to `tsc`; leaking one into the other would be a
+    // fixture-shaped coincidence that stops being true the first time someone widens it.
+    const plan: PackagePlan = { name: "@mizan/scripts", dir: "/repo", rel: "scripts", testPaths: ["scripts"] }
+    expect(checkCommand("typecheck", { bun: "/bun", tsc: "/tsc" }, plan)).toEqual(["/tsc", "--noEmit", "-p", "."])
   })
 
   test("the order is typecheck first, then test", () => {
@@ -357,19 +387,41 @@ describe("runCi — the root entrypoints are inside the gate", () => {
     }
   }, REAL_TOOLCHAIN_TIMEOUT_MS)
 
-  test("scripts/ is typechecked but never tested, because root `bun test` is forbidden", async () => {
-      // If `test` were ever added here, this directory would be the one place in the repository
-      // where `bun test` runs from the root — the collection failure AGENTS.md section 8 rules
-      // out, and the reason it would go unnoticed is that it would still be green.
-      const { root, cleanup } = await makeRootScriptWorkspace({ broken: false })
-      try {
-        const report = await runCi(await discoverPackages(root, ["packages/*"]), ["typecheck", "test"], realTools(), gateStub, [rootScriptsPlan(root)])
-        const scriptsOutcome = report.packages.find((outcome) => outcome.package.rel === "scripts")
-        expect(scriptsOutcome?.checks.map((check) => check.check)).toEqual(["typecheck"])
-      } finally {
-        await cleanup()
-      }
-    },
+  test("scripts/ is tested too, but SCOPED to itself, so root `bun test` never walks the packages", async () => {
+    // The regression this replaces: `scripts/verify-chain.test.ts` was typechecked on every CI run
+    // and executed on none, because a bare `bun test` at the root is the collection failure
+    // AGENTS.md section 8 rules out. Scoping by path keeps the guard and drops the vacuous green,
+    // and the assertion is on the COMMAND rather than on the run, so it cannot pass because a
+    // broken runner happened to report green.
+    const { root, cleanup } = await makeRootScriptWorkspace({ broken: false })
+    try {
+      const report = await runCi(await discoverPackages(root, ["packages/*"]), ["typecheck", "test"], realTools(), gateStub, [rootScriptsPlan(root)])
+      const scriptsOutcome = report.packages.find((outcome) => outcome.package.rel === "scripts")
+      expect(scriptsOutcome?.checks.map((check) => check.check)).toEqual(["typecheck", "test"])
+      expect(scriptsOutcome?.ok).toBe(true)
+      const plan = rootScriptsPlan(root).plan
+      expect(plan.testPaths).toEqual(["scripts"])
+      expect(checkCommand("test", realTools(), plan)).toEqual([realTools().bun, "test", "scripts"])
+    } finally {
+      await cleanup()
+    }
+  },
+    REAL_TOOLCHAIN_TIMEOUT_MS)
+
+  test("a failing test under scripts/ turns the run RED, because the guard can now fail", async () => {
+    // The point of scoping is not that the check exists — it is that it can fail. A fixture whose
+    // only test asserts 1 === 2 must be reported, or the check is decoration.
+    const { root, cleanup } = await makeRootScriptWorkspace({ broken: false })
+    try {
+      await writeFile(join(root, "scripts", "entry.test.ts"), 'import { expect, test } from "bun:test"\ntest("fails on purpose", () => { expect(1).toBe(2) })\n')
+      const report = await runCi([], ["test"], realTools(), gateStub, [rootScriptsPlan(root)])
+      expect(report.ok).toBe(false)
+      expect(report.reasons).toContain("package scripts failed")
+      expect(summariseReport(report)).toContain("scripts")
+    } finally {
+      await cleanup()
+    }
+  },
     REAL_TOOLCHAIN_TIMEOUT_MS)
 
   test("an extra plan with no checks does not fabricate a pass", async () => {

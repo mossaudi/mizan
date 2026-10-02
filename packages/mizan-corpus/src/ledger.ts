@@ -141,9 +141,9 @@ export type Attestation = {
   readonly schemaVersion: string
   readonly generatedAt: string
   readonly snapshotHash: string
-    readonly recordCount: number
-    readonly quarantinedRows: number
-    readonly collectionCounts: Readonly<Record<string, number>>
+  readonly recordCount: number
+  readonly quarantinedRows: number
+  readonly collectionCounts: Readonly<Record<string, number>>
   readonly sources: readonly {
     readonly source: string
     readonly licenceClass: string
@@ -153,6 +153,23 @@ export type Attestation = {
   }[]
   readonly chainHead: string
   readonly chainLength: number
+  /** VRO maturity level (1, 2, or 3). Optional for backward compatibility. */
+  readonly maturityLevel?: 1 | 2 | 3
+  /** The 8 IETF VRO control areas with their concrete field mappings. */
+  readonly controlAreas?: readonly {
+    readonly area: string
+    readonly fields: readonly string[]
+    readonly description: string
+  }[]
+  /** Evidence of the 100x byte-identical determinism gate. */
+  readonly determinismEvidence?: {
+    readonly gateName: string
+    readonly passed: boolean
+    readonly runCount: number
+    readonly byteIdentical: boolean
+  }
+  /** The corpus snapshot SHA-256 hash (redundant with snapshotHash for VRO compliance). */
+  readonly corpusSnapshotHash?: string
 }
 
 /**
@@ -188,6 +205,29 @@ export const AttestationSchema = Schema.Struct({
   ),
   chainHead: Schema.String,
   chainLength: Schema.Number,
+  /** VRO maturity level (1, 2, or 3). Optional for backward compatibility. */
+  maturityLevel: Schema.optional(Schema.Union([Schema.Literal(1), Schema.Literal(2), Schema.Literal(3)])),
+  /** The 8 IETF VRO control areas with their concrete field mappings. */
+  controlAreas: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        area: Schema.String,
+        fields: Schema.Array(Schema.String),
+        description: Schema.String,
+      }),
+    ),
+  ),
+  /** Evidence of the 100x byte-identical determinism gate. */
+  determinismEvidence: Schema.optional(
+    Schema.Struct({
+      gateName: Schema.String,
+      passed: Schema.Boolean,
+      runCount: Schema.Number,
+      byteIdentical: Schema.Boolean,
+    }),
+  ),
+  /** The corpus snapshot SHA-256 hash (redundant with snapshotHash for VRO compliance). */
+  corpusSnapshotHash: Schema.optional(Schema.String),
 })
 
 /** A mismatch between the attestation and a fresh ingest is a LOUD failure, never a warning. */export const compareAttestations = (committed: Attestation, fresh: Attestation): readonly string[] => {
@@ -317,6 +357,81 @@ const BYTE_ORDER_MARK = "\uFEFF"
  */
 const stripByteOrderMark = (text: string): string => (text.startsWith(BYTE_ORDER_MARK) ? text.slice(1) : text)
 
+/** The exact set of keys an `attestation.json` may carry. */
+const ATTESTATION_KEYS = [
+  "schemaVersion",
+  "generatedAt",
+  "snapshotHash",
+  "recordCount",
+  "quarantinedRows",
+  "collectionCounts",
+  "sources",
+  "chainHead",
+  "chainLength",
+  "maturityLevel",
+  "controlAreas",
+  "determinismEvidence",
+  "corpusSnapshotHash",
+] as const
+
+/**
+ * Reject unknown fields in an attestation.
+ *
+ * Effect's `Schema.Struct` strips unknown keys by default, which means a typo or a
+ * hand-edited field would be silently dropped — the attestation would decode as if the
+ * field were never there. This check compares the parsed keys against the expected
+ * set and names the offender, so a malformed file is diagnosable rather than silently
+ * accepted.
+ */
+const validateNoUnknownFields = (parsed: Record<string, unknown>): Result<null, CommittedReadFailure> => {
+  const unknown = Object.keys(parsed).filter((key) => !(ATTESTATION_KEYS as readonly string[]).includes(key))
+  if (unknown.length > 0) {
+    return err({ _tag: "malformed_shape", line: null, detail: `unknown field(s): ${unknown.join(", ")}` })
+  }
+  return ok(null)
+}
+
+/** The 8 IETF VRO control areas that must be present in a VRO-aligned attestation. */
+const VRO_CONTROL_AREAS = [
+  "identity",
+  "provenance",
+  "integrity",
+  "determinism",
+  "licensing",
+  "coverage",
+  "degradation",
+  "auditability",
+] as const
+
+/**
+ * Validate that an attestation is VRO-compliant.
+ *
+ * Checks that all 8 IETF VRO control areas are present, the maturity level is declared,
+ * the determinism evidence is present, and the corpus snapshot hash is present.
+ * Returns an error naming the first missing element.
+ */
+export const validateVroCompliance = (attestation: Attestation): Result<null, string> => {
+  if (attestation.maturityLevel === undefined) {
+    return err("maturityLevel is missing — the attestation must declare a VRO maturity level (1, 2, or 3)")
+  }
+  if (attestation.controlAreas === undefined) {
+    return err("controlAreas is missing — the attestation must map all 8 IETF VRO control areas")
+  }
+  const areas = attestation.controlAreas.map((c) => c.area)
+  for (const area of VRO_CONTROL_AREAS) {
+    if (!areas.includes(area)) {
+      return err(`control area "${area}" is missing from the attestation`)
+    }
+  }
+  if (attestation.determinismEvidence === undefined) {
+    return err("determinismEvidence is missing — the attestation must include evidence of the 100x byte-identical gate")
+  }
+  if (attestation.corpusSnapshotHash === undefined) {
+    return err("corpusSnapshotHash is missing — the attestation must include the corpus snapshot SHA-256 hash")
+  }
+  return ok(null)
+}
+
 /** Decode a committed `attestation.json`. */
 export const decodeAttestationText = (text: string): Result<Attestation, CommittedReadFailure> => {
   let parsed: unknown
@@ -325,6 +440,11 @@ export const decodeAttestationText = (text: string): Result<Attestation, Committ
   } catch (cause) {
     return err({ _tag: "malformed_json", line: null, detail: cause instanceof Error ? cause.message : "unparseable" })
   }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return err({ _tag: "malformed_shape", line: null, detail: "attestation.json must be a JSON object" })
+  }
+  const noUnknown = validateNoUnknownFields(parsed as Record<string, unknown>)
+  if (isErr(noUnknown)) return noUnknown
   const decoded = decodeOrFail(decodeSync(AttestationSchema), parsed, "Attestation")
   if (isErr(decoded)) return err({ _tag: "malformed_shape", line: null, detail: describeDecodeFailure(decoded.error) })
   return ok(decoded.value)

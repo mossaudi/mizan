@@ -20,16 +20,25 @@ import { verifyAnswer } from "@mizan/verify"
  * file mentions what the set says should happen; a module that cannot read the label cannot report
  * it.
  *
- * ## What holds that, and what does not
+ * ## What holds that
  *
- * The ban rests on the `SystemCase` type below, which has no field a label could arrive in, plus
- * review of this file. It is NOT held by a gate. There is no `B-1` in `GATE_IDS` and no
- * `packages/mizan-gate/src/benchmark-provenance.ts`; a structural scan that would reject the token
- * naming a verdict expectation is specified and unshipped, and that token is live in the eval
- * generator which publishes the sets. So this is a *reviewed* invariant, not a checked one, and
- * `docs/value-proof.md` states the same limit in the words a judge reads. It is written here
- * because the headline number of this project is the one place where an unshipped check named in
- * prose is least defensible.
+ * Two things, and the second is the one that used to be missing. The `SystemCase` type below has no
+ * field a label could arrive in, and `checkExecutorLabelBlindness` in
+ * `packages/mizan-gate/src/docs-benchmark.ts` scans this file for the identifiers that carry a
+ * verdict expectation, so `bun run check:docs` fails if one appears here. The identifiers themselves
+ * are listed once, in that module — a second copy in this header would be a second place to forget
+ * to update, and the first version of that header listed them and tripped its own rule.
+ *
+ * The scan is scoped to THIS file on purpose. `scripts/eval/` publishes the sets and holds the
+ * hand-adjudicated rulings, so a repository-wide ban would forbid the generator from expressing
+ * what a case is expected to be. Scoping it to the executor fails in the safe direction: rename
+ * this file and the scan stops matching, while the missing-file check reports it as a finding.
+ *
+ * This is a *docs* rule and not a gate, deliberately. `GATE_IDS` is a published count compared
+ * across every file in the repository, so an eighth entry would change what the repository claims
+ * about itself — a trade no formatting rule is worth. The headline number of this project is the
+ * one place where a checked invariant named only in prose was least defensible, and it is now
+ * checked.
  *
  * ## The arms stay independent
  *

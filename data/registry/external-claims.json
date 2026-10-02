@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Third-party figures an audited document may print, and the citation each one carries. A figure that is not here is not printable: `docs-external.ts` reports an `external-claim:<id>` marker that resolves to no entry, and reports any entry a document cites that is missing url, retrievedOn or scope. mizan measured none of these numbers, so `ownsVerdict` is false on every row and no entry may be a measurement of ours.",
+  "idPolicy": "An id carries no digits. A document writes `external-claim:<id>` into running prose, and rule ten counts every digit sequence in a benchmark section as a stated figure, so an id ending in a year would make the marker itself look like an unbacked claim. The year belongs in `source` and `retrievedOn`, where it is already recorded. Two ids may share a `source` and a `url` when one published figure has two ends and a document prints both: the lower and upper bound of a range are the same measurement and two separately traceable citations.",
+  "urlHandling": "URLs are data only. No build step, no test and no gate fetches them, so `bun run check:docs` is fully offline and a URL in this file can never become a request target.",
+  "claims": [
+    {
+      "id": "tow-miscited-share",
+      "figure": 60,
+      "statement": "Across eight AI search tools, more than 60% of 1,600 citation queries returned the wrong source.",
+      "source": "Tow Center for Digital Journalism, Columbia Journalism School (Columbia Journalism Review, 2025-03-06)",
+      "url": "https://www.cjr.org/tow_center/we-compared-eight-ai-search-engines-theyre-all-bad-at-citing-news.php",
+      "retrievedOn": "2026-10-01",
+      "scope": "The threshold of the published 'more than 60%' share, measured on eight AI search tools asked to attribute a quoted news excerpt to its headline, publisher, date and URL. News attribution, not religious text. A measurement of other products, not of mizan.",
+      "ownsVerdict": false
+    },
+    {
+      "id": "stanford-unsupported-share",
+      "figure": 50,
+      "statement": "Between 50% and 90% of LLM responses are not fully supported by the sources they cite.",
+      "source": "Stanford, An Automated Framework for Assessing How Well LLMs Cite Relevant Medical References (Nature Communications, 2025-04-16)",
+      "url": "https://law.stanford.edu/publications/an-automated-framework-for-assessing-how-well-llms-cite-relevant-medical-references",
+      "retrievedOn": "2026-10-01",
+      "scope": "The lower bound of a published 50-90% range across seven LLMs, 800 questions and 58,000 statement-source pairs. Medical queries, so the domain is not ours. A measurement of other systems, not of mizan. The upper bound is `stanford-unsupported-share-upper`.",
+      "ownsVerdict": false
+    },
+    {
+      "id": "stanford-unsupported-share-upper",
+      "figure": 90,
+      "statement": "Between 50% and 90% of LLM responses are not fully supported by the sources they cite.",
+      "source": "Stanford, An Automated Framework for Assessing How Well LLMs Cite Relevant Medical References (Nature Communications, 2025-04-16)",
+      "url": "https://law.stanford.edu/publications/an-automated-framework-for-assessing-how-well-llms-cite-relevant-medical-references",
+      "retrievedOn": "2026-10-01",
+      "scope": "The upper bound of the same published 50-90% range, registered separately because `docs/value-proof.md` prints both ends of it and the promise rule reports any percentage no entry vouches for. Same measurement as `stanford-unsupported-share`, and the same boundary: another system's, not mizan's.",
+      "ownsVerdict": false
+    }
+  ]
+}

@@ -75,8 +75,8 @@ pre { font-size: 0.95rem; margin: 0.25rem 0 0.75rem; overflow-wrap: anywhere; wh
       <p class="note">record — corpus text, inserted as characters</p>
       <pre dir="auto">حَدَّثَنَا أَحْمَدُ بْنُ صَالِحٍ، حَدَّثَنَا عَنْبَسَةُ، حَدَّثَنِي يُونُسُ، عَنِ ابْنِ شِهَابٍ، قَالَ حَدَّثَنِي حُمَيْدُ بْنُ عَبْدِ الرَّحْمَنِ، أَنَّ أَبَا هُرَيْرَةَ، قَالَ قَالَ رَسُولُ اللَّهِ صلى الله عليه وسلم ‏&quot;‏ يَتَقَارَبُ الزَّمَانُ وَيَنْقُصُ الْعِلْمُ وَتَظْهَرُ الْفِتَنُ وَيُلْقَى الشُّحُّ وَيَكْثُرُ الْهَرْجُ ‏&quot;‏ ‏.‏ قِيلَ يَا رَسُولَ اللَّهِ أَيَّةُ هُوَ قَالَ ‏&quot;‏ الْقَتْلُ الْقَتْلُ ‏&quot;‏ ‏.‏</pre>
     </article>
-    <h2>This page makes no request</h2>
-    <p class="note">No script, no stylesheet link, no image, no font, no fetch. It renders from <code>file://</code> with zero network access, so what you are reading is the committed bytes and nothing else. Run <code>bun run demo</code> for the full report, which prints each source’s URL and the snapshot hash beside every badge.</p>
+    <h2>This page makes no request, and takes no input</h2>
+    <p class="note">No script, no stylesheet link, no image, no font, no fetch. It renders from <code>file://</code> with zero network access, so what you are reading is the committed bytes and nothing else. There is no text box on purpose: accepting input needs a script, and ADR-C3 forbids one. To ask a question, use the CLI — <code>bun run ask</code>, with a key set for a live run and unset for the labelled replay; <code>bun run demo</code> prints the full report, with each source’s URL and the snapshot hash beside every badge.</p>
   </main>
 </body>
 </html>

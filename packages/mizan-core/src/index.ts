@@ -40,6 +40,7 @@ export { Correction, CorrectionSpan, LocatedCorrection, Relevance, RelevanceStat
 export { DEMO_ANCHOR_SET_VERSION, DEMO_QUESTION_SET_VERSION, DemoAnchor, DemoAnchorSet, DemoExpectation, DemoQuestion, DemoQuestionSet } from "./schema/demo.ts"
 export { DivergenceResolution, EvalAnchor, EvalCase, EvalSet, KnownDivergence } from "./schema/eval.ts"
 export { ResolvedCitation, unresolved } from "./schema/resolved.ts"
+export { SSR_SCHEMA_VERSION, SsrResult } from "./schema/ssr.ts"
 export { CorpusRecord, CorpusRecordMeta, GradeBasis, QURAN_COLLECTION, toRecordMeta } from "./schema/record.ts"
 export {
   LicenceClass,

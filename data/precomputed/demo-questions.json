@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "1",
+  "generatedAt": "2026-10-02T00:00:00.000Z",
+  "provider": "precomputed-transcript",
+  "model": "transcript-v1",
+  "precomputed": true,
+  "entries": [
+    {
+      "stage": "decompose",
+      "questionHash": "9fd4083645cc80f1f315fac2b7c29159331bbeef4cfee4f0b460d0428e499022",
+      "answer": {
+        "provider": "precomputed-transcript",
+        "model": "transcript-v1",
+        "transcript": "precomputed",
+        "questionHash": "9fd4083645cc80f1f315fac2b7c29159331bbeef4cfee4f0b460d0428e499022",
+        "prose": "Retrieve the opening of surah al-Ikhlas.",
+        "claims": [
+          {
+            "id": "q1",
+            "text": "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ قُلْ هُوَ ٱللَّهُ أَحَدٌ",
+            "quote": null,
+            "citations": []
+          }
+        ]
+      }
+    },
+    {
+      "stage": "answer",
+      "questionHash": "9fd4083645cc80f1f315fac2b7c29159331bbeef4cfee4f0b460d0428e499022",
+      "answer": {
+        "provider": "precomputed-transcript",
+        "model": "transcript-v1",
+        "transcript": "precomputed",
+        "questionHash": "9fd4083645cc80f1f315fac2b7c29159331bbeef4cfee4f0b460d0428e499022",
+        "prose": "The Qur'an states the oneness of God directly and without qualification. Surah al-Ikhlas opens by commanding the Prophet to say that He is one, and the surah then denies any likeness to Him.",
+        "claims": [
+          {
+            "id": "ikhlas-1",
+            "text": "The opening of sura al-Ikhlas commands the Prophet to declare that God is one.",
+            "quote": "قُلْ هُوَ ٱللَّهُ أَحَدٌ",
+            "citations": [
+              {
+                "collection": "quran",
+                "number": "6222",
+                "grade": null,
+                "raw": "Qur'an 112:1"
+              }
+            ]
+          }
+        ],
+        "confidence": 0.9
+      }
+    }
+  ]
+}

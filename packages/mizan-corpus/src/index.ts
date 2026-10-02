@@ -88,3 +88,13 @@ export {
 export { ADAPTERS, buildRegistryJsonl, runIngest, type IngestFailure, type IngestOptions, type IngestProgress, type IngestResult } from "./ingest.ts"
 
 export { auditCommittedCorpus, formatAudit, type AuditFinding, type CommittedCorpus } from "./audit.ts"
+
+export {
+  VRO_CONTROL_AREA_MAPPINGS,
+  VRO_SCHEMA_VERSION,
+  VROAttestation,
+  VROControlArea,
+  VROMaturityLevel,
+  DeterminismEvidence,
+  ControlAreaMapping,
+} from "./attestation-schema.ts"

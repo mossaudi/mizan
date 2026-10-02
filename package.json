@@ -27,6 +27,7 @@
     "benchmark:vs-search": "bun run scripts/benchmark/run.ts",
     "verify:ledger": "bun run scripts/verify-ledger.ts",
     "verify:runs": "bun run scripts/verify-runs.ts",
+    "verify:chain": "bun run scripts/verify-chain.ts",
     "check:docs": "bun run scripts/check-docs-claims.ts"
   },
   "dependencies": {

@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { isErr, isOk } from "@mizan/core"
 import {
   attestSnapshot,
@@ -7,7 +9,8 @@ import {
   describeAttestationProblem,
   type SnapshotIdentity,
 } from "../src/attest.ts"
-import { decodeAttestationText, describeReadFailure } from "../src/ledger.ts"
+import { decodeAttestationText, describeReadFailure, validateVroCompliance } from "../src/ledger.ts"
+import { VRO_CONTROL_AREA_MAPPINGS, VRO_SCHEMA_VERSION } from "../src/attestation-schema.ts"
 
 /**
  * `attest.ts` in unit form, and the reason this file exists.
@@ -51,6 +54,10 @@ const attestationText = (id: SnapshotIdentity): string =>
     sources: [],
     chainHead: HASH,
     chainLength: 2,
+    maturityLevel: 3,
+    controlAreas: VRO_CONTROL_AREA_MAPPINGS,
+    determinismEvidence: { gateName: "G-6", passed: true, runCount: 100, byteIdentical: true },
+    corpusSnapshotHash: id.snapshotHash,
   })
 
 describe("attestSnapshot — the corpus on disk against the corpus we authorised", () => {
@@ -211,5 +218,209 @@ describe("the two readers of attestation share one decoder", () => {
     const compared = attestSnapshot(attestationText(identity()), identity())
     if (isErr(compared)) throw new Error(`the comparison refused a file the decoder accepts: ${describeAttestationProblem(compared.error)}`)
     expect(compared.value.recordCount).toBe(parsed.value.recordCount)
+  })
+})
+
+describe("IETF VRO alignment — 8 control areas, 3 maturity levels", () => {
+  test("all 8 VRO control areas are mapped", () => {
+    const areas = VRO_CONTROL_AREA_MAPPINGS.map((m) => m.area)
+    expect(areas).toContain("identity")
+    expect(areas).toContain("provenance")
+    expect(areas).toContain("integrity")
+    expect(areas).toContain("determinism")
+    expect(areas).toContain("licensing")
+    expect(areas).toContain("coverage")
+    expect(areas).toContain("degradation")
+    expect(areas).toContain("auditability")
+    expect(areas).toHaveLength(8)
+  })
+
+  test("each control area has at least one concrete field", () => {
+    for (const mapping of VRO_CONTROL_AREA_MAPPINGS) {
+      expect(mapping.fields.length).toBeGreaterThanOrEqual(1)
+    }
+  })
+
+  test("the VRO schema version is declared", () => {
+    expect(VRO_SCHEMA_VERSION).toBe("1")
+  })
+
+  test("the determinism control area references the determinism evidence", () => {
+    const determinism = VRO_CONTROL_AREA_MAPPINGS.find((m) => m.area === "determinism")
+    expect(determinism).toBeDefined()
+    expect(determinism?.fields).toContain("determinismEvidence")
+  })
+
+  test("the integrity control area references the snapshot hash", () => {
+    const integrity = VRO_CONTROL_AREA_MAPPINGS.find((m) => m.area === "integrity")
+    expect(integrity).toBeDefined()
+    expect(integrity?.fields).toContain("snapshotHash")
+    expect(integrity?.fields).toContain("recordCount")
+  })
+
+  test("the auditability control area references the chain", () => {
+    const auditability = VRO_CONTROL_AREA_MAPPINGS.find((m) => m.area === "auditability")
+    expect(auditability).toBeDefined()
+    expect(auditability?.fields).toContain("chainHead")
+    expect(auditability?.fields).toContain("chainLength")
+  })
+})
+
+describe("VRO compliance — the committed attestation.json", () => {
+  const readCommittedAttestation = (): string => {
+    const path = join(import.meta.dir, "..", "..", "..", "attestation.json")
+    return readFileSync(path, "utf8")
+  }
+
+  test("the committed attestation.json decodes successfully", () => {
+    const decoded = decodeAttestationText(readCommittedAttestation())
+    if (isErr(decoded)) throw new Error(`committed attestation.json failed to decode: ${describeReadFailure(decoded.error)}`)
+    expect(decoded.value.snapshotHash).toMatch(/^[0-9a-f]{64}$/)
+  })
+
+  test("the committed attestation.json is VRO-compliant", () => {
+    const decoded = decodeAttestationText(readCommittedAttestation())
+    if (isErr(decoded)) throw new Error(`committed attestation.json failed to decode: ${describeReadFailure(decoded.error)}`)
+    const compliance = validateVroCompliance(decoded.value)
+    if (isErr(compliance)) throw new Error(`committed attestation.json is not VRO-compliant: ${compliance.error}`)
+  })
+
+  test("the committed attestation.json declares maturity level 3", () => {
+    const decoded = decodeAttestationText(readCommittedAttestation())
+    if (isErr(decoded)) throw new Error(`committed attestation.json failed to decode: ${describeReadFailure(decoded.error)}`)
+    expect(decoded.value.maturityLevel).toBe(3)
+  })
+
+  test("the committed attestation.json contains all 8 VRO control areas", () => {
+    const decoded = decodeAttestationText(readCommittedAttestation())
+    if (isErr(decoded)) throw new Error(`committed attestation.json failed to decode: ${describeReadFailure(decoded.error)}`)
+    const areas = decoded.value.controlAreas?.map((c) => c.area) ?? []
+    for (const area of ["identity", "provenance", "integrity", "determinism", "licensing", "coverage", "degradation", "auditability"]) {
+      expect(areas).toContain(area)
+    }
+  })
+
+  test("the committed attestation.json includes determinism evidence", () => {
+    const decoded = decodeAttestationText(readCommittedAttestation())
+    if (isErr(decoded)) throw new Error(`committed attestation.json failed to decode: ${describeReadFailure(decoded.error)}`)
+    expect(decoded.value.determinismEvidence).toBeDefined()
+    expect(decoded.value.determinismEvidence?.gateName).toBe("G-6")
+    expect(decoded.value.determinismEvidence?.passed).toBe(true)
+    expect(decoded.value.determinismEvidence?.runCount).toBe(100)
+    expect(decoded.value.determinismEvidence?.byteIdentical).toBe(true)
+  })
+
+  test("the committed attestation.json includes corpus snapshot hash", () => {
+    const decoded = decodeAttestationText(readCommittedAttestation())
+    if (isErr(decoded)) throw new Error(`committed attestation.json failed to decode: ${describeReadFailure(decoded.error)}`)
+    expect(decoded.value.corpusSnapshotHash).toBe(decoded.value.snapshotHash)
+  })
+})
+
+describe("VRO compliance — validation rejects non-compliant attestations", () => {
+  const compliantAttestation = () => ({
+    schemaVersion: "1.0.0",
+    generatedAt: "2026-01-01T00:05:00.000Z",
+    snapshotHash: HASH,
+    recordCount: 27234,
+    quarantinedRows: 0,
+    collectionCounts: { quran: 6236 },
+    sources: [],
+    chainHead: HASH,
+    chainLength: 2,
+    maturityLevel: 3 as const,
+    controlAreas: VRO_CONTROL_AREA_MAPPINGS,
+    determinismEvidence: { gateName: "G-6", passed: true, runCount: 100, byteIdentical: true },
+    corpusSnapshotHash: HASH,
+  })
+
+  test("a compliant attestation passes validation", () => {
+    const result = validateVroCompliance(compliantAttestation())
+    expect(isOk(result)).toBe(true)
+  })
+
+  test("missing maturityLevel fails validation", () => {
+    const { maturityLevel: _, ...withoutMaturity } = compliantAttestation()
+    const result = validateVroCompliance(withoutMaturity)
+    if (isOk(result)) throw new Error("an attestation without maturityLevel was accepted")
+    expect(result.error).toContain("maturityLevel")
+  })
+
+  test("missing controlAreas fails validation", () => {
+    const { controlAreas: _, ...withoutControlAreas } = compliantAttestation()
+    const result = validateVroCompliance(withoutControlAreas)
+    if (isOk(result)) throw new Error("an attestation without controlAreas was accepted")
+    expect(result.error).toContain("controlAreas")
+  })
+
+  test("a missing control area fails validation and names the area", () => {
+    const partial = compliantAttestation()
+    const withoutOne = { ...partial, controlAreas: VRO_CONTROL_AREA_MAPPINGS.filter((m) => m.area !== "determinism") }
+    const result = validateVroCompliance(withoutOne)
+    if (isOk(result)) throw new Error("an attestation missing a control area was accepted")
+    expect(result.error).toContain("determinism")
+  })
+
+  test("missing determinismEvidence fails validation", () => {
+    const { determinismEvidence: _, ...withoutEvidence } = compliantAttestation()
+    const result = validateVroCompliance(withoutEvidence)
+    if (isOk(result)) throw new Error("an attestation without determinismEvidence was accepted")
+    expect(result.error).toContain("determinismEvidence")
+  })
+
+  test("missing corpusSnapshotHash fails validation", () => {
+    const { corpusSnapshotHash: _, ...withoutHash } = compliantAttestation()
+    const result = validateVroCompliance(withoutHash)
+    if (isOk(result)) throw new Error("an attestation without corpusSnapshotHash was accepted")
+    expect(result.error).toContain("corpusSnapshotHash")
+  })
+})
+
+describe("unknown fields are rejected", () => {
+  test("an attestation with an unknown field is refused", () => {
+    const text = JSON.stringify({
+      schemaVersion: "1.0.0",
+      generatedAt: "2026-01-01T00:05:00.000Z",
+      snapshotHash: HASH,
+      recordCount: 27234,
+      quarantinedRows: 0,
+      collectionCounts: { quran: 6236 },
+      sources: [],
+      chainHead: HASH,
+      chainLength: 2,
+      maturityLevel: 3,
+      controlAreas: VRO_CONTROL_AREA_MAPPINGS,
+      determinismEvidence: { gateName: "G-6", passed: true, runCount: 100, byteIdentical: true },
+      corpusSnapshotHash: HASH,
+      unknownField: "sneaky",
+    })
+    const decoded = decodeAttestationText(text)
+    if (isOk(decoded)) throw new Error("an attestation with an unknown field was accepted")
+    expect(decoded.error._tag).toBe("malformed_shape")
+    expect(decoded.error.detail).toContain("unknownField")
+  })
+
+  test("an attestation with multiple unknown fields names all of them", () => {
+    const text = JSON.stringify({
+      schemaVersion: "1.0.0",
+      generatedAt: "2026-01-01T00:05:00.000Z",
+      snapshotHash: HASH,
+      recordCount: 27234,
+      quarantinedRows: 0,
+      collectionCounts: { quran: 6236 },
+      sources: [],
+      chainHead: HASH,
+      chainLength: 2,
+      maturityLevel: 3,
+      controlAreas: VRO_CONTROL_AREA_MAPPINGS,
+      determinismEvidence: { gateName: "G-6", passed: true, runCount: 100, byteIdentical: true },
+      corpusSnapshotHash: HASH,
+      extraOne: 1,
+      extraTwo: 2,
+    })
+    const decoded = decodeAttestationText(text)
+    if (isOk(decoded)) throw new Error("an attestation with unknown fields was accepted")
+    expect(decoded.error.detail).toContain("extraOne")
+    expect(decoded.error.detail).toContain("extraTwo")
   })
 })

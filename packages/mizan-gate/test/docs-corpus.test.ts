@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import type { DocsClaim } from "../src/docs-claims.ts"
 import { checkedPaths, runDocsClaimChecks } from "../src/docs-check.ts"
-import { CORPUS_SURFACE_EXTENSIONS, CORPUS_SURFACE_ROOTS, checkCorpusAbsenceUnstated } from "../src/docs-corpus.ts"
+import { CORPUS_SURFACE_EXTENSIONS, CORPUS_SURFACE_ROOTS, NAMES, checkCorpusAbsenceUnstated, checkCorpusPresenceContradiction } from "../src/docs-corpus.ts"
 import { groupFigure } from "../src/docs-value.ts"
 
 /**
@@ -131,9 +131,246 @@ describe("R15 — a public surface names an absent collection only to renounce i
   })
 })
 
+/**
+ * R18 — the mirror of R15.
+ *
+ * R15 stops a surface claiming to cover a collection the snapshot does not serve. This half stops a
+ * surface continuing to renounce one the snapshot *does*, which is the direction that goes stale: the
+ * disclosure was true when written and stops being true when the corpus changes, and nothing in the
+ * build notices. Every test here is paired with an R15 non-finding, because a rule that reported the
+ * honest renunciation of an unserved collection would be reporting the truth as a defect.
+ */
+describe("R18 - a surface may not renounce a collection the snapshot serves", () => {
+  const served = new Set(["quran", "nasai", "malik"])
+
+  test("a surface that renounces a served collection fails, and names the line", () => {
+    const claims = checkCorpusPresenceContradiction("The corpus is the Qur'an only; no Sunan is held.\n", "README.md", served)
+    expect(rules(claims)).toEqual(["corpus-absence-stated-for-served-collection"])
+    expect(claims[0]?.file).toBe("README.md")
+    expect(details(claims)).toContain("line 1")
+    expect(details(claims)).toContain("attestation.collectionCounts")
+  })
+
+  test("an honest renunciation of an unserved collection still passes", () => {
+    expect(details(checkCorpusPresenceContradiction("No Bukhari, no Muslim - recorded as absent.\n", "README.md", served))).toBe("")
+  })
+
+  test("the served set comes from the attestation, and a document cannot renounce what it says is served", () => {
+    const attestation = readAttestation()
+    const claims = checkCorpusPresenceContradiction(`The corpus is the Qur'an only; no Sunan is held.\n`, "README.md", new Set(Object.keys(attestation.collectionCounts)))
+    expect(rules(claims)).toEqual(["corpus-absence-stated-for-served-collection"])
+    expect(Object.keys(attestation.collectionCounts)).toContain("nasai")
+  })
+
+  test("a repository with no attestation has no served set, so there is nothing to contradict", () => {
+    expect(details(checkCorpusPresenceContradiction("No Sunan is held.\n", "README.md", new Set()))).toBe("")
+  })
+
+  test("a sentence boundary ends the claim, so a table row beside a renunciation is not one", () => {
+    // The shipped README writes "**4 Sunan + Muwatta + Qur'an, 27,234 records.** No Bukhari, no
+    // Muslim" on one line. A split that required whitespace after the full stop would miss the
+    // boundary, because the emphasis markers sit in between, and would read the first clause as
+    // renouncing the Qur'an named in it.
+    const line = "**4 Sunan + Muwatta + Qur'an, 27,234 records.** No Bukhari, no Muslim - recorded as absent."
+    expect(details(checkCorpusPresenceContradiction(line, "README.md", served))).toBe("")
+  })
+
+  test("an affirmative coverage claim is not a renunciation, which is the false positive this rule had", () => {
+    // Found by the fixture that added `collectionCounts` to a test tree, which is exactly what
+    // `servedCollections` failing closed exposed. "Tanzil - Qur'an is served verbatim" is the sentence a
+    // disclosure uses to state what it holds, and `COVERAGE` matched it — so the rule reported a true
+    // document as renouncing the Qur'an. A rule that does that gets switched off by the next person to
+    // touch it, which is why the coverage vocabulary is necessary but not sufficient here.
+    for (const line of [
+      "Tanzil - Qur'an is served verbatim.",
+      "Qur'an records are served from the committed snapshot.",
+      "The Sunan are held in `attestation.json.collectionCounts`.",
+      "This repository ships the Qur'an and four Sunan.",
+      "Nasai is included in the corpus registry.",
+    ]) {
+      expect(details(checkCorpusPresenceContradiction(`${line}\n`, "README.md", served))).toBe("")
+    }
+  })
+
+  test("a marker about a different subject in the same sentence is not a marker about the collection", () => {
+    // Found by writing ADR-C9's own description of this rule, which contains the words "Sunan" and
+    // "absent" in one sentence — `absent` describing the *vocabulary*, not the Sunan. A clause-wide
+    // search reported ADR-C9 as renouncing a collection it serves, which is the one thing a document
+    // describing the rule must never do. The bound that fixes it is six words, and this is the test
+    // that says so.
+    expect(details(checkCorpusPresenceContradiction('only as "the Sunan are not in the corpus" is not caught, because `corpus` is deliberately absent from the coverage vocabulary.\n', "docs/specs/adr/ADR-C9.md", served))).toBe("")
+    // The residual is stated in ADR-C9 rather than hidden, so it is asserted here as a non-finding:
+    // `corpus` is deliberately absent from the coverage vocabulary, which means a renunciation phrased
+    // only as "not in the corpus" is not caught. Asserting it as a finding would be a claim the rule
+    // does not make.
+    expect(details(checkCorpusPresenceContradiction("the Sunan are not in the corpus, and that is the point.\n", "README.md", served))).toBe("")
+  })
+
+  test("the second residual, asserted rather than discovered: a marker about another subject inside the window fires anyway", () => {
+    // ADR-C9 states this as a known false positive, and a residual that lives only in prose is a
+    // residual that gets "fixed" by someone who has not read the prose. The clause here is true and the
+    // finding is wrong: `absent` qualifies the tafsir layer, not the collection. Closing it needs
+    // sentence-level parsing of what the marker modifies, which this rule declines to grow — so it is
+    // pinned as the current, documented behaviour instead of being quietly tolerated.
+    expect(rules(checkCorpusPresenceContradiction("The Qur'an, absent any tafsir layer, is served verbatim.\n", "README.md", served))).toEqual(["corpus-absence-stated-for-served-collection"])
+  })
+
+  test("a licence column is not a coverage claim", () => {
+    expect(details(checkCorpusPresenceContradiction("| Qur'an (Tanzil, Uthmani) | 6,236 | no-derivatives |\n", "README.md", served))).toBe("")
+  })
+
+  test("a general negation about something other than holding is not a coverage claim", () => {
+    expect(details(checkCorpusPresenceContradiction("The Qur'an states the oneness of God directly and without qualification.\n", "README.md", served))).toBe("")
+  })
+
+  test("an ordinary contrast between two collections is not a renunciation", () => {
+    expect(details(checkCorpusPresenceContradiction("The Qur'an is in the corpus but the Sunan is not.\n", "README.md", served))).toBe("")
+  })
+
+  test("every shape a real renunciation takes is caught", () => {
+    // The four constructions that attach a negation to a coverage verb, plus the coverage words that
+    // are renunciations on their own. One loop over all nine, because a rule that catches seven ways
+    // of writing the same lie and misses the eighth is not a rule a reviewer can trust.
+    for (const line of [
+      "No Sunan is included in this snapshot.",
+      "No Sunan is served.",
+      "No Qur'an is served.",
+      "The Sunan are absent from the corpus.",
+      "We do not serve the Sunan.",
+      "The Sunan are quarantined and not served.",
+      "Muwatta is not ingested.",
+      "The Sunan are excluded, by design.",
+      "The Sunan are deferred to a later snapshot.",
+      "The Sunan are never shipped.",
+      "An-Nasa'i is not currently included.",
+    ]) {
+      expect(rules(checkCorpusPresenceContradiction(`${line}\n`, "README.md", served))).toEqual(["corpus-absence-stated-for-served-collection"])
+    }
+  })
+
+  test("a bare negation beside a collection name is not a renunciation, so the rule stays usable", () => {
+    // The false positive the narrowed vocabulary exists to prevent. `not` and `no` appear in ordinary
+    // prose about collections constantly; what makes a sentence a renunciation is the negation being
+    // attached to the coverage verb, and that is the shape the pattern requires.
+    for (const line of [
+      "The Qur'an is not a book of jurisprudence.",
+      "The Sunan are not a single author.",
+      "Muwatta is not attributed to one narrator.",
+      "There is no doubt that the Qur'an is served.",
+      "No claim here concerns authorship.",
+    ]) {
+      expect(details(checkCorpusPresenceContradiction(`${line}\n`, "README.md", served))).toBe("")
+    }
+  })
+
+  test("a separator inside a collection's name is part of the name, not a word boundary", () => {
+    // `an-Nasa'i` is the name a document writes and `nasai` is the key the attestation holds, and the
+    // apostrophe, the hyphen and the space are all separators inside one name. A `\b` boundary alone
+    // would match none of the three forms, and a rule that matched none of them would look like it
+    // was working.
+    expect(rules(checkCorpusPresenceContradiction("An-Nasa'i is not served.\n", "README.md", served))).toEqual(["corpus-absence-stated-for-served-collection"])
+    expect(rules(checkCorpusPresenceContradiction("Nasai is not served.\n", "README.md", served))).toEqual(["corpus-absence-stated-for-served-collection"])
+    expect(details(checkCorpusPresenceContradiction("Nasrani is not served.\n", "README.md", served))).toBe("")
+  })
+
+  test("a name is matched in Arabic as well as Latin, because both decks are surfaces", () => {
+    expect(rules(checkCorpusPresenceContradiction("الموطأ غير مُقدَّم.\n", "submission/make_deck_ar.py", served))).toEqual(["corpus-absence-stated-for-served-collection"])
+  })
+
+  test("a competitor's name that contains a family word is not this repository's collection", () => {
+    // The shipped comparison table names a competitor "UmmahAPI / Sunnah.com" and its own column
+    // "What a product ships". Both halves are in this rule's vocabulary and neither is a claim about
+    // what mizan holds, which is why `sunnah` is not a name and why the family name is.
+    expect(details(checkCorpusPresenceContradiction("| What a product ships | Ansari | UmmahAPI / Sunnah.com | mizan |\n", "docs/value-proof.md", served))).toBe("")
+  })
+
+  test("one finding per offending line, so the fix list is the file", () => {
+    expect(checkCorpusPresenceContradiction("No Sunan is held.\nMuwatta is not served.\n", "README.md", served)).toHaveLength(2)
+  })
+
+  test("the repository's own surfaces renounce nothing it serves", () => {
+    const claims = runDocsClaimChecks(ROOT).claims.filter((found) => found.rule === "corpus-absence-stated-for-served-collection")
+    expect(details(claims)).toBe("")
+  })
+})
+
 describe("the runner reads the surfaces a judge reads", () => {
   const corpusFindings = (root: string): readonly DocsClaim[] =>
     runDocsClaimChecks(root).claims.filter((found) => found.rule === "corpus-absence-unstated")
+
+  const presenceFindings = (root: string): readonly DocsClaim[] =>
+    runDocsClaimChecks(root).claims.filter((found) => found.rule === "corpus-absence-stated-for-served-collection")
+
+  test("an attestation that cannot say which collections are served fails rather than disabling the rule", () => {
+    // The fail-closed case. `servedCollections` used to return an empty set both for "no attestation"
+    // and for "an attestation with no readable collectionCounts", and R18 is the rule that makes every
+    // renunciation of a served collection illegal — so an empty served set made every renunciation
+    // legal while the build stayed green. These three trees are the shapes that used to pass silently.
+    const unusable: readonly (readonly [string, string])[] = [
+      ["no collectionCounts field", JSON.stringify({ recordCount: 1 })],
+      ["a collectionCounts that is not an object", JSON.stringify({ recordCount: 1, collectionCounts: "quran" })],
+      ["an empty collectionCounts", JSON.stringify({ recordCount: 0, collectionCounts: {} })],
+      ["a collectionCounts whose only key is not a collection name", JSON.stringify({ recordCount: 1, collectionCounts: { "not a name!": 1 } })],
+      ["not valid JSON at all", "{ this is not json"],
+    ]
+    for (const [what, body] of unusable) {
+      const claims = presenceFindings(tree({ "attestation.json": body, "README.md": "No Sunan is held.\n" }))
+      // One message for all five shapes: they are one defect — the attestation cannot name a served
+      // collection — and five wordings would be five chances to describe one of them wrongly.
+      expect(details(claims)).toContain(`carries no readable \`collectionCounts\``)
+      expect(details(claims)).toContain("R18")
+      expect(what.length).toBeGreaterThan(0)
+      expect(claims.length).toBe(1)
+    }
+  })
+
+  test("the finding is about the attestation, so the fix is in the artefact rather than the prose", () => {
+    // The message has to name the file whose content is wrong. A finding on `README.md` would send a
+    // reader to edit the honest sentence to silence a rule the malformed artefact turned off.
+    const claims = presenceFindings(tree({ "attestation.json": JSON.stringify({ recordCount: 1 }), "README.md": "No Sunan is held.\n" }))
+    expect(new Set(claims.map((found) => found.file))).toEqual(new Set(["attestation.json"]))
+    expect(details(claims)).toContain("R18")
+  })
+
+  test("the absent-attestation case is still a skip, because that repository claims no corpus", () => {
+    // The line this draws is at *claiming*, and it is deliberate: a fork that ships no attestation has
+    // made no claim R18 can falsify, and failing it would punish a repository for a file it never
+    // said it had. The tree below carries the same stale renunciation and is not reported.
+    const claims = presenceFindings(tree({ "README.md": "No Sunan is held.\n" }))
+    expect(details(claims)).toBe("")
+  })
+
+  test("the served set is read from the attestation, not from a document", () => {
+    // The mirror reads the one committed record of what is served. A repository that ships no
+    // attestation has no served set, so the rule has nothing to falsify and says nothing.
+    expect(details(presenceFindings(tree({ "attestation.json": JSON.stringify({ recordCount: 1, collectionCounts: { quran: 1 } }) })))).toBe("")
+    const served = tree({
+      "attestation.json": JSON.stringify({ recordCount: 1, collectionCounts: { quran: 1 } }),
+      "README.md": "No Qur'an is served.\n",
+    })
+    expect(rules(presenceFindings(served))).toEqual(["corpus-absence-stated-for-served-collection"])
+  })
+
+  test("a stale disclosure is caught the day the corpus starts serving the collection", () => {
+    // The scenario the rule exists for, built rather than described: the sentence was true, then the
+    // corpus changed, and the document did not. Nothing else in the build would notice.
+    const stale = tree({
+      "attestation.json": JSON.stringify({ recordCount: 2, collectionCounts: { quran: 1, nasai: 1 } }),
+      "README.md": "No Sunan is held.\n",
+    })
+    expect(rules(presenceFindings(stale))).toEqual(["corpus-absence-stated-for-served-collection"])
+    expect(presenceFindings(stale)[0]?.file).toBe("README.md")
+  })
+
+  test("a served collection with no recorded name is reported, so the rule cannot go blind quietly", () => {
+    // Fail closed: the corpus grew, nothing in the docs changed, and the rule would otherwise have
+    // stopped watching the new collection while still reporting that it checks the corpus (AGENTS.md §3).
+    const grown = tree({
+      "attestation.json": JSON.stringify({ recordCount: 1, collectionCounts: { quran: 1, a_seventh_book: 1 } }),
+    })
+    expect(details(presenceFindings(grown))).toContain("a_seventh_book")
+    expect(details(presenceFindings(grown))).toContain("blind")
+  })
 
   test("the surface set is docs and submission, and it reads decks as well as markdown", () => {
     expect([...CORPUS_SURFACE_ROOTS]).toEqual(["docs", "submission"])
@@ -244,3 +481,62 @@ describe("the published sentence is backed by the committed attestation (runs on
     expect(read(".gitignore")).toContain(REGISTRY_RELATIVE)
   })
 })
+
+/**
+ * The name table is a claim about how documents spell things, so the one entry here that is a plain
+ * misspelling is asserted absent rather than left to review.
+ *
+ * `موطّن` reads *muwaṭṭan* — "made firm" — a different word from the collection's name `الموطأ`,
+ * *Muwattaʾ*: it swaps the final `أ` for a tanwīn-marked `ن` and drops the article. It is not a
+ * transliteration, a variant or a typo of anything, so it matched no surface and widened no pattern —
+ * and it was the single entry a judge reading the table would be most likely to check by reading it,
+ * in the one artefact whose whole job is to be right about names.
+ *
+ * The table is deliberately *not* held to "every name occurs in a shipped surface", and that is worth
+ * saying because the assertion is the obvious next one and it is false. `السنن` is the family word
+ * every surface uses in place of four separate names, and `القران` is a spelling variant no surface
+ * uses today. Both are entries whose whole purpose is to fire on a *future* surface, and a test that
+ * demanded they be used would have deleted them. The positive half — that the real Arabic deck line is
+ * watched — is asserted in the R18 block above.
+ */
+describe("the name table holds no misspelling of a served collection", () => {
+  /**
+   * The Latin names are spellings, not identifiers.
+   *
+   * The low-severity finding from the third review: `muwattah` is the spelling on the collection's own
+   * Wikipedia article and the one an Arabic-literate author types from memory, the table listed only
+   * `muwatta`, and so a surface honestly saying "the Muwattah is not served" got a rule about
+   * misspellings instead of the finding that actually mattered. Renaming a served collection is still
+   * caught, so nothing was opened — an alias is a real spelling, and a genuine rename is not one.
+   */
+  const SERVED = new Set(["malik"])
+
+  test("the Muwatta name is the work's name, not a misspelling of it", () => {
+    expect(NAMES["malik"]).toEqual(["muwatta", "muwattah", "malik", "الموطأ"])
+  })
+
+  test("the ordinary transliteration is watched too, which is the finding", () => {
+    // The exact shape the review reported: a surface stating, in its own words, that a collection it
+    // does serve is not held, and getting a rule about misspellings rather than the finding. R18
+    // judges a clause, so the negation rides the coverage verb — "is not served" — not a bare "not".
+    expect(checkCorpusPresenceContradiction("The Muwattah is not served.\n", "README.md", SERVED)).toHaveLength(1)
+    // The name it already knew, as the control: same sentence, spelling that was always watched.
+    expect(checkCorpusPresenceContradiction("The Muwatta is not served.\n", "README.md", SERVED)).toHaveLength(1)
+  })
+
+  test("and an honest renouncement is still not a finding, so the alias adds no false positives", () => {
+    // The non-finding that gives the one above its meaning: the alias widened the name table, and a
+    // served collection described as served is still correct behaviour.
+    expect(checkCorpusPresenceContradiction("The Muwattah is served.\n", "README.md", SERVED)).toEqual([])
+  })
+
+  test("the Arabic deck's own spelling is still watched, so the entry is load-bearing", () => {
+    // The non-finding that gives the one above its meaning: the removal did not blind the rule to
+    // Muwatta. Read from the deck rather than typed, so it fails if the deck's spelling changes.
+    const line = read("submission/make_deck_ar.py").split("\n").find((text) => text.includes("سنن")) ?? ""
+    expect(line).toContain("موطأ")
+    expect(checkCorpusPresenceContradiction(`الموطأ غير مقدَّم\n`, "submission/make_deck_ar.py", new Set(["malik"]))).toHaveLength(1)
+  })
+})
+
+

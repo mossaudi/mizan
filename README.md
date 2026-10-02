@@ -185,6 +185,13 @@ strict:
   to `REJECTED`, which is asserted by a planted regression. An anchor is a decision a human made
   for a case, never a default applied to text nobody ruled on.
 
+**One sentence carries the whole mapping, because two different things are easy to confuse here: the
+human ruling and the procedure's output.** A person ruled the 40 fabrications `REJECTED` — they assert
+something the source does not say — and the procedure emits `UNVERIFIABLE` for all 40, because an
+anchor drawn from a largely real span *locates*. Both are true, they answer different questions, and
+`docs/anchor-protocol.md` carries the full argument; `docs/specs/adr/ADR-C7.md` is the record that
+fixes the mapping, and the code is the authority for it.
+
 Two things about that ruling are worth more than the ruling itself, because both are the kind of
 detail a product is built to hide:
 
@@ -209,8 +216,22 @@ moves when the code moves is not an authority.
 
 ## The corpus
 
-**4 Sunan + Muwatta + Qur'an, 27,234 records.** No Bukhari, no Muslim — recorded as absent rather
-than quietly substituted.
+**4 Sunan + Muwatta + Qur'an, 27,234 records.** **No Bukhari, no Muslim and no an-Nawawi is served** —
+`attestation.json.collectionCounts` names exactly six collections, and those three are not among them,
+so none of the three is served. All three are fetched: they are listed in `QURANLAB_COLLECTIONS`, so
+they are present in the tree, and calling them "not ingested" was wrong in a way that flattered us.
+What actually holds their rows back is grading, not licensing. The source is recorded `content-only`
+under a dataset card declaring a per-row mixed licence, so redistribution of the text is permitted,
+derived works are restricted, and the commercial-use question is **not established either way** — this
+repository makes no determination about it. On grading, our registry records `gradeApplicable: true`
+for the whole source, and every one of the 15,026 held-back rows is a row whose dataset asserts no
+grade at all, so `quarantineReason` returns `missing_required_grade`. Under ADR-06 a row the dataset
+declines to grade is held back rather than served with a `null` grade we invented (ADR-C9).
+
+**Which collections those 15,026 rows belong to is not recorded, and this document does not guess.**
+The attestation carries the count and the reason, not a per-collection breakdown — so the per-collection
+statement made above is the served set, read from the attestation by name, and no claim is made about
+which collection any held-back row came from.
 
 | Collection | Records | Licence class |
 | --- | --- | --- |
@@ -226,10 +247,13 @@ attribution intact, in `data/registry/sources.json` and per-anchor in the artefa
 is stored verbatim and never rewritten, because the terms require it and because rewriting a sacred
 text to suit a normaliser would be wrong on its own terms.
 
-**15,026 of the 36,024 rows the hadith source shipped are quarantined, not served.** They carry
-no grade, and the rule is that a grade is never ours: we store exactly what the dataset asserts,
-or `null`, and we never default, infer or upgrade one. That costs us 41.7% of the hadith source.
-We took the cost.
+**15,026 of the 36,024 rows the hadith source shipped are quarantined, not served.** Every one is a row
+whose dataset asserts no grade, and the rule is that a grade is never ours: we store exactly what the
+dataset asserts, or `null`, and we never default, infer or upgrade one. What a dataset declines to grade
+is held back rather than served with a `null` we invented. That costs us 41.7% of the hadith source. We
+took the cost. This is a statement about rows, and it is kept as one: `attestation.json` records
+`quarantinedRows` and no per-collection attribution of it, so nothing here assigns those rows to a named
+collection.
 
 ---
 

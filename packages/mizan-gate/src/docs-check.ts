@@ -12,9 +12,12 @@ import { checkGateCountClaim, GATE_CLAIM_EXCLUDES, GATE_CLAIM_EXTENSIONS } from 
 import { checkSnapshotArithmetic } from "./docs-snapshot.ts"
 import { checkEvalBreadth } from "./docs-artifacts.ts"
 import { checkLiveProviderClaim } from "./docs-egress.ts"
-import { checkAnswerQualityClaim, checkBenchmarkClaimUnbacked, type StatedBenchmark } from "./docs-value.ts"
+import { checkAnswerQualityClaim, checkBenchmarkClaimUnbacked, statementBacking, type StatedBenchmark } from "./docs-value.ts"
+import { checkExternalClaimUnbacked, externalClaimFigures, EXTERNAL_CLAIMS_PATH } from "./docs-external.ts"
+import { checkExecutorLabelBlindness, EXECUTOR_PATH } from "./docs-benchmark.ts"
+import { checkVerdictPolarityInverted } from "./docs-polarity.ts"
 import { ADR_DIRECTORY, checkAdrCitationUnresolved, checkAdrDocument } from "./docs-adr.ts"
-import { checkCorpusAbsenceUnstated } from "./docs-corpus.ts"
+import { checkCorpusAbsenceUnstated, checkCorpusPresenceContradiction, checkServedCollectionsNamed } from "./docs-corpus.ts"
 import { isDeclaredGenerated } from "./docs-generated.ts"
 import { checkRunbookOrder } from "./docs-runbook.ts"
 import { collectCorpusSurfaces } from "./docs-surfaces.ts"
@@ -88,6 +91,19 @@ export const AUDITED_DOCUMENTS = [...REQUIRED_DOCUMENTS, ENV_EXAMPLE, VALUE_PROO
 
 /** A `Set` rather than `REQUIRED_DOCUMENTS.includes`, which will not accept a wider union. */
 const REQUIRED: ReadonlySet<string> = new Set(REQUIRED_DOCUMENTS)
+
+/**
+ * The documents that promise every figure they print is sourced, so every percentage anywhere in
+ * them is held to that promise (R17's second half; see `docs-external.ts`).
+ *
+ * One document, and the choice is an argument rather than an accident. `docs/value-proof.md` opens
+ * by asserting that every number in it comes from a file committed to this repository, so an
+ * unsourced percentage there falsifies a sentence the document makes about itself. The other five
+ * audited documents print heterogeneous figures from unrelated commits — `README.md`'s `41.7%`,
+ * `INTEGRITY.md`'s `8%`, `DISCLOSURE.md`'s `19%` — none of which promises anything of the sort, and
+ * `ADR-C8` names them as the limit this leaves rather than leaving it implicit.
+ */
+export const FIGURE_PROMISE_DOCUMENTS: ReadonlySet<string> = new Set([VALUE_PROOF])
 
 /**
  * Which files are documents, derived from the one list that says so.
@@ -200,6 +216,68 @@ const adrIdentifiers = (root: string): ReadonlySet<string> => {
 }
 
 /**
+ * The external-claim registry, parsed as `unknown` and handed to the rule that narrows it.
+ *
+ * Deliberately not decoded through a schema. This is a committed file the rule itself is auditing,
+ * exactly like `data/registry/sources.json`, and the reason a document claim is already handled at
+ * that boundary is written down in `docs-claims.ts`: routing a config file that is *under* audit
+ * through `decodeOrFail` would only move the question of who checks the schema. The narrow happens
+ * in `docs-external.ts`, and anything it cannot vouch for is reported.
+ */
+const readJson = (root: string, relative: string): unknown => {
+  const text = readIfPresent(root, relative)
+  if (text === null) return null
+  try {
+    return JSON.parse(text) as unknown
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The collections the attested snapshot serves, read from `collectionCounts`.
+ *
+ * The authority is the attestation rather than any document, for the same reason
+ * `checkSnapshotArithmetic` reads it: the document quotes a count, the attestation is the committed
+ * record of that count, and a rule that let a document define the served set would be judging the
+ * document by its own testimony.
+ *
+ * ## Three states, because two of them used to be one
+ *
+ * This returned an empty set both for "the repository ships no attestation" and for "the attestation
+ * is present but says nothing about which collections are served" — and R18 is a rule about
+ * collections a surface must *not* renounce, so an empty served set makes every renunciation legal.
+ * A malformed attestation therefore disabled the rule while looking exactly like passing it
+ * (AGENTS.md section 3, fail closed). `usable: false` is that middle state and the caller turns it
+ * into a finding rather than into a smaller rule.
+ *
+ * The absent case stays `usable: true` with an empty set on purpose, and for the reason
+ * `checkSnapshotArithmetic` skips rather than fails: a repository with no attestation makes no claim
+ * this rule can falsify. Failing there would punish a fork for a file it never claimed to ship. The
+ * line is drawn at *claiming* — an attestation that exists is a claim about the corpus, and one that
+ * cannot answer R18's question has failed to keep it.
+ */
+type ServedCollections = { readonly served: ReadonlySet<string>; readonly usable: boolean }
+
+const servedCollections = (root: string): ServedCollections => {
+  // `readJson` cannot tell an absent file from an unreadable one: both arrive as `null`. The
+  // distinction is this rule's whole fail-closed edge — an absent attestation is a repository that
+  // claims no corpus, and an unreadable one is a claim that failed to be made — so the presence of the
+  // file is asked separately rather than inferred from the parse.
+  const text = readIfPresent(root, ATTESTATION)
+  if (text === null) return { served: new Set(), usable: true }
+  const attestation = readJson(root, ATTESTATION)
+  if (typeof attestation !== "object" || attestation === null) return { served: new Set(), usable: false }
+  const counts = (attestation as { readonly collectionCounts?: unknown }).collectionCounts
+  if (typeof counts !== "object" || counts === null) return { served: new Set(), usable: false }
+  const served = new Set(Object.keys(counts as Record<string, unknown>).filter((key) => /^[a-z][a-z0-9_]*$/.test(key)))
+  // A counts object that yields no usable key is the same defect as a missing field: a record of a
+  // corpus naming no collection cannot renounce anything, so R18 would silently police nothing.
+  if (served.size === 0) return { served, usable: false }
+  return { served, usable: true }
+}
+
+/**
  * Audit every documented claim about the repository.
  *
  * A *required* document that is missing is itself a finding, not a reason to pass: `DISCLOSURE.md` is
@@ -259,6 +337,23 @@ export const runDocsClaimChecks = (root: string): DocsCheckResult => {
   const benchmark: StatedBenchmark = { path: BENCHMARK_ARTEFACT, text: readIfPresent(root, BENCHMARK_ARTEFACT) }
   if (benchmark.text !== null) recorded(BENCHMARK_ARTEFACT, "evidence")
 
+  // R17's registry. Read whole — it is a few kilobytes — and passed to the documents below, which
+  // are the only place a figure can be attributed to it. `null` when absent, which the rule reports
+  // against any document that still tries to attribute something.
+  const externalClaims = readJson(root, EXTERNAL_CLAIMS_PATH)
+  if (externalClaims !== null) recorded(EXTERNAL_CLAIMS_PATH, "evidence")
+  // Narrowed once, by the module that owns the narrowing, and handed to both rules: rule ten needs
+  // the figures it may back a section with, and rule seventeen needs to know which entries exist.
+  const externalFigures = externalClaimFigures(externalClaims)
+
+  // R17's promise half is given its backing set where the promise is checked rather than here, because
+  // the set is a function of the document as well as of the artefact: a percentage is admitted only
+  // where that document *attributes* it, on that line, to a named rate. Built once for all six
+  // documents it would have been a union of six different answers. `statementBacking` is still the only
+  // place that says which strings may stand for a published figure, so this file never answers that
+  // question itself (§17) — and it stays empty when the artefact is missing, because a repository whose
+  // artefact is gone has *fewer* things it may state, never more.
+
   const scripts = scriptsIn(root)
   const sources = productSources(root)
 
@@ -278,8 +373,9 @@ export const runDocsClaimChecks = (root: string): DocsCheckResult => {
     if (scripts !== null) claims.push(...checkDocumentedScripts(text, document, scripts))
     claims.push(...checkEvalBreadth(text, document, evalSets))
     claims.push(...checkLiveProviderClaim(text, document, sources))
-    claims.push(...checkBenchmarkClaimUnbacked(text, document, benchmark))
+    claims.push(...checkBenchmarkClaimUnbacked(text, document, benchmark, externalFigures))
     claims.push(...checkAnswerQualityClaim(text, document))
+    claims.push(...checkExternalClaimUnbacked(text, document, externalClaims, FIGURE_PROMISE_DOCUMENTS.has(document) ? { backing: statementBacking(text, benchmark) } : undefined))
     if (document === DEMO_RUNBOOK) claims.push(...checkRunbookOrder(text, document))
   }
 
@@ -321,9 +417,47 @@ export const runDocsClaimChecks = (root: string): DocsCheckResult => {
   // R15 rides a surface set of its own rather than the gate sweep: the sweep's job is numbers and
   // gate ids, where a fixture is text like any other, while a corpus-scope claim is made by the
   // documents and decks a judge reads and by nothing else. See `docs-corpus.ts` for why.
+  //
+  // R18 and R20 ride the same set, for the same reason and with the same reasoning each way: R18 is
+  // the mirror of R15 — a surface may not renounce a collection the snapshot serves — and R20 is a
+  // claim about what this repository's procedure returns, which is made in the same documents and in
+  // no fixture. A rule that ran over the `.ts` sweep instead would be reading test fixtures that
+  // quote `rejected` and `unverifiable` by the hundred.
+  const served = servedCollections(root)
+  if (!served.usable) {
+    claims.push(
+      claim(
+        "corpus-absence-stated-for-served-collection",
+        ATTESTATION,
+        `${ATTESTATION} carries no readable \`collectionCounts\`, so the set of collections this snapshot serves is unknown and R18 cannot tell a surface renouncing one from a surface describing it; an attestation that cannot answer the question has not kept the claim it makes`,
+      ),
+    )
+  }
+  // R18's completeness half, checked once against the attestation rather than per surface: a served
+  // collection with no name in `NAMES` is one no document can be judged about, so the corpus growing
+  // fails the build here instead of quietly widening what the rule cannot see. Skipped when the
+  // attestation is unusable, because the finding above has already said the served set is unknown and
+  // a second finding computed from that unknown set would be noise.
+  if (served.usable) claims.push(...checkServedCollectionsNamed(ATTESTATION, served.served))
   for (const surface of collectCorpusSurfaces(root, AUDITED_DOCUMENTS)) {
     recorded(surface.path, "surface")
     claims.push(...checkCorpusAbsenceUnstated(surface.text, surface.path))
+    if (served.usable) claims.push(...checkCorpusPresenceContradiction(surface.text, surface.path, served.served))
+    claims.push(...checkVerdictPolarityInverted(surface.text, surface.path))
+  }
+
+  // R19 is the one new rule that reads a source file rather than a document, because its subject is
+  // a source file: the benchmark executor that produces the detection rate. A missing executor is a
+  // finding rather than a skip, because `docs/value-proof.md` now states that this scan exists — so
+  // a repository without the file is a repository whose claim about the scan is false, which is the
+  // one state a rule here may not let pass.
+  const executor = readIfPresent(root, EXECUTOR_PATH)
+  recorded(EXECUTOR_PATH, "evidence")
+  if (executor === null) {
+    claims.push(claim("executor-label-blindness", EXECUTOR_PATH, `${EXECUTOR_PATH} is absent, so the anti-tautology scan cannot run and the documents that state it is shipped are describing a check this repository does not have`))
+  }
+  if (executor !== null) {
+    claims.push(...checkExecutorLabelBlindness(executor, EXECUTOR_PATH))
   }
 
   return { ok: claims.length === 0, claims, checked, swept: swept.length }

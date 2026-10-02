@@ -65,7 +65,24 @@ computed `VERIFIED` and a computed `REJECTED` from the same pass.
 
 The static page at `apps/web/index.html` is the same idea in a browser: no client script, no remote
 resource, and its own header line naming the mode. Its verdicts and their reasons are cross-checked
-against `data/demo-questions.json` in `apps/web/test/page.test.ts`.
+against `data/demo-questions.json` in `apps/web/test/page.test.ts`. It is a static renderer and takes
+no input, by design — a text box needs a script, and ADR-C3 forbids one — so the demo surface you
+drive is this CLI.
+
+## 2b. What this release does not do
+
+Two gaps a judge will ask about are boundaries rather than omissions, and neither has a code path
+pretending otherwise:
+
+- **Tafsir: `unavailable`.** `tafsirLookup` returns a typed refusal naming a backend this release does
+  not ship. No tafsir is fabricated, and `.env.example` deliberately does not document a
+  `MIZAN_TAFSIR_URL`, because documenting one would promise a feature that does not exist (A05).
+- **No Arabic interface, no multilingual breadth.** The corpus is Arabic and the interface is English.
+  An Arabic UI is listed as `deferred, disclosed` in `docs/value-proof.md` rather than claimed.
+
+Neither is a crash and neither is a wrong answer: both are the honest states `AGENTS.md` §16 assigns
+them, and the section of `docs/value-proof.md` that says what is not claimed says so about these two
+by name.
 
 ## 3. When the live call fails
 

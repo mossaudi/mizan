@@ -42,18 +42,23 @@ import {
 type Plan = { readonly root: string; readonly checks: readonly CheckName[]; readonly tools: Toolchain }
 
 /**
- * The repository root, as a typecheck-only target.
+ * The repository root, as a target in its own right.
  *
- * `scripts/` is where `bun run ci`, `bun run ingest` and `bun run ingest:check` actually live,
- * and `discoverPackages` globs `packages/*` and `apps/*`, so nothing else in this run touches
- * them. That gap was not theoretical: `scripts/ingest.ts` imported `SourceRegistry` from
- * `@mizan/corpus` when the schema lives in `@mizan/core`, and every package typecheck, every
- * gate and the whole test suite were green while `bun run ingest` failed on a missing export.
- * The test check is deliberately omitted — `bun test` at the root is what section 8 forbids.
+ * `scripts/` is where `bun run ci`, `bun run ingest`, `bun run verify:chain` and
+ * `bun run benchmark` actually live, and `discoverPackages` globs `packages/*` and `apps/*`, so
+ * nothing else in this run touches them. That gap was not theoretical: `scripts/ingest.ts`
+ * imported `SourceRegistry` from `@mizan/corpus` when the schema lives in `@mizan/core`, and
+ * every package typecheck, every gate and the whole test suite were green while `bun run ingest`
+ * failed on a missing export.
+ *
+ * The test half is scoped with `testPaths: ["scripts"]` rather than omitted. A bare `bun test` at
+ * the root walks every package and silently skips any that fails to load, which section 8
+ * forbids; a named directory discovers only what is under it, so `scripts/verify-chain.test.ts`
+ * becomes a guard that can actually fail rather than a file CI typechecks and never runs.
  */
 const rootScripts = (root: string): ExtraPlan => ({
-  plan: { name: "@mizan/scripts", dir: root, rel: "scripts" } satisfies PackagePlan,
-  checks: ["typecheck"],
+  plan: { name: "@mizan/scripts", dir: root, rel: "scripts", testPaths: ["scripts"] } satisfies PackagePlan,
+  checks: ["typecheck", "test"],
 })
 
 /** Parse argv once, so `--only` and the gate-only decision cannot disagree. */

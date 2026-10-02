@@ -186,8 +186,10 @@ describe("the repository's own ADRs — the acceptance criteria, against the rea
     const files = readdirSync(ADR_ROOT)
       .filter((name) => name.startsWith("ADR" + "-") && name.endsWith(".md"))
       .sort()
-    // Six legacy identifiers and the five recorded this cycle — the set the citations name.
-    expect(files).toHaveLength(11)
+    // Six legacy identifiers and the nine recorded since — ADR-C1 through ADR-C9. The count is
+    // asserted rather than left open because a new decision that does not land here is a decision
+    // no citation can resolve, and that is exactly what rule twelve exists to prevent.
+    expect(files).toHaveLength(15)
     const incomplete: string[] = []
     for (const name of files) {
       const claims = checkAdrDocument(readFileSync(join(ADR_ROOT, name), "utf8"), `${ADR_DIRECTORY}/${name}`)

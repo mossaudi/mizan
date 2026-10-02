@@ -348,6 +348,65 @@ describe("the committed page", () => {
     expect(root.scripts["build:web"]).toBe("bun run apps/web/scripts/build-page.ts")
   })
 
+  test("the note saying it takes no input is backed by the document having no input", () => {
+    // The prose claim and the markup are the same claim, so both halves are asserted together. A page
+    // that printed "there is no text box on purpose" while carrying a `<form>` would have the more
+    // convincing lie, and no reader of the sentence would catch it.
+    const page = committedPage()
+    expect(page).toContain("This page makes no request, and takes no input")
+    for (const tag of ["<input", "<form", "<button", "<select", "<textarea", "<label"]) {
+      expect(page.toLowerCase()).not.toContain(tag)
+    }
+  })
+
+  test("the renderer itself declares no input and no request, so a hand edit is the only way in", () => {
+    // The committed bytes are the artefact, and the byte-identity test above already proves the file
+    // is what the renderer produces. This asserts the property on the *source*, which is the earlier
+    // of the two checks: a `<form>` added to `renderPage` is caught here with a failing name rather
+    // than as a byte diff. Read as source rather than as output because the words below appear in the
+    // page's own explanatory prose — `fetch` and "input" are both in the sentence the page prints.
+    const source = readText(join(PACKAGE_DIR, "src", "page.ts"))
+    for (const forbidden of ["<input", "<form", "<button", "fetch(", "XMLHttpRequest", "addEventListener", "onclick", "onchange", "oninput", "onSubmit", "document.query", "window.", "location.", "history.pushState"]) {
+      expect(source).not.toContain(forbidden)
+    }
+  })
+
+  test("the page has no backend to call and no route to be routed to", () => {
+    // ADR-C3's boundary: this is a static file, and there is no server component to route to. The
+    // absence of a `<form action>` or an endpoint URL is checked against the bytes, and the absence of
+    // a package dependency on the CLI or the corpus is checked against the manifest — a page that
+    // imported `runAsk` would render fine and stop being static at the first build.
+    const page = committedPage()
+    expect(page).not.toMatch(/\baction\s*=/i)
+    expect(page).not.toMatch(/\bmethod\s*=\s*["']?(post|get)/i)
+    expect(page).not.toMatch(/\bhref\b/i)
+    const manifest = readJson("apps/web/package.json") as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> }
+    const dependencies = { ...manifest.dependencies, ...manifest.devDependencies }
+    for (const dependency of Object.keys(dependencies)) {
+      expect(dependency).not.toContain("cli")
+      expect(dependency).not.toContain("corpus")
+      expect(dependency).not.toContain("agent")
+      expect(dependency).not.toContain("provider")
+    }
+  })
+
+  test("the guard is armed: an input element and a request are what these assertions forbid", () => {
+    // Planted, so an edit that relaxes the patterns above fails here rather than passing quietly.
+    // These cover the *interactivity* shapes, which are a different claim from the injection ones:
+    // `<input>` and `<form>` are valid HTML and inert as far as injection goes, so `assertNoInjection`
+    // is right not to report them and only this block forbids them. The injection guard is armed
+    // separately above, against the shapes that are actually injection.
+    for (const plant of ["<input>", "<FORM>", "<form>", "<button>", "<textarea>", "<select>"]) {
+      expect(committedPage().toLowerCase()).not.toContain(plant.toLowerCase())
+    }
+    expect(committedPage()).not.toMatch(/\bfetch\s*\(/)
+    expect(committedPage()).not.toMatch(/\son(?:input|change|submit|click)\s*=/i)
+    // The guard is the negation, so prove the negation still fires: each plant above matches the
+    // pattern the assertions use, and the committed page does not.
+    expect("<input name=\"q\">".toLowerCase()).toContain("<input")
+    expect('<form action="/ask">').toMatch(/\baction\s*=/i)
+  })
+
   test("carries no secret, no key reference and no configuration (A05/A07)", () => {
     const page = committedPage()
     for (const forbidden of [".env", "API_KEY", "apiKey", "MIZAN_", "Authorization", "Bearer "]) {

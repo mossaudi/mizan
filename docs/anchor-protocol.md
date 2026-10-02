@@ -132,6 +132,10 @@ The contract, as implemented at step 5b of `verify.ts`:
    read one.
 4. On `located: true` the verdict becomes `unverifiable` with reason `no_matching_evidence`. On
    `located: false` the verdict is `rejected` with reason `quote_absent_at_cited_id` — unchanged.
+   The mapping is stated in one place and it is not this list: `docs/specs/adr/ADR-C7.md` is its
+   authority, it reconciles ADR-C1, and the code is what it records. A specification once proposed
+   the inverse of this table, and `packages/mizan-gate/src/docs-polarity.ts` now reports a document
+   that pairs a locator result or a reason with the verdict the other one requires.
 5. It is **deterministic**: same snapshot, same claim, same output, byte-identical across runs. The
    verifier's determinism guarantee is the repository's central claim, and a probabilistic or
    heuristic locator would break it.

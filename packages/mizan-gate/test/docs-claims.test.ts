@@ -743,6 +743,9 @@ describe("runDocsClaimChecks — the runner, end to end", () => {
     "package.json": JSON.stringify({ scripts: { verify: "bun run scripts/verify-ledger.ts" } }),
     "apps/cli/src/provider-config.ts": providerSource,
     "data/registry/sources.json": goodRegistry,
+    // R19's subject, present because its absence is a finding: `docs/value-proof.md` states that the
+    // anti-tautology scan ships, so a tree without the executor describes a check it does not have.
+    "scripts/benchmark/system-arm.ts": "export const runSystemArm = () => []\n",
   }
 
   test("passes a consistent tree and names what it audited", () => {
@@ -832,10 +835,13 @@ describe("runDocsClaimChecks — the runner, end to end", () => {
   test("a tree with an attestation is checked for quarantine arithmetic, and a wrong table fails", () => {
     // The wiring, not the rule: proves `runDocsClaimChecks` reads `attestation.json` and passes
     // the disclosure through, so the R5 self-test above is not testing a function nothing calls.
+    // `collectionCounts` is present because R18 is fail-closed on an attestation that cannot name a
+    // served collection: the fixture omitting it would now fail for a reason this test is not about.
     const attestation = JSON.stringify({
       recordCount: 27234,
       quarantinedRows: 15026,
       sources: [{ rows: 6236 }, { rows: 36024 }],
+      collectionCounts: { quran: 6236, nasai: 5672 },
     })
     const disclosure = `${clean["DISCLOSURE.md"] ?? ""}\n| | Records |\n| --- | --- |\n| Enabled in the registry | 42260 |\n| Quarantined | 15026 |\n| Served | 27234 |\n`
 

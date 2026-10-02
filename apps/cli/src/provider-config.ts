@@ -1,5 +1,5 @@
 import { err, isErr, ok, type Result } from "@mizan/core"
-import { hostedProvider, transcriptProvider, type Provider, type Transport } from "@mizan/agent"
+import { hostedProvider, ollamaProvider, transcriptProvider, type Provider, type Transport } from "@mizan/agent"
 import { readTranscript } from "./transcript-file.ts"
 
 /**
@@ -265,6 +265,25 @@ export const resolveProvider = async (root: string, transcriptRelative: string):
     { url: endpoint.value, apiKey, model: readEnv(ENV_MODEL) ?? DEFAULT_PROVIDER_MODEL, name: "hosted" },
     transportFor(apiKey),
   )
+}
+
+/**
+ * Resolve the provider with Ollama fallback.
+ *
+ * When all remote providers are unavailable (no API key, no transcript), the system
+ * falls back to a local Ollama instance so demos can proceed fully offline.
+ *
+ * The fallback is automatic: the caller does not need to know which provider was
+ * selected. The provider's `kind` field tells the truth — `"live"` for hosted and
+ * Ollama, `"precomputed"` for transcripts.
+ */
+export const resolveProviderWithFallback = async (root: string, transcriptRelative: string): Promise<Provider> => {
+  const provider = await resolveProvider(root, transcriptRelative)
+  // If the provider is unconfigured (no key, no transcript), fall back to Ollama.
+  if (provider.name === "unconfigured") {
+    return ollamaProvider()
+  }
+  return provider
 }
 
 export * as ProviderConfig from "./provider-config.ts"

@@ -63,6 +63,11 @@ export type DocsRule =
   | "adr-citation-unresolved"
   | "adr-document-incomplete"
   | "corpus-absence-unstated"
+  | "corpus-absence-stated-for-served-collection"
+  | "external-claim-unbacked"
+  | "promise-figure-unbacked"
+  | "executor-label-blindness"
+  | "verdict-polarity-inverted"
   | "runbook-live-after-replay"
   | "runbook-live-unlabelled"
   | "runbook-replay-unlabelled"
@@ -116,9 +121,6 @@ const globPrefix = (token: string): string | null => {
   if (lastSlash === -1) return null
   return prefix.slice(0, lastSlash)
 }
-
-/** Strip the `.ts` line comments and `/** *\/` block comments before scanning. */
-const withoutComments = (text: string): string => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "")
 
 /**
  * R1: every backticked repository path in a document must exist on disk, or be a declared
