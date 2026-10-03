@@ -18,18 +18,18 @@ commit hash.
 |---|---|---|---|---|---|---|
 | 1 | fabricated_doi | fabricated_hadith_id | RT-001 | Easy | unverifiable | `packages/mizan-verify/test/red-team.test.ts` |
 | 2 | nonexistent_venue | nonexistent_collection | RT-002 | Easy | unverifiable | `packages/mizan-verify/test/red-team.test.ts` |
-| 3 | placeholder_authors | placeholder_grade | RT-003 | Easy | unverifiable | `packages/mizan-verify/test/red-team.test.ts` |
-| 4 | future_date | anachronistic_attribution | RT-004 | Easy | unverifiable | `packages/mizan-verify/test/red-team.test.ts` |
+| 3 | placeholder_authors | placeholder_grade | RT-003 | Easy | rejected | `packages/mizan-verify/test/red-team.test.ts` |
+| 4 | future_date | anachronistic_attribution | RT-004 | Easy | rejected | `packages/mizan-verify/test/red-team.test.ts` |
 | 5 | chimeric_title | chimeric_citation | RT-005 | Medium | unverifiable | `packages/mizan-verify/test/red-team.test.ts` |
-| 6 | wrong_venue | wrong_collection | RT-006 | Medium | unverifiable | `packages/mizan-verify/test/red-team.test.ts` |
-| 7 | author_mismatch | misattributed_narrator | RT-007 | Medium | unverifiable | `packages/mizan-verify/test/red-team.test.ts` |
-| 8 | preprint_as_published | weak_grade_as_authentic | RT-008 | Medium | unverifiable | `packages/mizan-verify/test/red-team.test.ts` |
-| 9 | hybrid_fabrication | hybrid_fabrication | RT-009 | Medium | unverifiable | `packages/mizan-verify/test/red-team.test.ts` |
-| 10 | merged_citation | merged_citation | RT-010 | Medium | unverifiable | `packages/mizan-verify/test/red-team.test.ts` |
-| 11 | partial_author_list | partial_quote | RT-011 | Medium | unverifiable | `packages/mizan-verify/test/red-team.test.ts` |
-| 12 | near_miss_title | near_miss_quote | RT-012 | Hard | unverifiable | `packages/mizan-verify/test/red-team.test.ts` |
-| 13 | plausible_fabrication | plausible_fabrication | RT-013 | Hard | unverifiable | `packages/mizan-verify/test/red-team.test.ts` |
-| 14 | arxiv_version_mismatch | version_mismatch | RT-014 | Hard | unverifiable | `packages/mizan-verify/test/red-team.test.ts` |
+| 6 | wrong_venue | wrong_collection | RT-006 | Medium | rejected | `packages/mizan-verify/test/red-team.test.ts` |
+| 7 | author_mismatch | misattributed_narrator | RT-007 | Medium | rejected | `packages/mizan-verify/test/red-team.test.ts` |
+| 8 | preprint_as_published | weak_grade_as_authentic | RT-008 | Medium | rejected | `packages/mizan-verify/test/red-team.test.ts` |
+| 9 | hybrid_fabrication | hybrid_fabrication | RT-009 | Medium | rejected | `packages/mizan-verify/test/red-team.test.ts` |
+| 10 | merged_citation | merged_citation | RT-010 | Medium | rejected | `packages/mizan-verify/test/red-team.test.ts` |
+| 11 | partial_author_list | partial_quote | RT-011 | Medium | rejected | `packages/mizan-verify/test/red-team.test.ts` |
+| 12 | near_miss_title | near_miss_quote | RT-012 | Hard | rejected | `packages/mizan-verify/test/red-team.test.ts` |
+| 13 | plausible_fabrication | plausible_fabrication | RT-013 | Hard | rejected | `packages/mizan-verify/test/red-team.test.ts` |
+| 14 | arxiv_version_mismatch | version_mismatch | RT-014 | Hard | rejected | `packages/mizan-verify/test/red-team.test.ts` |
 
 ## Difficulty Tier Summary
 
@@ -41,15 +41,62 @@ commit hash.
 
 ## Expected Verdicts
 
-All 14 fixtures are expected to produce `unverifiable` (not `verified`). This is because:
+Every fixture must produce a refusal. The column above names **which** refusal, and it is
+exact, because the benchmark scores a case as passed only when the verifier's verdict
+**equals** the declared one (`casePassed` in `packages/mizan-bench/src/report.ts`).
+An earlier version of this matrix declared `unverifiable` for all 14 and excused the
+difference with "a `rejected` verdict is also acceptable" — which reported 11 of 14
+correct red-team verdicts as benchmark failures. The distinction is real, not cosmetic:
 
-- The fabricated quotes are synthetic text that does not exist in the corpus.
-- The citations point to nonexistent or wrong sources.
-- The verifier's fail-closed design means any unresolvable or uncontained citation
-  produces `unverifiable`, never `verified`.
+| Declared verdict | Reason | Fixtures | Why |
+|---|---|---|---|
+| `unverifiable` | `identifier_unresolved` | RT-001, RT-002, RT-005 | The collection or the number is not in the snapshot at all. |
+| `rejected` | `quote_absent_at_cited_id` | RT-003, RT-004, RT-006 … RT-014 | The identifier resolves to a real record and the fabricated quote is not a span of it. |
 
-A `rejected` verdict is also acceptable (the citation resolved to a real record but
-the quote was absent), but `verified` is never acceptable.
+`verified` is never acceptable, and no fixture declares it. The unit suite
+(`test/red-team.test.ts`) runs with **empty** evidence, where nothing can resolve, so it
+observes `unverifiable` for all 14 and asserts the property that must hold in both
+configurations: never `verified`. The snapshot-relative measurement in
+`scripts/benchmark.ts` is what reproduces the column above.
+
+### Correction: 11, not 10
+
+An earlier revision of this document said the inverted verdict column reported **10** of 14
+cases as failures. It reported **11**: RT-003 through RT-014, excluding RT-005. The count is
+now asserted by `test/hallmark-coverage.test.ts`, which reads this table and diffs it against
+`RED_TEAM_FIXTURES` — so a document that drifts from the code fails the suite rather than
+misreporting a number to a judge.
+
+## Disclosure: the Sprint 1 fixtures cited collections this snapshot does not ship
+
+The citation identifiers in the red-team fixtures were changed during Sprint 2, and that
+change was not disclosed when it was made. It is disclosed here because a red-team suite whose
+inputs were re-pointed measures something different from the suite it was declared to be.
+
+**What the Sprint 1 fixtures did.** 11 of the 14 cited `bukhari:1` or `muslim:1` — not shipped.
+Those 11 therefore resolved to zero records, and
+every one of them earned `unverifiable (identifier_unresolved)` for a reason that has nothing
+to do with the hallucination type it was supposed to exercise: the suite reported 14/14 while
+the containment arm — "this source exists, and it does not contain this quote" — never ran
+once.
+
+The six collections `data/corpus.db` ships are `quran`, `nasai`, `abudawud`, `ibnmajah`,
+`tirmidhi` and `malik`, and every identifier cited in the table below resolves against one of
+them.
+
+**What they cite now.** The 11 containment-arm fixtures cite **11 distinct identifiers across
+6 collections**, each of which resolves to a real record, so each earns `rejected
+(quote_absent_at_cited_id)`. Three fixtures stay on the resolution arm deliberately, because
+refusing an identifier we cannot resolve is a separate property from misquoting a source we can:
+
+| Arm | Fixtures | Identifier shape |
+|---|---|---|
+| Containment (`rejected`) | RT-003, RT-004, RT-006 … RT-014 | Resolves to a real record; the fabricated quote is not a span of it |
+| Resolution (`unverifiable`) | RT-001, RT-002, RT-005 | Real collection + number past its end (`tirmidhi:999999`), no such collection, real collection + a number that does not exist (`tirmidhi:0`) |
+
+**Why the disclosure is in this document and not only in the commit.** The fixture table is
+the artefact a judge reads. A correction that lives only in a commit message is invisible to
+the reader who needs it, which makes it the same defect as the one it corrects.
 
 ## Adaptation Notes
 
@@ -74,6 +121,7 @@ DOIs, venues). mizan verifies Qur'an/hadith citations, so the types are adapted:
 ## Security Note
 
 All fabricated text in the red-team fixtures is clearly synthetic (prefixed with
-`FABRICATED_`). No real hadith or Qur'an text is used in red-team test cases. The
-fixtures are in a separate directory from the real corpus and are never loaded into
-corpus.db.
+`FABRICATED_`), and `test/red-team.test.ts` asserts that marker on every fixture. No real
+hadith or Qur'an text is used in red-team cases. The fixtures are declared in
+`packages/mizan-verify/src/red-team.ts` — outside every ingest path — and are never loaded
+into `corpus.db`.

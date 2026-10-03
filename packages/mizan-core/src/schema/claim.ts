@@ -60,4 +60,35 @@ export type Answer = Schema.Schema.Type<typeof Answer>
 /** A claim with no quote and no citation: the shape a bare assertion takes. */
 export const emptyClaim = (id: string, text: string): Claim => ({ id, text, quote: null, citations: [] })
 
+/**
+ * One claim's quote, with "there is no quote" collapsed to `null`.
+ *
+ * ## Why the rule lives here rather than at each call site
+ *
+ * The verifier answers a quote-less claim `unverifiable (empty_quote)` — `verifyClaim` folds the
+ * quote and returns at step 1 when the fold is empty. But that is a *verdict*, and a caller that
+ * has not yet reached the verifier has to decide what to put in the `Claim` it is about to build.
+ * Two boundaries do that: the MCP server's argument decoder and the benchmark harness's case
+ * construction. They had each grown their own copy of the rule, one written `quote === "" ? null`
+ * and one written `fixture.claim.quote ?? ""` — the second of which does not apply the rule at
+ * all, so a case carrying no quote would reach the verifier as an empty STRING.
+ *
+ * That is AGENTS.md section 17 exactly: a duplicated rule is a place where two runs can
+ * legitimately disagree. It is here, beside `Claim`, because it is a fact about a `Claim`'s
+ * `quote` field and about nothing else.
+ *
+ * ## Why trimming, when the fold already trims
+ *
+ * `normalizeForMatch` collapses whitespace and trims, so trimming here changes nothing a verdict
+ * can see. What it buys is a single definition of "no quote": without it, `"   "` is a quote
+ * here and an empty fold there, so the value means one thing at the boundary and another at the
+ * verifier. `null` is the only representation of "this claim asserted no falsifiable span", and
+ * the type says so.
+ */
+export const normalizeQuote = (quote: string | null | undefined): string | null => {
+  if (typeof quote !== "string") return null
+  const trimmed = quote.trim()
+  return trimmed.length === 0 ? null : trimmed
+}
+
 export * as ClaimSchema from "./claim.ts"

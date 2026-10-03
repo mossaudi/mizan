@@ -1,0 +1,2547 @@
+{
+  "schemaVersion": "3",
+  "counts": {
+    "totalCases": 257,
+    "passedCases": 257,
+    "fabricatedCases": 54,
+    "falseVerdicts": 0,
+    "totalSentences": 3,
+    "supportedSentences": 3
+  },
+  "ssr": 1,
+  "falsePositiveRate": 0,
+  "passRate": 1,
+  "suites": [
+    {
+      "name": "golden-live",
+      "metrics": {
+        "passRate": 1,
+        "ssr": 1,
+        "falsePositiveRate": null,
+        "counts": {
+          "totalCases": 3,
+          "passedCases": 3,
+          "fabricatedCases": 0,
+          "falseVerdicts": 0,
+          "totalSentences": 3,
+          "supportedSentences": 3
+        }
+      },
+      "cases": [
+        {
+          "id": "golden-001",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": true
+        },
+        {
+          "id": "golden-002",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": true
+        },
+        {
+          "id": "golden-003",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": true
+        }
+      ]
+    },
+    {
+      "name": "golden-eval",
+      "metrics": {
+        "passRate": 1,
+        "ssr": null,
+        "falsePositiveRate": null,
+        "counts": {
+          "totalCases": 200,
+          "passedCases": 200,
+          "fabricatedCases": 0,
+          "falseVerdicts": 0,
+          "totalSentences": 0,
+          "supportedSentences": 0
+        }
+      },
+      "cases": [
+        {
+          "id": "golden-001",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-002",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-003",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-004",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-005",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-006",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-007",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-008",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-009",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-010",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-011",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-012",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-013",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-014",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-015",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-016",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-017",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-018",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-019",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-020",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-021",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-022",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-023",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-024",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-025",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-026",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-027",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-028",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-029",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-030",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-031",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-032",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-033",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-034",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-035",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-036",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-037",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-038",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-039",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-040",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-041",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-042",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-043",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-044",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-045",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-046",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-047",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-048",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-049",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-050",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-051",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-052",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-053",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-054",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-055",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-056",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-057",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-058",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-059",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-060",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-061",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-062",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-063",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-064",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-065",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-066",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-067",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-068",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-069",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-070",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-071",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-072",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-073",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-074",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-075",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-076",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-077",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-078",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-079",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-080",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-081",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-082",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-083",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-084",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-085",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-086",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-087",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-088",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-089",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-090",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-091",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-092",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-093",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-094",
+          "expectedVerdict": "verified",
+          "scoredBy": "exact",
+          "verdict": "verified",
+          "reason": "exact_containment",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-095",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-096",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-097",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-098",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-099",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-100",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-101",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-102",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-103",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-104",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-105",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-106",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-107",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-108",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-109",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-110",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-111",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-112",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-113",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-114",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-115",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-116",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-117",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-118",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-119",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-120",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-121",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-122",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-123",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-124",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-125",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-126",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-127",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-128",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-129",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-130",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-131",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-132",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-133",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-134",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-135",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-136",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-137",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-138",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-139",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-140",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-141",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-142",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-143",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-144",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-145",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-146",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-147",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-148",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-149",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-150",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-151",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-152",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-153",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-154",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-155",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-156",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-157",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-158",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-159",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-160",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-161",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-162",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-163",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-164",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-165",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-166",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-167",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-168",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-169",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-170",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-171",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-172",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-173",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-174",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-175",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-176",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-177",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-178",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-179",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-180",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-181",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "collection_ambiguous",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-182",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "collection_ambiguous",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-183",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "collection_ambiguous",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-184",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "collection_ambiguous",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-185",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "collection_ambiguous",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-186",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "collection_ambiguous",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-187",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "collection_ambiguous",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-188",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "collection_ambiguous",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-189",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "collection_ambiguous",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-190",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "collection_ambiguous",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-191",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "collection_ambiguous",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-192",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "collection_ambiguous",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-193",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "collection_ambiguous",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-194",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "collection_ambiguous",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-195",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "collection_ambiguous",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-196",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "collection_ambiguous",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-197",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "collection_ambiguous",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-198",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "collection_ambiguous",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-199",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "collection_ambiguous",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "golden-200",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "collection_ambiguous",
+          "passed": true,
+          "contributesSentences": false
+        }
+      ]
+    },
+    {
+      "name": "redteam-eval",
+      "metrics": {
+        "passRate": 1,
+        "ssr": null,
+        "falsePositiveRate": 0,
+        "counts": {
+          "totalCases": 40,
+          "passedCases": 40,
+          "fabricatedCases": 40,
+          "falseVerdicts": 0,
+          "totalSentences": 0,
+          "supportedSentences": 0
+        }
+      },
+      "cases": [
+        {
+          "id": "redteam-001",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-002",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-003",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-004",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-005",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-006",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-007",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-008",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-009",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-010",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-011",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-012",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-013",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-014",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-015",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-016",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-017",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-018",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-019",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-020",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-021",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-022",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-023",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-024",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-025",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-026",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-027",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-028",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-029",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-030",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-031",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-032",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-033",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-034",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-035",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-036",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-037",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-038",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-039",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "redteam-040",
+          "expectedVerdict": "rejected",
+          "scoredBy": "never_verified",
+          "verdict": "unverifiable",
+          "reason": "no_matching_evidence",
+          "passed": true,
+          "contributesSentences": false
+        }
+      ]
+    },
+    {
+      "name": "hallmark-red-team",
+      "metrics": {
+        "passRate": 1,
+        "ssr": null,
+        "falsePositiveRate": 0,
+        "counts": {
+          "totalCases": 14,
+          "passedCases": 14,
+          "fabricatedCases": 14,
+          "falseVerdicts": 0,
+          "totalSentences": 0,
+          "supportedSentences": 0
+        }
+      },
+      "cases": [
+        {
+          "id": "RT-001",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-002",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-003",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-004",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-005",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-006",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-007",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-008",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-009",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-010",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-011",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-012",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-013",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-014",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        }
+      ]
+    },
+    {
+      "name": "hallmark",
+      "derivedFrom": "hallmark-red-team",
+      "metrics": {
+        "passRate": 1,
+        "ssr": null,
+        "falsePositiveRate": 0,
+        "counts": {
+          "totalCases": 14,
+          "passedCases": 14,
+          "fabricatedCases": 14,
+          "falseVerdicts": 0,
+          "totalSentences": 0,
+          "supportedSentences": 0
+        }
+      },
+      "cases": [
+        {
+          "id": "RT-001",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-002",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-003",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-004",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-005",
+          "expectedVerdict": "unverifiable",
+          "scoredBy": "exact",
+          "verdict": "unverifiable",
+          "reason": "identifier_unresolved",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-006",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-007",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-008",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-009",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-010",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-011",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-012",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-013",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        },
+        {
+          "id": "RT-014",
+          "expectedVerdict": "rejected",
+          "scoredBy": "exact",
+          "verdict": "rejected",
+          "reason": "quote_absent_at_cited_id",
+          "passed": true,
+          "contributesSentences": false
+        }
+      ]
+    }
+  ],
+  "outcome": "pass"
+}

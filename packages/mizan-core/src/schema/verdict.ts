@@ -156,6 +156,49 @@ export const ClaimVerdict = Schema.Struct({
 })
 export type ClaimVerdict = Schema.Schema.Type<typeof ClaimVerdict>
 
+/**
+ * The publishable projection of a verdict: the decision, its reason, and its match strength.
+ *
+ * ## Why this exists and why it is not `ClaimVerdict`
+ *
+ * A `ClaimVerdict` carries `evidence`, and evidence carries `sourceUrl`, `license` and
+ * `attribution` — corpus metadata about rows we fetched. A surface that returns the whole
+ * verdict therefore returns corpus metadata whether or not it meant to. Two projections of the
+ * same fact in two places is how one of them grows a field the other does not, so this is the
+ * one place that says what a verdict looks like when it leaves the process, and both the MCP
+ * tool result and the wire schema are derived from it.
+ *
+ * ## Why the projection is named rather than inlined
+ *
+ * It began as an object literal in the MCP server, which gate G-6.4 reported as an ad-hoc
+ * match strength. The gate was right about the shape: a call site that re-keys `matchStrength`
+ * is one edit away from writing one. Naming it here puts the field list beside the type it
+ * projects — `ClaimVerdict` — so the two cannot drift, and the gate's allowlist (`this file`
+ * and `verify.ts` own the two match shapes) stays as narrow as it was written to be.
+ *
+ * ## `matchStrength`, not a computed label
+ *
+ * `trace.ts` publishes `summariseClaim`, which flattens the strength to the single word
+ * `exact` | `none`. That is the right shape for a hash-only trace and the wrong shape for a
+ * tool result, where a client may want the constrained `{ kind, percent }` pair. Two
+ * projections, two audiences, one owner each — and neither invents a third match shape.
+ */
+export const VerdictSummary = Schema.Struct({
+  claimId: Schema.String,
+  verdict: Verdict,
+  reason: VerdictReason,
+  matchStrength: MatchStrength,
+})
+export type VerdictSummary = Schema.Schema.Type<typeof VerdictSummary>
+
+/** @see VerdictSummary */
+export const summariseVerdict = (verdict: ClaimVerdict): VerdictSummary => ({
+  claimId: verdict.claimId,
+  verdict: verdict.verdict,
+  reason: verdict.reason,
+  matchStrength: verdict.matchStrength,
+})
+
 export const DegradeReason = Schema.Union([
   Schema.Literal("provider_unavailable"),
   Schema.Literal("provider_timeout"),

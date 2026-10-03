@@ -1,4 +1,4 @@
-import type { Claim, ClaimVerdict, Relevance, ResolvedCitation, VerdictReport } from "@mizan/core"
+import type { Claim, ClaimVerdict, DetectionBasis, Relevance, ResolvedCitation, VerdictReport } from "@mizan/core"
 import { badgeFor, normalizeForTerminal, transcriptLabel } from "@mizan/core"
 import type { TranscriptSource } from "@mizan/agent"
 import { longestRunFor, resolutionKey } from "@mizan/verify"
@@ -261,11 +261,60 @@ const renderClaim = (verdict: ClaimVerdict, claim: Claim | undefined, sources: S
   return lines
 }
 
+/**
+ * The detected question language, as the boundary reported it.
+ *
+ * Carried into the header so US-13's support is observable rather than asserted: a reader can see
+ * which language the program decided it was asked in, and which direction that language runs. The
+ * native language NAME is never printed, because the header is the one part of the report a judge
+ * screenshots and a language tag is enough to check the detection without printing the question
+ * anywhere it did not have to be (AGENTS.md section 13).
+ *
+ * `basis` is present because a marker heuristic cannot always tell two languages apart, and "we
+ * detected Malay" is not something this program is entitled to say when Malay and Indonesian scored
+ * the same. A tag guessed at the table's whim and a tag from a marker only one language has must not
+ * read the same on the line a judge screenshots.
+ */
+export type QuestionLanguage = {
+  readonly language: string
+  readonly rtl: boolean
+  /**
+   * How the language was decided. Absent renders no qualifier, which is the right behaviour for the
+   * only basis that needs no caveat and for any caller that has not been taught to pass one — an
+   * absent qualifier must never be read as a confident one, so `detected` is the default word rather
+   * than `unknown`.
+   */
+  readonly basis?: DetectionBasis
+}
+
+/** The basis word for a detection, and the qualifier to print when it is not the confident case. */
+const BASIS_QUALIFIER: Readonly<Record<DetectionBasis, string>> = {
+  marker: "detected",
+  "sole-script-language": "sole script language",
+  "script-default": "script default, no marker matched",
+  "ambiguous-markers": "ambiguous: several languages matched equally",
+}
+
+/**
+ * The language line, with its evidence.
+ *
+ * The qualifier appears only where the evidence is weaker than the word "detected" would imply, so a
+ * screenshot of a Persian question does not carry a caveat the reader has to decode, and a screenshot
+ * of an Arabic question with no marker carries one it cannot miss.
+ */
+const languageLine = (question: QuestionLanguage): string => {
+  const direction = question.rtl ? "rtl" : "ltr"
+  const qualifier = question.basis === undefined ? "detected" : BASIS_QUALIFIER[question.basis]
+  return `language     ${question.language} (${direction}, ${qualifier})`
+}
+
 export const renderHeader = (options: {
   readonly transcript: TranscriptSource
   readonly model: string
   readonly snapshotHash: string
   readonly sourceCount: number
+  /** Absent for a report assembled without a question, which renders no language line at all. */
+  readonly question?: QuestionLanguage
 }): string =>
   [
     bar(64),
@@ -277,6 +326,7 @@ export const renderHeader = (options: {
     // drift apart (AGENTS.md section 17).
     `transcript    ${transcriptLabel(options.transcript)}`,
     `snapshot      ${options.snapshotHash.slice(0, 16)}…`,
+    ...(options.question === undefined ? [] : [languageLine(options.question)]),
     bar(64),
   ].join("\n")
 
@@ -296,8 +346,18 @@ export const renderReport = (options: {
   readonly model: string
   readonly sourceCount: number
   readonly snapshotHash: string
+  /** The language the boundary detected. Omitted when there was no question to detect. */
+  readonly question?: QuestionLanguage
 }): string => {
-  const sections: string[] = [renderHeader({ transcript: options.transcript, model: options.model, snapshotHash: options.snapshotHash, sourceCount: options.sourceCount })]
+  const sections: string[] = [
+    renderHeader({
+      transcript: options.transcript,
+      model: options.model,
+      snapshotHash: options.snapshotHash,
+      sourceCount: options.sourceCount,
+      question: options.question,
+    }),
+  ]
   sections.push(normalizeForTerminal(options.prose))
   sections.push("")
   // `verifyAnswer` preserves the caller's claim order, so index `i` of the report is the verdict

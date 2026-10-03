@@ -44,10 +44,19 @@ export const EXIT_USAGE = 2
 export const EXIT_UNTRUSTED = 3
 
 /**
- * The 7 named exit codes for the 7 failure modes in the degradation matrix.
+ * The 7 named aliases for the 7 failure modes in the degradation matrix.
  *
- * Each failure mode has a unique non-zero exit code so a harness can distinguish
- * between them. The codes are documented in `docs/degradation-matrix.md`.
+ * ## Why these are aliases and not a code per failure mode
+ *
+ * This comment used to claim that "each failure mode has a unique non-zero exit code so a harness
+ * can distinguish between them". That was false, and it was false in the direction that matters:
+ * the table underneath holds 1, 1, 1, 3, 3, 1, 1 — **two** distinct values across seven failure
+ * modes, because a run that cannot answer a question and a run whose model was unreachable are the
+ * same fact to a shell. A constant block that overstates its own granularity is a comment a reviewer
+ * trusts and a harness cannot rely on, so the claim is restated as what is actually true: each mode
+ * has a name, and the name maps to one of two codes a shell can branch on. The per-mode distinction
+ * lives in the message the entry point prints and in `docs/degradation-matrix.md`, not in the code,
+ * because a shell cannot read the message.
  */
 
 /** Failure mode 1: Provider down — LLM provider unreachable. */

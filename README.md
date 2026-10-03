@@ -83,7 +83,9 @@ The rest of the surface needs the full corpus, which is 27,234 records and about
 ```bash
 bun run ingest                 # fetch sources, build the snapshot and the registry (gitignored)
 bun run ask "your question"
+bun run benchmark              # every eval set and the HALLMARK fixtures: one report, one exit code
 bun run benchmark:vs-search    # the red-team set through plain FTS5 search and through mizan
+bun run mcp                    # the read-only verifier as a Model Context Protocol server on stdio
 bun run ci                     # typecheck + tests + the seven structural gates
 ```
 
@@ -97,6 +99,22 @@ configuration they were produced under, and `bun run benchmark:vs-search` prints
 deliberately restates none of them: until a check compares a number in prose against that
 artefact, a quoted figure is an unchecked claim, and the point of the benchmark is that its number
 can be re-run.
+
+`bun run benchmark` runs every suite in `data/benchmark/benchmark-report.json`: the golden claims
+measured against the shipped snapshot, both committed eval sets from `data/eval/` — the normalization
+cases and the fabrications — and the HALLMARK fixtures, plus a per-type roll-up marked as derived so
+it cannot be counted twice. The committed eval sets build their own snapshot from their own anchors,
+so those suites are hermetic and still run on a checkout with no corpus downloaded.
+
+Each row in that report names the bar its case was held to, and the fabrication suite is held to the
+published one: no fabrication may come back `verified`. That is deliberately not the same thing as
+the per-case verdict written in `data/eval/`, which the adjudication record publishes as moved from
+`rejected` to `unverifiable` for all of them — a human ruling that a text is fabricated, measured by a
+verifier that cannot locate the anchor and says so. The report prints what the verifier returned as
+well as what the case was held to, so the difference is visible rather than summarised away.
+
+The report is a record, not a claim: `bun run benchmark` writes it, and `scripts/benchmark.test.ts`
+fails if the file on disk is not byte-identical to a fresh run of the same corpus.
 
 With no API key configured — the state of a fresh checkout — `bun run ask` replays a committed
 transcript and says so on every line. It never presents a precomputed answer as a live generation.
@@ -112,6 +130,30 @@ order or either label changes.
 # A number that does not exist: unverifiable, because you cannot prove a negative.
 bun test --cwd apps/cli
 ```
+
+### Or over MCP, read-only
+
+`bun run mcp` starts the verifier as a Model Context Protocol server on stdio. It exposes one tool,
+`verify`, takes a list of claims each carrying its own quotes and citations, and returns one verdict
+per claim — `verified`, `rejected` or `unverifiable` — together with the match strength. It has no
+tool that writes, and no tool that returns corpus text: a client learns *whether* a quote is in the
+record it was cited to and nothing about what else is in it.
+
+The transcript is reproducible, so the server is checkable rather than described:
+
+```bash
+$ printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+  '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"verify","arguments":{"claims":[{"claimId":"c-1","text":"لا تقبل صلاه بغير طهور ولا صدقه من غلول","quote":"لا تقبل صلاه بغير طهور ولا صدقه من غلول","citations":[{"collection":"tirmidhi","number":"1","raw":"tirmidhi:1"}]}]}}}' \
+  | bun run mcp
+```
+
+A request that exceeds the frame limit is refused by name rather than truncated. The framing is
+newline-delimited JSON-RPC - one request per line - and the reader buffers a partial line until its
+terminator arrives, so a value split across two TCP chunks is reassembled rather than misread. The
+server reads the corpus read-only: it cannot modify the snapshot it is attesting against. Malformed
+requests get a JSON-RPC error, never a verdict.
 
 ---
 

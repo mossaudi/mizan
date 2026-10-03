@@ -182,10 +182,10 @@ this repository on anyone's behalf.
 | Committed fabricated set to be caught | no | no | no | partial | shared task | **yes** |
 | Interactive demo surface | CLI | app | docs | app | not applicable | static page |
 | Live-vs-replay disclosure | not applicable | not applicable | not applicable | not applicable | not applicable | **yes** |
-| Read-only API endpoint | no | yes | yes | yes (MCP) | no | **deferred, disclosed** |
+| Read-only API endpoint | no | yes | yes | yes (MCP) | no | **yes (MCP, read-only)** |
 | Arabic interface | yes | no | yes | no | yes | **deferred, disclosed** |
 | Bukhari and Muslim corpus | partial | partial | yes | no | no | **deferred, disclosed** |
-| Multilingual breadth | yes | no | no | yes | no | **deferred, disclosed** |
+| Multilingual breadth | yes | no | no | yes | no | **partial, disclosed** |
 | Tafsir | no | no | yes | no | no | **deferred, disclosed** |
 | Externally run benchmark | yes (IslamicMMLU) | no | no | no | yes (norms) | **not yet claimed** |
 
@@ -230,7 +230,34 @@ silently, and a green run there can mean "nothing was collected".
   attestation by name.
 - **No grade is ours.** A grade is stored exactly as its source dataset asserts it, with its source
   and basis, or as `null` when the dataset carries none (ADR-06).
-- **Deferred, not hidden.** A read-only API endpoint, an Arabic interface, multilingual breadth and
-  tafsir are not built. `tafsirLookup` returns a typed `unavailable` refusal rather than a fabricated
-  tafsir, and no multilingual UI is implemented. They are listed above as `deferred, disclosed`
-  because an omission a judge discovers is worse than one this document admits.
+- **Deferred, not hidden.** An Arabic interface, a multilingual interface and tafsir are not built.
+  `tafsirLookup` returns a typed `unavailable` refusal rather than a fabricated tafsir, and no
+  multilingual UI is implemented. They are listed above as `deferred, disclosed` because an omission
+  a judge discovers is worse than one this document admits. The read-only API endpoint is no longer
+  in this list: it is the stdio MCP server in `packages/mizan-mcp`, which exposes one tool and no
+  way to write. Its transcript is verifiable with `bun run mcp`, and it returns verdicts with match
+  strength but no corpus text.
+- **Multilingual breadth is partial, not deferred — and the boundary is drawn here.** `processQuestion`
+  in `@mizan/core` detects the language of a question across 44 languages, flags right-to-left ones,
+  and refuses a payload-shaped question at the boundary. `bun run ask` calls it before it opens the
+  corpus, resolves a provider or composes any SQL, and the report header prints the detected language
+  tag and direction, so the support is observable rather than asserted. Verification is
+  language-agnostic: it compares a folded quote against a corpus record, and neither knows what
+  language the question was in. What is **not** built is a translated interface or a translated
+  answer — a question in Urdu is answered from an Arabic corpus, so it comes back in Arabic. The
+  count is 44, pinned exactly by `packages/mizan-core/test/i18n.test.ts`: an earlier draft of this
+  document published 45 against a list of 44, and the only assertion behind it was `>= 25`, which the
+  wrong number passed as readily as the right one.
+
+  **What "detects" is worth.** The detector is a script test followed by whole-word markers, and it
+  says so on the same header line as the tag: `language  ms (ltr, ambiguous: several languages matched
+  equally)`. Nineteen pairs of languages in the table share at least one marker, so a text built from
+  only shared markers genuinely cannot be told apart — Malay and Indonesian share sixteen, and Spanish,
+  Portuguese, Italian and French share enough that a question can tie across four at once. Where
+  candidates tie, the tag is the table-order winner, which is arbitrary among the tied set and is
+  labelled `ambiguous` rather than presented as a detection. Where no marker matches at all — the
+  common case for Arabic, which carries no markers in the table — the script default is used and the
+  line reads `script default, no marker matched`. Nineteen single-language scripts are decided by the
+  script alone, and those say `sole script language` instead of `detected`, because nothing was
+  detected. What the tag is *not* is a routing decision: nothing downstream branches on it, so a wrong
+  tag costs a reader a mislabelled header and the verifier not at all.

@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { RED_TEAM_FIXTURES } from "./red-team-fixtures.ts"
+import { HALLMARK_TYPES, RED_TEAM_FIXTURES } from "./red-team-fixtures.ts"
+
+/**
+ * The committed coverage matrix, as an absolute path.
+ *
+ * Declared once so the four assertions below that read it cannot disagree about which file they read.
+ */
+const MATRIX_PATH = join(import.meta.dir, "..", "..", "..", "docs", "hallmark-coverage-matrix.md")
 
 /**
  * HALLMARK 14-type coverage matrix test.
@@ -19,26 +26,20 @@ import { RED_TEAM_FIXTURES } from "./red-team-fixtures.ts"
  * The HALLMARK benchmark's core finding is that the false-positive rate, not recall,
  * decides whether a verifier is deployable. This test ensures mizan's verifier handles
  * every known hallucination category, not just the easy ones.
+ *
+ * ## The taxonomy is imported, not retyped
+ *
+ * This file used to declare its own copy of the 14 type strings. That is a second answer to "what
+ * are the HALLMARK types" which can agree with the fixtures while being wrong about the paper, and
+ * a coverage test that enumerates the taxonomy from the same place the fixtures are built is the
+ * only version that can notice a type nobody implemented (AGENTS.md section 17).
  */
 
-const HALLMARK_TYPES = [
-  "fabricated_doi",
-  "nonexistent_venue",
-  "placeholder_authors",
-  "future_date",
-  "chimeric_title",
-  "wrong_venue",
-  "author_mismatch",
-  "preprint_as_published",
-  "hybrid_fabrication",
-  "merged_citation",
-  "partial_author_list",
-  "near_miss_title",
-  "plausible_fabrication",
-  "arxiv_version_mismatch",
-] as const
-
 describe("HALLMARK 14-type coverage", () => {
+  test("the published taxonomy is the 14 types, so a shortened list cannot quietly pass this suite", () => {
+    expect(HALLMARK_TYPES).toHaveLength(14)
+  })
+
   test("all 14 HALLMARK types are mapped", () => {
     const mappedTypes = RED_TEAM_FIXTURES.map((f) => f.hallmarkType)
     for (const type of HALLMARK_TYPES) {
@@ -80,16 +81,14 @@ describe("HALLMARK 14-type coverage", () => {
   })
 
   test("the coverage matrix document is present", () => {
-    const matrixPath = join(import.meta.dir, "..", "..", "..", "docs", "hallmark-coverage-matrix.md")
-    const content = readFileSync(matrixPath, "utf8")
+    const content = readFileSync(MATRIX_PATH, "utf8")
     expect(content).toContain("HALLMARK")
     expect(content).toContain("RT-001")
     expect(content).toContain("RT-014")
   })
 
   test("the coverage matrix includes the HALLMARK paper reference", () => {
-    const matrixPath = join(import.meta.dir, "..", "..", "..", "docs", "hallmark-coverage-matrix.md")
-    const content = readFileSync(matrixPath, "utf8")
+    const content = readFileSync(MATRIX_PATH, "utf8")
     expect(content).toContain("arXiv:2607.18360")
   })
 
@@ -98,5 +97,33 @@ describe("HALLMARK 14-type coverage", () => {
       expect(fixture.claim.text).toContain("FABRICATED")
       expect(fixture.claim.quote).toContain("FABRICATED")
     }
+  })
+
+  test("the matrix document's declared verdicts are the fixtures' declared verdicts", () => {
+    // The document is the citable artefact, so it is a second published answer to "what does RT-004
+    // earn?". It WAS a second answer, and it was the wrong one: the matrix printed `unverifiable` for
+    // all 14 while the fixtures earned `rejected` for 11 of them, and the benchmark then reported 10
+    // correct verdicts as failures. A document nobody diffs against the code is a document that
+    // drifts, so the diff is the test.
+    const matrix = readFileSync(MATRIX_PATH, "utf8")
+    const rowOf = (id: string): string | undefined =>
+      matrix.split("\n").find((line) => line.startsWith(`| `) && line.includes(`| ${id} |`))
+
+    for (const fixture of RED_TEAM_FIXTURES) {
+      const row = rowOf(fixture.id)
+      expect(row).toBeDefined()
+      // Column 6 of the matrix table is the expected verdict. Sliced by cell boundary so the fixture
+      // id in column 4 and the test file path in column 7 cannot be mistaken for it.
+      const cells = (row ?? "").split("|").map((cell) => cell.trim())
+      expect(cells[6]).toBe(fixture.expectedVerdict)
+    }
+  })
+
+  test("no fixture declares `verified`, because that is the one verdict this suite exists to forbid", () => {
+    // The field's type already forbids it, so this is a guard on the type, not on the data: it fails
+    // the moment somebody widens `expectedVerdict` to include `verified`, which is the single edit
+    // that would let the suite declare its own failure as an expectation.
+    const declared = new Set(RED_TEAM_FIXTURES.map((fixture) => fixture.expectedVerdict))
+    expect(declared.has("verified" as (typeof RED_TEAM_FIXTURES)[number]["expectedVerdict"])).toBe(false)
   })
 })

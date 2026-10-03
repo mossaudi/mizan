@@ -33,7 +33,7 @@ export { displayWidth, isBareControl, stripTerminalControls, ESC, ZERO_WIDTH } f
 
 export { decodeOrFail, decodeSync, describeDecodeFailure, type Decodable, type DecodeFailure } from "./schema/decode.ts"
 export { ANCHOR_PROTOCOL_VERSION, AnchorAdjudication, AnchorAdjudicationSet, AnchorSpan } from "./schema/anchor.ts"
-export { Answer, Citation, Claim, emptyClaim } from "./schema/claim.ts"
+export { Answer, Citation, Claim, emptyClaim, normalizeQuote } from "./schema/claim.ts"
 export { BaselineDeclaration, BenchmarkOutcome, BenchmarkResult, BENCHMARK_SCHEMA_VERSION, HONEST_BASELINE, PRE_REGISTERED_HYPOTHESIS, METHOD_NOT_PUBLISHED, PEER_REGISTER_VERSION, PeerFigure, PeerMethod, PeerRegister, peerStatesAFigure } from "./schema/benchmark.ts"
 export { COVERAGE_SCHEMA_VERSION, CollectionCoverage, CoverageTotals, QuarantineCoverage, SourceCoverage } from "./schema/coverage.ts"
 export { Correction, CorrectionSpan, LocatedCorrection, Relevance, RelevanceState, UnverifiableCorrection } from "./schema/display.ts"
@@ -58,10 +58,12 @@ export {
   Verdict,
   VerdictReason,
   VerdictReport,
+  VerdictSummary,
   badgeFor,
   evidenceIsPresent,
   exactMatchStrength,
   noMatchStrength,
+  summariseVerdict,
 } from "./schema/verdict.ts"
 export {
   ChainHead,
@@ -81,3 +83,20 @@ export {
   traceDigest,
   transcriptLabel,
 } from "./schema/trace.ts"
+
+export {
+  SUPPORTED_LANGUAGES,
+  LANGUAGE_COUNT,
+  detectLanguage,
+  detectLanguageWithBasis,
+  isSupportedLanguage,
+  isRtlLanguage,
+  getLanguage,
+  validateQuestion,
+  processQuestion,
+  rtlLanguages,
+  ltrLanguages,
+  type Detection,
+  type DetectionBasis,
+  type Language,
+} from "./i18n.ts"

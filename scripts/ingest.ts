@@ -3,7 +3,6 @@ import { existsSync } from "node:fs"
 import { readFile } from "node:fs/promises"
 import { decodeOrFail, decodeSync, describeDecodeFailure, err, isErr, ok, SourceRegistry, type Decodable, type Result } from "@mizan/core"
 import {
-  AttestationSchema,
   auditCommittedCorpus,
   decodeAttestationText,
   decodeLedgerText,

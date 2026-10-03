@@ -4,6 +4,7 @@ import { GENESIS_PREV_HASH, isSha256Hex, sha256Hex, shortHash } from "../src/has
 import { describeError, err, errorTag, flatMap, isErr, isOk, mapError, mapResult, ok, unwrapOrThrow, type Result } from "../src/result.ts"
 import { withDeadline } from "../src/time.ts"
 import { decodeOrFail, decodeSync, type DecodeFailure } from "../src/schema/decode.ts"
+import { normalizeQuote } from "../src/schema/claim.ts"
 import { Schema } from "effect"
 
 describe("Result", () => {
@@ -130,5 +131,47 @@ describe("withDeadline", () => {
       () => "timeout",
     )
     expect(value).toBe("timeout")
+  })
+})
+
+/**
+ * One rule for "this claim asserted no falsifiable span".
+ *
+ * ## Why this has its own block rather than living inside another test
+ *
+ * The rule was applied twice at two boundaries — the MCP argument decoder wrote `quote === "" ? null`
+ * and the benchmark harness wrote `fixture.claim.quote ?? ""` — and the second of those does not
+ * apply it at all. Two copies of a business rule is where two runs can legitimately disagree
+ * (AGENTS.md section 17), so it lives beside `Claim` and both call it. What is asserted here is
+ * that the ONE rule covers every representation of absence, because the verifier answers all of
+ * them `unverifiable (empty_quote)` and a boundary that treats one of them as a real quote hands
+ * the verifier a span nobody quoted.
+ */
+describe("normalizeQuote", () => {
+  const ABSENT: readonly (string | null | undefined)[] = [null, undefined, "", " ", "\t\n  "]
+
+  test("every representation of no quote is the same value: null", () => {
+    for (const quote of ABSENT) {
+      expect(normalizeQuote(quote)).toBeNull()
+    }
+  })
+
+  test("a real span survives, and comes back trimmed", () => {
+    expect(normalizeQuote("  لا تقبل صلاه بغير طهور  ")).toBe("لا تقبل صلاه بغير طهور")
+  })
+
+  test("a span of diacritics is NOT absent here", () => {
+    // The fold, not this function, is what decides that a diacritics-only span has nothing to
+    // contain. Collapsing it here would replace the verifier's named reason (`empty_quote`) with a
+    // boundary decision the verdict does not record, so the value is passed through and the reason
+    // stays where a reader can find it.
+    expect(normalizeQuote("ْ")).toBe("ْ")
+  })
+
+  test("a bidi control around a real span is kept, not silently rewritten", () => {
+    // R12 is a render-time control; a quote is evidence, so nothing here is stripped. Asserted
+    // because the tempting one-liner would be `normalize(quote)`, and that function folds letter
+    // forms the corpus licence forbids us from altering.
+    expect(normalizeQuote("بسم")).toBe("بسم")
   })
 })

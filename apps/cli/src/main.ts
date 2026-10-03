@@ -6,6 +6,7 @@ import {
   err,
   isErr,
   ok,
+  processQuestion,
   transcriptLabel,
   type Result,
   type RunTraceDraft,
@@ -13,9 +14,9 @@ import {
 import { attestSnapshot, describeAttestationProblem, openSnapshot, readSnapshotMeta, resolveCitations } from "@mizan/corpus"
 import { verifyAnswer } from "@mizan/verify"
 import type { Provider } from "@mizan/agent"
-import { runSpine, transcriptProvider } from "@mizan/agent"
+import { runSpine } from "@mizan/agent"
 import { appendRunTrace } from "@mizan/provenance"
-import { buildSourceTable, renderReport } from "./render.ts"
+import { buildSourceTable, renderReport, type QuestionLanguage } from "./render.ts"
 import { assessRelevance } from "./relevance.ts"
 import { makeRetriever } from "./retriever.ts"
 import { buildDraft, buildTimings } from "./trace-build.ts"
@@ -124,7 +125,7 @@ const readAttestedSnapshot = async (root: string, db: Database): Promise<Result<
 }
 
 /** The whole pipeline, with the database closed on every path out. */
-const ask = async (root: string, db: Database, question: string, snapshotHash: string): Promise<number> => {
+const ask = async (root: string, db: Database, question: string, snapshotHash: string, asked: QuestionLanguage): Promise<number> => {
   const startedAt = performance.now()
   const retriever = makeRetriever(db)
   const provider: Provider = await resolveProvider(root, TRANSCRIPT_RELATIVE)
@@ -194,6 +195,7 @@ const ask = async (root: string, db: Database, question: string, snapshotHash: s
       model: provider.model,
       sourceCount: outcome.contexts.length,
       snapshotHash,
+      question: asked,
     }),
   )
 
@@ -255,6 +257,29 @@ const main = async (): Promise<number> => {
     return EXIT_USAGE
   }
 
+  // US-13's boundary. The question is user input crossing into the system, so it is decoded and
+  // validated before anything is opened, any provider is resolved, or any SQL is composed — the one
+  // place where refusing is cheap and unambiguous. It is also the ONLY product caller of
+  // `processQuestion`: before this, the module was exported from `@mizan/core` and imported by
+  // nothing but its own test, which made "we accept questions in 44 languages" a claim with no
+  // route to the code that would have to honour it.
+  //
+  // `EXIT_USAGE` and not `EXIT_DEGRADED`, because nothing degraded: no verdict was computed, no
+  // provider was called, and no trace exists. The two failures — a payload-shaped question and an
+  // undetectable one — are both "you invoked me wrongly", and the message names which, because
+  // "rejected" without a reason is the surface §16 forbids.
+  const asked = processQuestion(question)
+  if (isErr(asked)) {
+    console.error(`ask REFUSED - ${asked.error}`)
+    console.error("  No answer was produced. Nothing was retrieved, generated or verified.")
+    return EXIT_USAGE
+  }
+  const askedLanguage: QuestionLanguage = {
+    language: asked.value.language,
+    rtl: asked.value.rtl,
+    basis: asked.value.basis,
+  }
+
   const corpusPath = `${root}/${CORPUS_RELATIVE}`
   if (!existsSync(corpusPath)) {
     // Not a degradation — a missing prerequisite, said plainly.
@@ -274,7 +299,7 @@ const main = async (): Promise<number> => {
       console.error(`  Rebuild the corpus with \`bun run ingest\`, or check that ${ATTESTATION_RELATIVE} matches it.`)
       return EXIT_UNTRUSTED
     }
-    return await ask(root, db, question, attested.value)
+    return await ask(root, db, question, attested.value, askedLanguage)
   } finally {
     // Every exit path closes the handle. The earlier version closed only on success, which
     // leaked the SQLite handle on exactly the degradation paths an operator debugs most.

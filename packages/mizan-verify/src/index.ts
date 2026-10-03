@@ -23,4 +23,11 @@ export { coerceClaimVerdict, coerceFailClosed, evidenceIsConsistent, type Coerce
 export { anchorFrom, appearsInOrder, locateAnchor, ANCHOR_MIN_WORDS, ANCHOR_MAX_WORDS, ANCHOR_MAX_CHARS, type OrderedRun } from "./steps/anchor.ts"
 export { verifyAnswer, type VerifyInput } from "./verify.ts"
 export { computeSsr, segmentSentences } from "./ssr.ts"
+export {
+  HALLMARK_TYPES,
+  RED_TEAM_FIXTURES,
+  type DifficultyTier,
+  type HallmarkType,
+  type RedTeamFixture,
+} from "./red-team.ts"
 export { longestRunFor, locatedSpanFor, type LongestRun, type LocatedSpan } from "./diagnostics/longest-run.ts"

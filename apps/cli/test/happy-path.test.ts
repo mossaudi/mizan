@@ -9,6 +9,19 @@ import { openSnapshot, readSnapshotMeta, resolveCitations } from "@mizan/corpus"
 import { runSpine, transcriptProvider, type RetrievedContext } from "@mizan/agent"
 import { verifyAnswer } from "@mizan/verify"
 import { preserveCommittedLedger, spawnCli } from "./committed-ledger.ts"
+import {
+  EXIT_ATTESTATION_MISMATCH,
+  EXIT_CORPUS_MISS,
+  EXIT_DEGRADED,
+  EXIT_LEDGER_WRITE_FAILURE,
+  EXIT_OK,
+  EXIT_PROVIDER_DOWN,
+  EXIT_RANKER_DOWN,
+  EXIT_TAFSIR_UNREACHABLE,
+  EXIT_UNTRUSTED,
+  EXIT_USAGE,
+  EXIT_VERIFICATION_TIMEOUT,
+} from "../src/exit-codes.ts"
 
 /**
  * The demo must work, not just the unit tests.
@@ -212,6 +225,52 @@ describe("the CLI's exit code tells a caller whether it got an answer", () => {
     expect(output).toContain("PRECOMPUTED")
   }, 60_000)
 
+  test.skipIf(!CORPUS_PRESENT)("the report states which language the question was asked in", async () => {
+    // US-13 made observable rather than asserted. Before this, `processQuestion` was exported from
+    // `@mizan/core` and imported by nothing but its own test, so "we take questions in 44
+    // languages" had no route to any code a user can reach. The language tag is printed in the
+    // header, which is the part of the report a judge screenshots.
+    const { code, output } = await run(QUESTION)
+    expect(code).toBe(0)
+    expect(output).toContain("language     en (ltr, detected)")
+  }, 60_000)
+
+  test.skipIf(!CORPUS_PRESENT)("a question that merely uses a SQL word is asked, not refused", async () => {
+    // The boundary must not refuse a real question. The previous filter rejected `\bsystem\b` and
+    // `\bdelete\b` on sight, so this reached the user as a refusal with a security label on it.
+    // The committed transcript covers no such question, so the honest outcome here is that the run
+    // got as far as asking the provider - and "model unavailable" is that outcome. What must NOT
+    // happen is the boundary refusing it: that is the assertion.
+    const { code, output } = await run("Explain the system of prayer in Islam.")
+    expect(output).not.toContain("ask REFUSED")
+    expect(code).not.toBe(EXIT_USAGE)
+  }, 60_000)
+
+  test.skipIf(!CORPUS_PRESENT)("a payload-shaped question is refused at the boundary, before anything runs", async () => {
+    // Refusal at the boundary is the cheap, unambiguous place: nothing is opened, no provider is
+    // resolved, no SQL is composed, and no trace exists - which is why this is EXIT_USAGE and not
+    // EXIT_DEGRADED. A degraded run has a record; this has none.
+    const { code, output } = await run("'; DROP TABLE records; --")
+    expect(code).toBe(EXIT_USAGE)
+    expect(output).toContain("ask REFUSED")
+    // The message names the reason. "Rejected" without one is the surface AGENTS.md section 16
+    // forbids, and a user who cannot tell why their question was refused cannot ask a different one.
+    expect(output).toContain("injection")
+    // And nothing that could be mistaken for an answer.
+    expect(output).not.toContain("VERIFIED")
+    expect(output).not.toContain("UNVERIFIABLE")
+    expect(output).not.toContain("model unavailable")
+  }, 60_000)
+
+  test.skipIf(!CORPUS_PRESENT)("a question in an undetectable script is refused, and says so", async () => {
+    // The other boundary refusal, and a different fact from the one above: mizan cannot read this,
+    // rather than mizan will not read it. Both are usage errors; neither is a verdict.
+    const { code, output } = await run("1234")
+    expect(code).toBe(EXIT_USAGE)
+    expect(output).toContain("ask REFUSED")
+    expect(output).toContain("could not detect")
+  }, 60_000)
+
   /**
    * The trace records what actually happened, not a plausible-looking summary.
    *
@@ -271,6 +330,62 @@ describe("the CLI's exit code tells a caller whether it got an answer", () => {
     expect(timings.retrievalMs).toBe(calls.reduce((sum, call) => sum + call.elapsedMs, 0))
     expect(timings.totalMs).toBeGreaterThanOrEqual(timings.retrievalMs)
   }, 60_000)
+})
+
+/**
+ * The exit-code table must stay honest about its own granularity.
+ *
+ * ## Why this exists
+ *
+ * `apps/cli/src/exit-codes.ts` carried a comment claiming "each failure mode has a unique non-zero
+ * exit code so a harness can distinguish between them", above seven aliases holding **two**
+ * distinct values. A comment that overstates what a constant guarantees is worse than no comment:
+ * a reviewer reads it and stops looking, and a harness written against it cannot work. The fix was to
+ * the comment, and this test is what stops the comment from quietly becoming true again by accident
+ * — someone adding a mode and picking a fresh number would break the documented contract below.
+ *
+ * The claim being pinned is therefore the honest one: the seven names exist, they map onto the codes
+ * `docs/degradation-matrix.md` publishes, and a caller branches on two.
+ */
+describe("the exit-code aliases are names, not distinct numbers", () => {
+  test("the seven degradation modes map onto the codes the matrix documents", () => {
+    const byMode = {
+      providerDown: EXIT_PROVIDER_DOWN,
+      corpusMiss: EXIT_CORPUS_MISS,
+      verificationTimeout: EXIT_VERIFICATION_TIMEOUT,
+      ledgerWriteFailure: EXIT_LEDGER_WRITE_FAILURE,
+      attestationMismatch: EXIT_ATTESTATION_MISMATCH,
+      tafsirUnreachable: EXIT_TAFSIR_UNREACHABLE,
+      rankerDown: EXIT_RANKER_DOWN,
+    } as const
+
+    // The exact table in `docs/degradation-matrix.md`. If a mode is given a new code, this is the
+    // test that refuses to let it do so quietly.
+    expect(Object.values(byMode)).toEqual([1, 1, 1, 3, 3, 1, 1])
+    expect(new Set(Object.values(byMode)).size).toBe(2)
+  })
+
+  test("every mode is distinguishable by NAME even where the number is shared", () => {
+    // The distinction a shell cannot make is carried by the name and by the printed message, so the
+    // seven aliases must all exist as separate bindings and none may shadow another.
+    const aliases = [
+      EXIT_PROVIDER_DOWN,
+      EXIT_CORPUS_MISS,
+      EXIT_VERIFICATION_TIMEOUT,
+      EXIT_LEDGER_WRITE_FAILURE,
+      EXIT_ATTESTATION_MISMATCH,
+      EXIT_TAFSIR_UNREACHABLE,
+      EXIT_RANKER_DOWN,
+    ]
+    expect(aliases).toHaveLength(7)
+    expect(aliases.every((code) => code !== 0)).toBe(true)
+  })
+
+  test("the four pipeline codes remain OK / degraded / usage / untrusted", () => {
+    // These four are what an entry point actually returns, and unlike the aliases above they are
+    // genuinely distinct — a caller branching on "did it run" and "can I trust it" depends on it.
+    expect([EXIT_OK, EXIT_DEGRADED, EXIT_USAGE, EXIT_UNTRUSTED]).toEqual([0, 1, 2, 3])
+  })
 })
 
 /**

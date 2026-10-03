@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { Database } from "bun:sqlite"
 import { verifyAnswer } from "@mizan/verify"
 import { buildSnapshot, openSnapshot, resolveCitations, toCorpusRecord } from "@mizan/corpus"
-import { renderReport, type SourceExcerpt, type SourceTable } from "../src/render.ts"
+import { renderHeader, renderReport, type SourceExcerpt, type SourceTable } from "../src/render.ts"
 import type { Claim, EvidenceRef, VerdictReport } from "@mizan/core"
 
 /**
@@ -244,6 +244,30 @@ describe("the kill-gate path, end to end over a real snapshot", () => {
 })
 
 describe("the report a judge reads", () => {
+  test("the language line carries how it was detected, so a default is not read as a detection", () => {
+    // US-13's boundary decides the language with a marker heuristic, and a heuristic cannot separate
+    // Malay from Indonesian or Spanish from Portuguese. The old header printed one tag either way, so a
+    // table-order guess read exactly like a marker only one language has. These are the four cases the
+    // boundary can now report, asserted on the rendered line, because the line is what gets
+    // screenshotted.
+    const header = (question: Parameters<typeof renderHeader>[0]["question"]): string => renderHeader({
+      transcript: "precomputed",
+      model: "transcript-v1",
+      snapshotHash: SNAPSHOT_HASH,
+      sourceCount: 2,
+      question,
+    })
+    expect(header({ language: "en", rtl: false, basis: "marker" })).toContain("language     en (ltr, detected)")
+    expect(header({ language: "zh", rtl: false, basis: "sole-script-language" })).toContain("language     zh (ltr, sole script language)")
+    expect(header({ language: "ar", rtl: true, basis: "script-default" })).toContain("language     ar (rtl, script default, no marker matched)")
+    expect(header({ language: "id", rtl: false, basis: "ambiguous-markers" })).toContain("language     id (ltr, ambiguous: several languages matched equally)")
+  })
+
+  test("a report with no question prints no language line at all", () => {
+    const text = renderHeader({ transcript: "precomputed", model: "transcript-v1", snapshotHash: SNAPSHOT_HASH, sourceCount: 2 })
+    expect(text).not.toContain("language")
+  })
+
   test("renders the transcript label, so a replay is never read as a live generation", () => {
     const text = renderReport({
       prose: "Fasting Ramadan is a migration.",
