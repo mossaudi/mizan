@@ -438,6 +438,43 @@ describe("the rendered block says nothing a reader could turn into a verdict", (
     // nothing rather than printing "none".
     expect(text()).not.toContain("grade:")
   })
+
+  // The three forbidden affordances of a suggestion block, as one test because they are one failure:
+  // a block that leans on any of them stops being evidence and becomes advice. Each probe is matched
+  // on a word boundary, so a legitimate citation that happens to contain a substring does not trip.
+  const FORBIDDEN = {
+    // Assertiveness: the block's whole value is that it shows a record instead of vouching for one.
+    assertiveness: /\b(verified|authentic|genuine|correct|true|accurate|confirmed|valid|proves?|proven)\b/i,
+    // Chatty openers: the register of a reading assistant, not of a citation.
+    chattiness: /\b(it (looks|seems|appears)|you (might|should|may|could)|perhaps|maybe|great question|let me|i (think|believe|suggest))\b/i,
+    // Question echo: the block locates the claim's quotation in the corpus. Restating the question
+    // beside it would put the model's framing in front of the reader as if it were the finding.
+    questionEcho: /\b(your question|the question|you asked|as you asked|in response to)\b/i,
+  } as const
+  const hits = (subject: string): readonly string[] => Object.entries(FORBIDDEN).filter(([, pattern]) => pattern.test(subject)).map(([name]) => name)
+
+  test("the three forbidden affordances are absent: assertiveness, chatty openers, question echo", () => {
+    const block = text().slice(text().indexOf(SUGGESTION_DISCLAIMER))
+    expect(hits(block)).toEqual([])
+  })
+
+  test("that probe is not vacuous: it fires on a block carrying all three", () => {
+    // A negative assertion over a word list is worth nothing if the list never matches anything, and a
+    // regex that silently stopped matching is the exact inert-rule failure this repository treats as a
+    // defect. So the detector is checked against a positive control before it is trusted to report the
+    // absence above: a block that does all three forbidden things must trip all three probes.
+    const control = `${SUGGESTION_DISCLAIMER}\nit looks like this is verified and accurate\nyou might find your question answered here`
+    expect(hits(control)).toEqual(["assertiveness", "chattiness", "questionEcho"])
+  })
+
+  test("a suggested record is shown, never quoted back as the reader's own question", () => {
+    // The positive half of "question echo": the corpus text IS on the block, because that is the whole
+    // feature. What must not happen is the block presenting it as an answer to a question the reader is
+    // never shown having asked - so the verse is present and the model's own prose is not.
+    const block = text().slice(text().indexOf(SUGGESTION_DISCLAIMER))
+    expect(block).toContain(VERSE)
+    expect(block).not.toContain("the model's prose")
+  })
 })
 
 describe("the pass is positional", () => {
