@@ -46,7 +46,31 @@ partial answer as complete.
 A failure mode in any component never bypasses the verification step. A `verified`
 verdict is never produced without actual verification.
 
+### Nearest-quote suggestions cannot fail into a badge
+
+The suggestion pass is display-only and runs **after** every verdict is printed (ADR-07). It has three
+states, and each has one correct surface:
+
+| Suggestion state | Trigger | Correct surface | Forbidden surfaces |
+|---|---|---|---|
+| `candidates` | One or more records cleared the floor | up to three lines, under `nearest suggestions (non-authoritative) — not a verification result` | any wording that reads as a correction, a grade, or a second opinion |
+| `no_candidates` | The scan read every record and none cleared the floor | "no record in this snapshot is close to this quotation (27,234 records searched)" | a guess, a cached list, an empty section with no explanation |
+| `unavailable` | A row could not be decoded, so `considered` would be a lie | `unavailable`, naming the row id and never its text | a partial list presented as the whole search |
+
+A suggestion failure is **never** a verdict failure: an undecodable row makes the *suggestions*
+unavailable, while the verdict that was already printed stands unchanged. The converse is also enforced —
+no suggestion can change, upgrade or block a verdict, and the flag `--no-suggestions` skips the pass
+entirely rather than silently degrading it.
+
+The cost is stated rather than hidden: one exhaustive scan of the snapshot per rejected claim, measured
+at **p50 594 ms / p95 709 ms / max 715 ms** on the committed 27,234-record corpus against a `< 50 ms`
+target that this architecture does not meet (ADR-08). That is the slowest of five consecutive runs;
+`docs/specs/measurements.md` is the one place the figure and the conditions it was measured under are
+recorded — corpus identity, case count, quantile rule, cache state, runtime, platform, CPU, and the
+1.5x band a rerun may differ by — and `bun run eval:suggestions` prints both in the same run.
+
 ## Testing
 
 Each failure mode has a test that triggers it and asserts the correct surface. The
-tests are in `packages/mizan-core/test/degradation.test.ts`.
+tests are in `packages/mizan-core/test/degradation.test.ts`. The suggestion states above are tested in
+`apps/cli/test/suggestions.test.ts` against a real snapshot, a real verifier and the real renderer.

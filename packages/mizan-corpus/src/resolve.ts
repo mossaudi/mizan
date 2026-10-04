@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite"
-import { CorpusRecord, decodeOrFail, decodeSync, isOk, unresolved, type Citation, type ResolvedCitation } from "@mizan/core"
+import { isOk, unresolved, type Citation, type CorpusRecord, type ResolvedCitation } from "@mizan/core"
+import { decodeRecordRow, recordSelect, rowId, type RawRow } from "./rows.ts"
 
 /**
  * Citation resolution — the seam between "a model said `bukhari:1`" and "here is the row".
@@ -21,69 +22,32 @@ import { CorpusRecord, decodeOrFail, decodeSync, isOk, unresolved, type Citation
  * The middle state is the one a naive implementation gets wrong, and getting it wrong
  * produces a confident falsehood: hadith number 1 exists in al-Bukhari, Sahih Muslim and
  * dozens of other collections, so resolving it to the first match would make the verifier
- * accuse a correct answer of misquoting. `unverifiable` says "we cannot tell", which is the
- * only honest output when that is the case.
+ * accuse a correct answer of misquoting. `unverifiable` says "we cannot tell", which is
+ * the only honest output when that is the case.
  *
- * ## Every row is decoded through `CorpusRecord`
+ * ## Every row is decoded, in `rows.ts`
  *
  * A row read back out of SQLite is still crossing a boundary — the file could have been
- * written by an older ingest, or tampered with. Decoding it means a malformed row is a typed
- * failure that this module can report, not a `textMatch` that is silently `undefined` and
- * quietly makes a `rejected` verdict out of a bug.
+ * written by an older ingest, or tampered with. The decode itself is shared with the
+ * nearest-quote scan, and a row that does not decode becomes a problem reported here rather
+ * than a `textMatch` that is silently `undefined` and quietly makes a `rejected` verdict out
+ * of a bug.
  */
-
-const RECORD_SELECT = `SELECT id, collection, number, grade, gradeApplicable, gradeSource, gradeBasis,
-  attribution, license, licenseUrl, sourceUrl, textDisplay, textMatch, translation FROM records`
-
-type RawRow = {
-  readonly id: string
-  readonly collection: string
-  readonly number: string | null
-  readonly grade: string | null
-  readonly gradeApplicable: number
-  readonly gradeSource: string
-  readonly gradeBasis: string
-  readonly attribution: string
-  readonly license: string
-  readonly licenseUrl: string
-  readonly sourceUrl: string
-  readonly textDisplay: string
-  readonly textMatch: string
-  readonly translation: string | null
-}
 
 export type ResolveProblem = {
   readonly citation: Citation
   readonly detail: string
 }
 
-/** SQLite has no boolean type; the column is 0/1 and the schema wants a boolean. */
-const toRecord = (row: RawRow): unknown => ({
-  id: row.id,
-  collection: row.collection,
-  number: row.number,
-  grade: row.grade,
-  gradeApplicable: row.gradeApplicable === 1,
-  gradeSource: row.gradeSource,
-  gradeBasis: row.gradeBasis,
-  attribution: row.attribution,
-  license: row.license,
-  licenseUrl: row.licenseUrl,
-  sourceUrl: row.sourceUrl,
-  textDisplay: row.textDisplay,
-  textMatch: row.textMatch,
-  translation: row.translation ?? undefined,
-})
-
 const rowsToRecords = (rows: readonly RawRow[]): { readonly records: readonly CorpusRecord[]; readonly problems: readonly ResolveProblem[] } => {
   const records: CorpusRecord[] = []
   const problems: ResolveProblem[] = []
   for (const row of rows) {
-    const decoded = decodeOrFail(decodeSync(CorpusRecord), toRecord(row), "CorpusRecord")
+    const decoded = decodeRecordRow(row)
     if (!isOk(decoded)) {
       problems.push({
         citation: { collection: row.collection, number: row.number, grade: null, raw: row.id },
-        detail: `row ${row.id} does not match CorpusRecord: ${decoded.error.detail}`,
+        detail: `row ${rowId(row)} does not match CorpusRecord: ${decoded.error.detail}`,
       })
       continue
     }
@@ -111,8 +75,8 @@ export const resolveCitations = (db: Database, citations: readonly Citation[]): 
     const collection = citation.collection.trim()
     const rows =
       collection.length === 0
-        ? db.query<RawRow, [string]>(`${RECORD_SELECT} WHERE number = ? ORDER BY id`).all(citation.number)
-        : db.query<RawRow, [string, string]>(`${RECORD_SELECT} WHERE collection = ? AND number = ? ORDER BY id`).all(collection, citation.number)
+        ? db.query<RawRow, [string]>(recordSelect(" WHERE number = ? ORDER BY id")).all(citation.number)
+        : db.query<RawRow, [string, string]>(recordSelect(" WHERE collection = ? AND number = ? ORDER BY id")).all(collection, citation.number)
 
     const decoded = rowsToRecords(rows)
     problems.push(...decoded.problems)

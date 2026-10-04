@@ -25,6 +25,7 @@
     "ask": "bun run apps/cli/src/main.ts",
     "demo": "bun run apps/cli/src/demo.ts",
     "benchmark:vs-search": "bun run scripts/benchmark/run.ts",
+    "eval:suggestions": "bun run scripts/eval/suggest-coverage.ts",
     "verify:ledger": "bun run scripts/verify-ledger.ts",
     "verify:runs": "bun run scripts/verify-runs.ts",
     "verify:chain": "bun run scripts/verify-chain.ts",
@@ -38,6 +39,7 @@
     "@mizan/corpus": "workspace:*",
     "@mizan/gate": "workspace:*",
     "@mizan/provenance": "workspace:*",
+    "@mizan/suggest": "workspace:*",
     "@mizan/verify": "workspace:*"
   },
   "devDependencies": {

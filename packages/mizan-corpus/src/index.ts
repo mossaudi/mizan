@@ -48,6 +48,19 @@ export {
 export { resolveCitations, type ResolveProblem } from "./resolve.ts"
 
 /**
+ * The nearest-quote read path: a streamed scan for rows worth ranking, and a bounded follow-up
+ * read for the winners' metadata. The judgement is `@mizan/suggest`'s; this module only opens the
+ * database and refuses to pretend a row it could not decode was never there (ADR-08).
+ */
+export {
+  fetchSuggestionRecords,
+  scanSuggestionCandidates,
+  type SuggestionCandidateSource,
+} from "./candidates.ts"
+
+export { CANDIDATE_COLUMNS, RECORD_COLUMNS, recordSelect, toRecord, type RawCandidateRow, type RawRow } from "./rows.ts"
+
+/**
  * The query-path attestation checks. Exported next to `readSnapshotMeta` rather than from
  * `ingest.ts` because these are the readers of the attestation and the three of them must not drift:
  * `compareAttestations` decides whether a FRESH ingest matches the committed file, `attestSnapshot`

@@ -12,6 +12,7 @@
     "@mizan/corpus": "workspace:*",
     "@mizan/provenance": "workspace:*",
     "@mizan/retrieval": "workspace:*",
+    "@mizan/suggest": "workspace:*",
     "@mizan/verify": "workspace:*"
   },
   "devDependencies": {

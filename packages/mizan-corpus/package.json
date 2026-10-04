@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@mizan/core": "workspace:*",
+    "@mizan/suggest": "workspace:*",
     "effect": "4.0.0-beta.83"
   },
   "devDependencies": {

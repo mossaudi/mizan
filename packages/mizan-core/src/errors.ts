@@ -9,6 +9,14 @@
 // ── corpus ────────────────────────────────────────────────────────────────────
 
 export type CorpusError =
+  /** A record could not be decoded through its schema, so it was not used. Fails CLOSED. */
+  | {
+      readonly _tag: "row_undecodable"
+      /** The `recordId` of the row, or `"unknown"`. Never the row's text. */
+      readonly recordId: string
+      /** The schema failure, which names a path and not a payload. */
+      readonly detail: string
+    }
   /** Content hash or record count no longer matches `attestation.json`. Fails CLOSED. */
   | { readonly _tag: "attestation_mismatch"; readonly source: string; readonly field: string; readonly expected: string; readonly actual: string }
   /** A pinned source returned fewer records than its published baseline. Fails the build. */

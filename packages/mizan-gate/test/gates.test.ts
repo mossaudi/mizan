@@ -31,6 +31,10 @@ checkNoSimilarity,
   checkNoPercentKeyOnPath,
   checkNoAppCodeOnPath,
   checkDisplayPathPresent,
+  checkRelevanceModuleHasNoOutcome,
+  checkSuggestPackageIsLeaf,
+  checkSuggestPackageNamesNoOutcome,
+  checkSuggestPackageHasNoAmbientAuthority,
   findRepositoryRoot,
   findRoot,
   requireRepositoryRoot,
@@ -448,7 +452,9 @@ describe("G-7 verdict path purity", () => {
       "apps/cli/src/render.ts": "export const render = true",
       "apps/cli/src/correction.ts": "export const correction = true",
       "apps/cli/src/relevance.ts": "export const relevance = true",
+      "apps/cli/src/suggestions.ts": 'import { rankNeighbours } from "@mizan/suggest"\nexport const rank = rankNeighbours',
       "apps/web/src/page.ts": "export const page = true",
+      "packages/mizan-suggest/src/suggest.ts": 'import { normalizeForMatch } from "@mizan/core"\nexport const fold = normalizeForMatch',
     }
     const declared = Object.entries(displayDefaults).map(([path, text]) =>
       file(path, over[path] ?? text),
@@ -499,6 +505,84 @@ describe("G-7 verdict path purity", () => {
   test("planted: a renamed display module strips the display rules from scope", () => {
     const files = pureTree({}).filter((source) => source.path !== "apps/cli/src/render.ts")
     expect(rules(checkDisplayPathPresent(files))).toEqual(["G-7.6 display-path-present"])
+  })
+
+  test("planted: the suggestion module naming an outcome is caught, exactly like relevance", () => {
+    const files = pureTree({ "apps/cli/src/suggestions.ts": 'export const outcome = { verdict: "verified" }\n' })
+    expect(rules(checkNoPercentKeyOnPath(files))).toEqual([])
+    expect(rules(checkRelevanceModuleHasNoOutcome(files))).toEqual([])
+    // The display module itself may not be word-banned — `render.ts` prints `verified` as a badge —
+    // but the package it calls may not, which is what G-7.9 asserts below.
+    expect(rules(checkSuggestPackageNamesNoOutcome(files))).toEqual([])
+  })
+
+  test("planted: the suggestion package importing anything but core is caught", () => {
+    const files = pureTree({ "packages/mizan-suggest/src/suggest.ts": 'import { Database } from "bun:sqlite"\nexport const db = Database\n' })
+    expect(rules(checkSuggestPackageIsLeaf(files))).toEqual(["G-7.8 suggest-package-is-leaf"])
+  })
+
+  test("planted: a re-export of another workspace package is caught too", () => {
+    // The dependency is the same whether it is imported or forwarded, and an index barrel is where
+    // a forwarding dependency hides from a grep for `import`.
+    const files = pureTree({ "packages/mizan-suggest/src/index.ts": 'export { verifyAnswer } from "@mizan/verify"\n' })
+    expect(rules(checkSuggestPackageIsLeaf(files))).toEqual(["G-7.8 suggest-package-is-leaf"])
+  })
+
+  test("planted: a specifier that merely contains the allowed package is caught", () => {
+    const files = pureTree({ "packages/mizan-suggest/src/suggest.ts": 'import { x } from "@mizan/core-plus"\nexport const y = x\n' })
+    expect(rules(checkSuggestPackageIsLeaf(files))).toEqual(["G-7.8 suggest-package-is-leaf"])
+  })
+
+  test("planted: the suggestion package naming an outcome is caught", () => {
+    const files = pureTree({ "packages/mizan-suggest/src/suggest.ts": 'export const banner = "verified"\n' })
+    expect(rules(checkSuggestPackageNamesNoOutcome(files))).toEqual(["G-7.9 suggest-package-names-no-outcome"])
+  })
+
+  test("a comment in the suggestion package may explain itself in the banned words", () => {
+    // Comments are stripped, which is what lets the module say WHY it cannot reach a verdict without
+    // tripping the rule that forbids it. Pinned so a future `mode` change is caught here.
+    const files = pureTree({
+      "packages/mizan-suggest/src/suggest.ts": ["// this must never become a verdict, or a verified badge", 'import { foldQuote } from "./trigrams.ts"', "export const fold = foldQuote"].join("\n"),
+    })
+    expect(rules(checkSuggestPackageNamesNoOutcome(files))).toEqual([])
+    expect(rules(checkSuggestPackageIsLeaf(files))).toEqual([])
+  })
+
+  describe("G-7.11 the suggestion package has no ambient authority", () => {
+    const rule = "G-7.11 suggest-package-has-no-ambient-authority"
+
+    test("planted: a network call in the suggestion package is caught", () => {
+      // The rule G-7.8 cannot express: `fetch` is a global, so there is no import for an allowlist to
+      // reject. Every fixture below is planted for exactly that reason.
+      const files = pureTree({ "packages/mizan-suggest/src/suggest.ts": 'export const ask = () => fetch("https://example.invalid")\n' })
+      expect(rules(checkSuggestPackageHasNoAmbientAuthority(files))).toEqual([rule])
+    })
+
+    test("planted: the three globals that make a ranking irreproducible are caught", () => {
+      for (const planted of ["const at = Date.now()", "const roll = Math.random()", "const home = process.env.HOME"]) {
+        const files = pureTree({ "packages/mizan-suggest/src/suggest.ts": `export const x = () => { ${planted}; return 1 }\n` })
+        expect(rules(checkSuggestPackageHasNoAmbientAuthority(files))).toEqual([rule])
+      }
+    })
+
+    test("planted: a stringified call is caught, because a cached response is still a network call", () => {
+      const files = pureTree({ "packages/mizan-suggest/src/suggest.ts": 'export const cached = "fetch(\\u0028https://example.invalid\\u0029)"\n' })
+      expect(rules(checkSuggestPackageHasNoAmbientAuthority(files))).toEqual([rule])
+    })
+
+    test("a clean ranking module trips nothing", () => {
+      const files = pureTree({
+        "packages/mizan-suggest/src/rank.ts": ['import { byCodeUnit } from "./rank.ts"', "export const shared = (a: string, b: string) => (a < b ? -1 : 1)"].join("\n"),
+      })
+      expect(rules(checkSuggestPackageHasNoAmbientAuthority(files))).toEqual([])
+    })
+
+    test("the rule is wired into the gate, so a tree with a violation fails G-7 as a whole", () => {
+      // Asserted through the gate and not only through the rule: an exported rule nobody calls is a
+      // rule that protects nothing (AGENTS.md §14).
+      const files = pureTree({ "packages/mizan-suggest/src/suggest.ts": 'export const cached = () => fetch("https://example.invalid")\n' })
+      expect(rules(gateVerdictPathPurity(files))).toContain(rule)
+    })
   })
 })
 

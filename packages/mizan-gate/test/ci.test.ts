@@ -439,18 +439,38 @@ describe("runCi — the root entrypoints are inside the gate", () => {
   }, REAL_TOOLCHAIN_TIMEOUT_MS)
 })
 
+/**
+ * The plans discovery finds in THIS repository, resolved once, at module load.
+ *
+ * The test name below is prose over this array rather than a hardcoded count. A title that says
+ * "six" while discovery finds twelve is the same defect class the v5 precision cycle exists to
+ * remove: the repository states something its own tooling contradicts, in the one place a reviewer
+ * is guaranteed to read it. Discovery is the one owner of the number (E2.4), and the test body
+ * reuses the same array, so the name and the behaviour are provably one computation.
+ *
+ * A checkout this cannot identify is a loud failure at load rather than a fixture test that
+ * quietly stops covering anything — `requireRepositoryRoot` exists precisely because a suite that
+ * cannot find the repository must report nothing rather than report a pass.
+ */
+const discoverRealPlans = async (): Promise<readonly PackagePlan[]> => {
+  const root = requireRepositoryRoot(import.meta.dir)
+  if (isErr(root)) throw new Error(root.error)
+  return await discoverPackages(root.value, ["packages/*", "apps/*"])
+}
+
+const realPlans: readonly PackagePlan[] = await discoverRealPlans()
+
 describe("the real repository is green under the real runner", () => {
-  test("all six existing packages typecheck and test green", async () => {
+  test(`all ${realPlans.length} discovered workspace packages typecheck and test green`, async () => {
     const root = requireRepositoryRoot(import.meta.dir)
     if (isErr(root)) throw new Error(root.error)
     const tools = resolveToolchain(root.value)
     if (isErr(tools)) throw new Error(tools.error)
 
-    const plans = await discoverPackages(root.value, ["packages/*", "apps/*"])
-    expect(plans.length).toBeGreaterThan(0)
+    expect(realPlans.length).toBeGreaterThan(0)
     const gates = await gateStub()
     const outcomes = []
-    for (const plan of plans) outcomes.push(await runPackageChecks(plan, ["typecheck"], tools.value))
+    for (const plan of realPlans) outcomes.push(await runPackageChecks(plan, ["typecheck"], tools.value))
     // Asserted as a list of failures rather than through buildReport, because an empty list
     // fed to buildReport is now (correctly) red for having checked nothing.
     const failures = outcomes.filter((outcome) => !outcome.ok).map((outcome) => summariseReport(buildReport([outcome], gates)))

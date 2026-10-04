@@ -186,10 +186,14 @@ describe("the repository's own ADRs — the acceptance criteria, against the rea
     const files = readdirSync(ADR_ROOT)
       .filter((name) => name.startsWith("ADR" + "-") && name.endsWith(".md"))
       .sort()
-    // Six legacy identifiers and the nine recorded since — ADR-C1 through ADR-C9. The count is
-    // asserted rather than left open because a new decision that does not land here is a decision
-    // no citation can resolve, and that is exactly what rule twelve exists to prevent.
-    expect(files).toHaveLength(15)
+    // Six legacy identifiers and the thirteen recorded since — ADR-C1 through ADR-C9, then ADR-07
+    // through ADR-10 for the nearest-quote suggestions — plus ADR-C10 and ADR-C11 from the Sprint 1
+    // precision cycle (measurement conditions; the pinned Effect beta). The count is asserted rather
+    // than left open because a new decision that does not land here is a decision no citation can
+    // resolve, and that is exactly what rule twelve exists to prevent. It is the one count in this
+    // file that stays typed, deliberately: rule twelve above proves every citation resolves, so what is
+    // left for this to catch is a file added to the directory without anyone reading it.
+    expect(files).toHaveLength(21)
     const incomplete: string[] = []
     for (const name of files) {
       const claims = checkAdrDocument(readFileSync(join(ADR_ROOT, name), "utf8"), `${ADR_DIRECTORY}/${name}`)

@@ -38,6 +38,22 @@ import closure, so the number printed there provably had no hand in the badge pr
 Ask it a question whose citation is a fabrication and the same three lines appear under a
 `REJECTED` badge, with the invented quote and the genuine text side by side.
 
+Under a `REJECTED` badge there is one more block, and it is the only thing this repository adds to the
+badge that the badge does not already say:
+
+```
+nearest suggestions (non-authoritative) — not a verification result
+  searched 27,234 records in this snapshot
+  1. abudawud:1003  بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+```
+
+A `REJECTED` badge tells a reader that the quote is wrong. It does not tell them what the model *meant*,
+and the answer to that question is already in the corpus. Those lines are the nearest records by exact
+containment first and then by shared character 3-grams — an **order of real record ids**, never a
+percentage, never a confidence, and never anything a badge could be built from. They appear only for
+rejected claims, they are switched off with `--no-suggestions`, and when the search finds nothing it
+says so in words rather than rendering an empty block. See ADR-07, ADR-08, ADR-09 and ADR-10.
+
 ---
 
 ## The one idea
@@ -85,6 +101,7 @@ bun run ingest                 # fetch sources, build the snapshot and the regis
 bun run ask "your question"
 bun run benchmark              # every eval set and the HALLMARK fixtures: one report, one exit code
 bun run benchmark:vs-search    # the red-team set through plain FTS5 search and through mizan
+bun run eval:suggestions       # nearest-quote recall at three floors, and the cost of the real path
 bun run mcp                    # the read-only verifier as a Model Context Protocol server on stdio
 bun run ci                     # typecheck + tests + the seven structural gates
 ```

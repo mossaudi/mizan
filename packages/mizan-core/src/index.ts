@@ -36,7 +36,7 @@ export { ANCHOR_PROTOCOL_VERSION, AnchorAdjudication, AnchorAdjudicationSet, Anc
 export { Answer, Citation, Claim, emptyClaim, normalizeQuote } from "./schema/claim.ts"
 export { BaselineDeclaration, BenchmarkOutcome, BenchmarkResult, BENCHMARK_SCHEMA_VERSION, HONEST_BASELINE, PRE_REGISTERED_HYPOTHESIS, METHOD_NOT_PUBLISHED, PEER_REGISTER_VERSION, PeerFigure, PeerMethod, PeerRegister, peerStatesAFigure } from "./schema/benchmark.ts"
 export { COVERAGE_SCHEMA_VERSION, CollectionCoverage, CoverageTotals, QuarantineCoverage, SourceCoverage } from "./schema/coverage.ts"
-export { Correction, CorrectionSpan, LocatedCorrection, Relevance, RelevanceState, UnverifiableCorrection } from "./schema/display.ts"
+export { Correction, CorrectionSpan, LocatedCorrection, NearbyRecord, Relevance, RelevanceState, SUGGESTION_DISCLAIMER, Suggestion, SuggestionCandidates, SuggestionNoCandidates, SuggestionScope, SuggestionUnavailable, UnverifiableCorrection, type SuggestionState } from "./schema/display.ts"
 export { DEMO_ANCHOR_SET_VERSION, DEMO_QUESTION_SET_VERSION, DemoAnchor, DemoAnchorSet, DemoExpectation, DemoQuestion, DemoQuestionSet } from "./schema/demo.ts"
 export { DivergenceResolution, EvalAnchor, EvalCase, EvalSet, KnownDivergence } from "./schema/eval.ts"
 export { ResolvedCitation, unresolved } from "./schema/resolved.ts"

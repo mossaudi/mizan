@@ -20,7 +20,7 @@ import { PERCENT_OWNERS, VERDICT_PATH, VERDICT_PATH_ENTRY, inAny } from "./g6-no
  * make it a worse rule — and G-7 answers the *path* question: the transitive closure of
  * `verify.ts`, plus the display modules that reuse its relation.
  *
- * ## Seven rules
+ * ## Ten rules
  *
  *  - **G-7.1 the anchor module has no opinion.** `steps/anchor.ts` may not contain the token
  *    `verdict` at all. This is the cheap version of "the anchor can only ever produce
@@ -57,6 +57,33 @@ import { PERCENT_OWNERS, VERDICT_PATH, VERDICT_PATH_ENTRY, inAny } from "./g6-no
  *    capability is not present in the file, so neither mistake is available to make. This is the
  *    same shape as G-7.1, for the same reason, and it is checked in `code+strings` mode so a
  *    constant cannot smuggle the word in.
+ *  - **G-7.8 the suggestion package is a leaf.** `packages/mizan-suggest/` may import only
+ *    relative modules and `@mizan/core`. Sprint 1 added the one module in this repository whose
+ *    entire job is to compute a similarity between two pieces of text, and its safety argument is
+ *    that it is a *pure ranking function*: no I/O, no corpus, no provider, no network, no clock,
+ *    nothing to depend on. Every one of those properties is a property of the dependency list,
+ *    and a dependency list is exactly what a well-meaning performance PR changes — `fastest-
+ *    levenshtein`, a SQLite handle, a cache. AGENTS.md section 9 states the rule for the verifier
+ *    in prose; ADR-07 states it for the module one door away, and this rule makes it
+ *    machine-checkable.
+ *  - **G-7.9 the suggestion package names no outcome.** `verdict` and `verified` may not appear
+ *    anywhere in `packages/mizan-suggest/`, in code or in a string. G-7.8 already forbids it
+ *    importing the verifier, so this is not about the import; it is about the *shape of the
+ *    answer*. A `rankNeighbours` that returned `{ order, verdict }` would be the CWE-345 hole
+ *    with a friendly name, and the cheapest way to make that unwritable is to forbid the words in
+ *    the one file that produces the list. Same shape and same reasoning as G-7.1 and G-7.7, and
+ *    for the same reason: the capability is absent rather than merely unused.
+ *  - **G-7.11 the suggestion package has no ambient authority.** No clock, no randomness, no
+ *    network, no environment, no timer, no dynamic import anywhere in `packages/mizan-suggest/`.
+ *    This is the rule G-7.8 cannot express. A dependency list is what a well-meaning PR changes,
+ *    and a dependency list is exactly what G-7.8 reads — but `fetch("https://…")`, `Date.now()` and
+ *    `process.env.X` need no import at all. They are globals, so an import-allowlist rule is blind to
+ *    them by construction: the vector this feature would be attacked with is a "cache the nearest
+ *    results" call, and that call is one bare identifier wide. The determinism claim the package
+ *    exists to extend — the same list, byte for byte, on every run and every machine — is a
+ *    property of its reachable globals, so the globals are what is checked. G-1.3 already asserts
+ *    this over the verifier; this asserts it over the module one door away, reusing the same
+ *    vocabulary from the same place (AGENTS.md §17).
  *
  * ## What G-7 does not check, stated rather than discovered
  *
@@ -85,13 +112,33 @@ export const ANCHOR_MODULE = "packages/mizan-verify/src/steps/anchor.ts"
  * declared rather than left out because it is a display surface a user opens directly and it is
  * NOT wired into `render.ts` — which is precisely the residual exposure the header below names
  * as being covered by review. Putting it in the list means the gate covers it instead.
+ *
+ * Story 4 of Sprint 1 added `apps/cli/src/suggestions.ts`: the composition half of the
+ * nearest-quote feature. It reads the corpus and the verdicts and hands `render.ts` a block of
+ * real record ids and texts — and it is the first display module that *imports* rather than
+ * merely formatting, so it is exactly where a display-only helper could start reaching for a
+ * provider or a network call. Declaring it keeps G-7.2, G-7.3 and G-7.4 applying to it; G-7.8 and
+ * G-7.9 cover the package it calls.
  */
 export const DISPLAY_PATH = [
   "apps/cli/src/render.ts",
   "apps/cli/src/correction.ts",
   "apps/cli/src/relevance.ts",
+  "apps/cli/src/suggestions.ts",
   "apps/web/src/page.ts",
 ] as const
+
+/**
+ * The pure ranking package, whose two rules are about what it may import and what it may name.
+ *
+ * A path prefix rather than an exact file, because the property is a property of the PACKAGE: every
+ * module in it computes the same kind of relation, so a helper module added next week inherits the
+ * rule without anyone remembering to list it.
+ */
+export const SUGGEST_PATH = "packages/mizan-suggest/"
+
+/** The only non-relative specifier the suggestion package may import. */
+export const SUGGEST_ALLOWED_SPECIFIER = "@mizan/core"
 
 /** The module that may not name an outcome, for the reason given in G-7.7. */
 export const RELEVANCE_MODULE = "apps/cli/src/relevance.ts"
@@ -189,11 +236,72 @@ export const checkDisplayPathPresent = (files: readonly SourceFile[]): readonly 
   }))
 }
 
+/**
+ * G-7.8's pattern: an import specifier that is neither relative nor the one allowed package.
+ *
+ * Written as a negative lookahead over the specifier rather than as "list the forbidden ones", so
+ * that adding a dependency fails the gate by default instead of passing until somebody remembers
+ * to update a list. `from\s*["']` (not `import\s`) catches a re-export too, which matters: a
+ * package that only forwards another package's symbols still depends on it, and an index barrel is
+ * exactly where that hides. The relative alternative is `\.\.?/`, so a specifier that merely
+ * *contains* `core` — `@mizan/core-plus` — is not mistaken for the allowed one.
+ */
+export const SUGGEST_IMPORT_RULE = new RegExp(
+  `from\\s*["'](?!\\.{1,2}/|${SUGGEST_ALLOWED_SPECIFIER}["'])[^"']+["']`,
+)
+
 /** G-7.7 — the relevance module may not name an outcome, in code or in a string. */
 export const checkRelevanceModuleHasNoOutcome = (files: readonly SourceFile[]): readonly Finding[] => {
   const relevance = productionFiles(files).filter((file) => file.path === RELEVANCE_MODULE)
   return findMatchingLines("G-7", "G-7.7 relevance-module-has-no-outcome", relevance, tokenPattern(RELEVANCE_BANNED_WORDS), "code+strings")
 }
+
+/** G-7.8 — the suggestion package imports only relative modules and `@mizan/core`. */
+export const checkSuggestPackageIsLeaf = (files: readonly SourceFile[]): readonly Finding[] =>
+  findMatchingLines(
+    "G-7",
+    "G-7.8 suggest-package-is-leaf",
+    productionFiles(files).filter((file) => file.path.startsWith(SUGGEST_PATH)),
+    SUGGEST_IMPORT_RULE,
+    "code+strings",
+  )
+
+/** G-7.9 — the suggestion package may not name an outcome, in code or in a string. */
+export const checkSuggestPackageNamesNoOutcome = (files: readonly SourceFile[]): readonly Finding[] =>
+  findMatchingLines(
+    "G-7",
+    "G-7.9 suggest-package-names-no-outcome",
+    productionFiles(files).filter((file) => file.path.startsWith(SUGGEST_PATH)),
+    tokenPattern(RELEVANCE_BANNED_WORDS),
+    "code+strings",
+  )
+
+/**
+ * G-7.11 — no clock, randomness, network, environment, timer or dynamic import in the suggestion
+ * package.
+ *
+ * ## Why this rule exists when G-7.8 already reads the dependency list
+ *
+ * Because the interesting calls need no import. `fetch("https://…")`, `Date.now()`, `Math.random()`
+ * and `process.env.MODEL` are globals — an import allowlist is blind to all four *by construction*,
+ * and the vector this feature would realistically be attacked with is a "cache the nearest results"
+ * call, which is one bare identifier wide. G-7.8 makes a new dependency a build failure; this makes
+ * a new *global* one a build failure too. The determinism the package exists to extend — the same
+ * list, byte for byte, on every run and every machine — is a property of its reachable globals, so
+ * the globals are what get checked.
+ *
+ * Code and strings, like G-7.9, so that a stringified call is caught too — a cached response kept as
+ * text is still a network call, and the vocabulary is imported from G-1 rather than retyped, because
+ * "what counts as ambient authority" is one fact with one owner (AGENTS.md §17).
+ */
+export const checkSuggestPackageHasNoAmbientAuthority = (files: readonly SourceFile[]): readonly Finding[] =>
+  findMatchingLines(
+    "G-7",
+    "G-7.11 suggest-package-has-no-ambient-authority",
+    productionFiles(files).filter((file) => file.path.startsWith(SUGGEST_PATH)),
+    tokenPattern(AMBIENT_AUTHORITY_TOKENS),
+    "code+strings",
+  )
 
 /** The whole gate. */
 export const gateVerdictPathPurity = (files: readonly SourceFile[]): readonly Finding[] => [
@@ -204,6 +312,9 @@ export const gateVerdictPathPurity = (files: readonly SourceFile[]): readonly Fi
   ...checkNoAppCodeOnPath(files),
   ...checkDisplayPathPresent(files),
   ...checkRelevanceModuleHasNoOutcome(files),
+  ...checkSuggestPackageIsLeaf(files),
+  ...checkSuggestPackageNamesNoOutcome(files),
+  ...checkSuggestPackageHasNoAmbientAuthority(files),
 ]
 
 /** Re-exported so a caller building an overlay does not have to remember two entry points. */

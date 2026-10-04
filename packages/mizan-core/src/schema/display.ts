@@ -109,4 +109,138 @@ export const Relevance = Schema.Struct({
 })
 export type Relevance = Schema.Schema.Type<typeof Relevance>
 
+/**
+ * One nearby record, as a suggestion may name it.
+ *
+ * ## Why a `nearby` is not an `EvidenceRef`
+ *
+ * `EvidenceRef` is what a verdict rests on: it is inside `VerdictReport`, it feeds the badge, and
+ * it is hash-chained into the run trace. This type is not. It is display-only, it carries no text,
+ * and it is reachable only from `render.ts` — so a renderer cannot read a `nearby` as though it were
+ * the evidence a `verified` badge was computed from, because it is not evidence and the badge was
+ * already decided before this was built.
+ *
+ * ## Why there is no number in here
+ *
+ * There is no `score`, no `percent`, no `confidence`, no overlap count, and no field a caller could
+ * divide to manufacture one. The ranking value stays inside `@mizan/suggest`, and the closeness a
+ * reader wants is printed by the renderer from the EXISTING display-only `longestRunFor`
+ * diagnostic — two integers in a sentence, no quotient. That is the same discipline as `Relevance`
+ * above and `MatchStrength` itself (AGENTS.md §10), and gate G-7.4 enforces it: `percent`,
+ * `confidence`, `score` and `trustScore` are banned property keys on every display module.
+ *
+ * `collection` and `number` are stored separately rather than as a pre-joined label because the
+ * label is a *formatting* decision and belongs to the renderer that already owns it for evidence
+ * (`citationLabel` in `render.ts`). One owner per rule, AGENTS.md §17.
+ *
+ * `grade` is carried exactly as the dataset stores it, with `gradeApplicable`, `gradeSource` and
+ * `gradeBasis`, and the renderer prints it only when applicable (AGENTS.md §15). A grade is never
+ * ours, and a suggestion is never a ruling.
+ */
+export const NearbyRecord = Schema.Struct({
+  /** Dense from 1. Position in a list, not a measurement. */
+  rank: Schema.Number,
+  recordId: Schema.String,
+  collection: Schema.String,
+  number: Schema.NullOr(Schema.String),
+  /** The record's own URL, never one reconstructed from the id. */
+  sourceUrl: Schema.String,
+  attribution: Schema.String,
+  license: Schema.String,
+  grade: Schema.NullOr(Schema.String),
+  gradeApplicable: Schema.Boolean,
+  gradeSource: Schema.String,
+  gradeBasis: Schema.String,
+})
+export type NearbyRecord = Schema.Schema.Type<typeof NearbyRecord>
+
+/**
+ * The three states a suggestion search can be in, and no fourth.
+ *
+ *  - `candidates`      one to five nearby records were found, in rank order.
+ *  - `no_candidates`   the corpus was searched and nothing cleared the floor. This is a fact about
+ *                      proximity, never a fact about authenticity.
+ *  - `unavailable`     the search could not be run, and says why.
+ *
+ * ## The distinction that is load-bearing
+ *
+ * `no_candidates` and `unavailable` are different claims, and collapsing them is the failure this
+ * union exists to prevent: "we looked and found nothing near your quote" and "we could not look"
+ * are opposite sentences, and a reader given the first when the truth was the second has been told
+ * the corpus has no near record when in fact the program never ran. `considered` appears on both
+ * searched states so the scope is visible on screen rather than assumed, and `unavailable` carries
+ * no count because there was no search to count.
+ *
+ * ## An absent `Suggestion` is a fourth state, and it is not in this union
+ *
+ * When suggestions were never computed — the feature is off, the claim was not a rejection, the
+ * quote was absent — there is no `Suggestion` at all, and the renderer prints nothing. That is
+ * honest, because the surface genuinely did not compute anything, and it is why this union has
+ * three members and not five: `not_applicable` and `disabled` would both be claims about *why*
+ * nothing was computed, and the caller that knows the why is the caller that omits the value.
+ */
+/**
+ * Where a suggestion search looked, stated rather than implied.
+ *
+ * ## Why widening has to be in the contract
+ *
+ * A citation names a collection, and a search that answers it with records from a different book has
+ * answered a different question. So the default scope is the cited collection. But a list that quietly
+ * fell back to the whole snapshot when that came up empty reads exactly like a scoped one, and the
+ * reader cannot tell — which is the silent downgrade AGENTS.md §16 exists to prevent. So the scope is
+ * a field, and `widenedFrom` is what makes the widening legible: "nothing was close within bukhari"
+ * is a statement the reader can act on, and it is a different statement from "nothing was close".
+ *
+ * The collection name is the one the CITATION gave, never a name invented here, and it is printed as
+ * it is stored — no normalisation, no aliasing, no second source of truth for a collection's identity
+ * (AGENTS.md §17).
+ */
+export const SuggestionScope = Schema.Union([
+  /** Records were ranked from this collection alone. */
+  Schema.Struct({ kind: Schema.Literal("collection"), collection: Schema.String }),
+  /** The whole snapshot was searched. `widenedFrom` names the collection that came up empty. */
+  Schema.Struct({ kind: Schema.Literal("snapshot"), widenedFrom: Schema.NullOr(Schema.String) }),
+])
+export type SuggestionScope = Schema.Schema.Type<typeof SuggestionScope>
+
+export const SuggestionCandidates = Schema.Struct({
+  state: Schema.Literal("candidates"),
+  /** Records the search examined. Printed, so a bound is visible rather than silent. */
+  considered: Schema.Number,
+  scope: SuggestionScope,
+  candidates: Schema.Array(NearbyRecord),
+})
+export type SuggestionCandidates = Schema.Schema.Type<typeof SuggestionCandidates>
+
+export const SuggestionNoCandidates = Schema.Struct({
+  state: Schema.Literal("no_candidates"),
+  /** Records the search examined. */
+  considered: Schema.Number,
+  scope: SuggestionScope,
+  reason: Schema.String,
+})
+export type SuggestionNoCandidates = Schema.Schema.Type<typeof SuggestionNoCandidates>
+
+export const SuggestionUnavailable = Schema.Struct({
+  state: Schema.Literal("unavailable"),
+  reason: Schema.String,
+})
+export type SuggestionUnavailable = Schema.Schema.Type<typeof SuggestionUnavailable>
+
+export const Suggestion = Schema.Union([SuggestionCandidates, SuggestionNoCandidates, SuggestionUnavailable])
+export type Suggestion = Schema.Schema.Type<typeof Suggestion>
+
+/** The state discriminant, for a caller that switches on it. */
+export type SuggestionState = Suggestion["state"]
+
+/**
+ * The disclaimer that travels with every rendered suggestion.
+ *
+ * One owner, one spelling, imported by every surface that prints a candidate — AGENTS.md §17. A
+ * disclaimer retyped per surface is a disclaimer that will eventually be retyped wrong, and this
+ * one is the load-bearing sentence of the whole feature: it is what stops a list of real records
+ * beside a `REJECTED` badge from reading as a correction, a ruling, or an upgrade.
+ */
+export const SUGGESTION_DISCLAIMER = "nearest suggestions (non-authoritative) — not a verification result"
+
 export * as DisplaySchema from "./display.ts"

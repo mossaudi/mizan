@@ -1,9 +1,10 @@
-import type { Claim, ClaimVerdict, DetectionBasis, Relevance, ResolvedCitation, VerdictReport } from "@mizan/core"
-import { badgeFor, normalizeForTerminal, transcriptLabel } from "@mizan/core"
+import type { Claim, ClaimVerdict, DetectionBasis, NearbyRecord, Relevance, ResolvedCitation, SuggestionScope, VerdictReport } from "@mizan/core"
+import { SUGGESTION_DISCLAIMER, badgeFor, normalizeForTerminal, transcriptLabel } from "@mizan/core"
 import type { TranscriptSource } from "@mizan/agent"
 import { longestRunFor, resolutionKey } from "@mizan/verify"
 import { correctionFor, renderCorrection } from "./correction.ts"
 import { relevanceLabel } from "./relevance.ts"
+import type { NearbyText, SuggestionBlock } from "./suggestions.ts"
 
 /**
  * Rendering. Text nodes only, no markup — AGENTS.md section 11.
@@ -217,6 +218,115 @@ const renderRelevance = (relevance: Relevance | undefined): string => {
 }
 
 /**
+ * The nearest-suggestion block, printed under the correction.
+ *
+ * ## Why this is here and not in `suggestions.ts`
+ *
+ * The feature module owns the composition and the contract; this module owns every string a person
+ * reads. `citationLabel`, `displayed()` and `INDENT` all already live here, and a second copy of the
+ * truncation announcement or of the `collection number` spelling would be exactly the drift
+ * AGENTS.md section 17 exists to prevent.
+ *
+ * ## Why the disclaimer is mandatory and comes first
+ *
+ * `SUGGESTION_DISCLAIMER` is imported from `@mizan/core`, so the terminal, the static page and any
+ * future surface cannot describe this list three different ways. It is printed on EVERY state
+ * including `unavailable`, because the failure mode of this feature is a list of real records from a
+ * real corpus sitting under a `REJECTED` badge and reading as a correction — or worse, as the reason
+ * for the badge. Nothing here can change the badge: the badge above was printed from
+ * `ClaimVerdict`, and this function is handed a `Suggestion` with no verdict in it.
+ *
+ * ## The grade line is conditional
+ *
+ * `gradeApplicable` decides whether a grade is printed at all, and the grade is shown as the
+ * dataset's own attribution (`gradeSource`, `gradeBasis`) rather than as our ruling (AGENTS.md
+ * §15). A hadith collection with no grade concept prints nothing rather than printing `none`.
+ */
+const renderSuggestionLine = (record: NearbyRecord, text: NearbyText | undefined, quote: string): string[] => {
+  const label = citationLabel(record.collection, record.number)
+  const lines = [`${INDENT}${record.rank}. ${normalizeForTerminal(label)} — ${normalizeForTerminal(record.sourceUrl)}`]
+  if (text !== undefined) lines.push(`${CONTINUATION}${normalizeForTerminal(displayed(text.textDisplay))}`)
+  // Display-only, exactly like the `run:` line above: two integers, no quotient, and no path to
+  // `verify.ts` from this file's imports (G-2.2).
+  if (text !== undefined) {
+    const run = longestRunFor(quote, text.textMatch)
+    lines.push(`${INDENT}        shared: ${run.runChars} of ${run.quoteChars} folded characters — display only, never a verdict`)
+  }
+  if (!record.gradeApplicable || record.grade === null) return lines
+  return [...lines, `${INDENT}        grade: ${normalizeForTerminal(record.grade)} (dataset's own grade; ${record.gradeSource}/${record.gradeBasis}, not ours)`]
+}
+
+/**
+ * How the search was scoped, in one sentence, for every state that searched.
+ *
+ * ## Why this is a function and not three format strings at three call sites
+ *
+ * Because the widening is the whole point of having the scope at all. A list drawn from the whole
+ * snapshot after the cited collection came up empty is only *half* as useful as a scoped one, and it
+ * is actively misleading if the reader is not told — so the one thing this line may never do is omit
+ * `widenedFrom`. `SuggestionScope` makes it structurally impossible to omit: a `snapshot` scope
+ * carries the collection name as a field, so there is nothing to forget.
+ */
+const scopeLine = (scope: SuggestionScope): string => {
+  if (scope.kind === "collection") return `within ${normalizeForTerminal(scope.collection)}`
+  if (scope.widenedFrom === null) return "whole snapshot"
+  return `whole snapshot — nothing was close within ${normalizeForTerminal(scope.widenedFrom)}`
+}
+
+/**
+ * One claim's suggestion pass, in every state it can be in.
+ *
+ * `block === null` renders nothing at all, and that is the honest surface: the pass was not run
+ * because the claim was not rejected or carried no quotation. A rejected claim always gets a block,
+ * so a reader is never left inferring "nothing near it" from silence.
+ */
+const renderSuggestion = (block: SuggestionBlock | undefined | null, quote: string): string[] => {
+  if (block === undefined || block === null) return []
+  const { suggestion } = block
+  const header = `${INDENT}${SUGGESTION_DISCLAIMER}:`
+
+  if (suggestion.state === "unavailable") {
+    return [header, `${CONTINUATION}${normalizeForTerminal(suggestion.reason)}`]
+  }
+  if (suggestion.state === "no_candidates") {
+    return [header, `${CONTINUATION}${normalizeForTerminal(suggestion.reason)}`]
+  }
+
+  const texts = new Map(block.texts.map((text) => [text.recordId, text]))
+  const lines = [
+    `${INDENT}${SUGGESTION_DISCLAIMER}: ${suggestion.candidates.length} of ${suggestion.considered} records searched, ${scopeLine(suggestion.scope)}`,
+  ]
+  for (const record of suggestion.candidates) lines.push(...renderSuggestionLine(record, texts.get(record.recordId), quote))
+  return lines
+}
+
+/**
+ * The evidence lines: the record the claim was decided against, or the reason there is none.
+ *
+ * Returned rather than pushed in place so that `renderClaim` has no early return between the badge
+ * and the suggestion block. It used to `return` here when a citation resolved to nothing, which
+ * meant a caller that handed it a block had the block silently dropped — a swallow that looks
+ * identical to "there was nothing to show", the one failure this feature must never have.
+ */
+const sourceLines = (source: SourceExcerpt | null, claim: Claim, quote: string, outcome: ClaimVerdict["verdict"]): string[] => {
+  if (source === null) return [`${INDENT}source:  ${unresolvedLine(claim)}`]
+  const lines = [
+    `${INDENT}source:  ${normalizeForTerminal(source.label)} — ${normalizeForTerminal(source.sourceUrl)}`,
+    `${CONTINUATION}${normalizeForTerminal(displayed(source.textDisplay))}`,
+  ]
+  // Display-only. See the module header: this number cannot reach `verify.ts`, and the badge above
+  // was printed from `ClaimVerdict`, not from anything computed on this line.
+  const run = longestRunFor(quote, source.textMatch)
+  lines.push(`${INDENT}run:     ${run.runChars} of ${run.quoteChars} folded characters shared — display only, never a verdict`)
+  // A correction is offered for a rejection and for nothing else. `correctionFor` is total, so a
+  // rejected claim whose citation resolved to nothing degrades to a stated reason rather than
+  // silently printing nothing — which would read as "there is no correction to make" rather than
+  // "we could not look".
+  lines.push(...renderCorrection(correctionFor({ verdict: outcome, quote, recordTextMatch: source.textMatch })))
+  return lines
+}
+
+/**
  * One claim: the badge, then the evidence for it.
  *
  * `claim` is looked up positionally and may be absent, because `verifyAnswer` preserves order
@@ -227,7 +337,13 @@ const renderRelevance = (relevance: Relevance | undefined): string => {
  * assessment prints as *not assessed*, which is a different statement from any of the three states
  * and is the honest one.
  */
-const renderClaim = (verdict: ClaimVerdict, claim: Claim | undefined, sources: SourceTable, relevance: Relevance | undefined): string[] => {
+const renderClaim = (
+  verdict: ClaimVerdict,
+  claim: Claim | undefined,
+  sources: SourceTable,
+  relevance: Relevance | undefined,
+  suggestion: SuggestionBlock | null,
+): string[] => {
   const lines = [`[${displayVerdict(verdict)}] ${verdict.claimId} — ${verdict.reason} (match: ${verdict.matchStrength.kind})`]
   lines.push(renderRelevance(relevance))
 
@@ -237,27 +353,15 @@ const renderClaim = (verdict: ClaimVerdict, claim: Claim | undefined, sources: S
     return lines
   }
   lines.push(`${INDENT}quoted:  ${normalizeForTerminal(quote)}`)
-
   if (claim === undefined) return lines
-  const source = resolveSource(verdict, claim, sources)
-  if (source === null) {
-    lines.push(`${INDENT}source:  ${unresolvedLine(claim)}`)
-    return lines
-  }
 
-  lines.push(`${INDENT}source:  ${normalizeForTerminal(source.label)} — ${normalizeForTerminal(source.sourceUrl)}`)
-  lines.push(`${CONTINUATION}${normalizeForTerminal(displayed(source.textDisplay))}`)
+  lines.push(...sourceLines(resolveSource(verdict, claim, sources), claim, quote, verdict.verdict))
 
-  // Display-only. See the module header: this number cannot reach `verify.ts`, and the badge
-  // above was printed from `ClaimVerdict`, not from anything computed on this line.
-  const run = longestRunFor(quote, source.textMatch)
-  lines.push(`${INDENT}run:     ${run.runChars} of ${run.quoteChars} folded characters shared — display only, never a verdict`)
-
-  // A correction is offered for a rejection and for nothing else. `correctionFor` is total, so a
-  // rejected claim whose citation resolved to nothing degrades to a stated reason rather than
-  // silently printing nothing — which would read as "there is no correction to make" rather than
-  // "we could not look".
-  lines.push(...renderCorrection(correctionFor({ verdict: verdict.verdict, quote, recordTextMatch: source.textMatch })))
+  // The suggestion block comes last, and it is offered for a rejection and for nothing else. It
+  // reads the quote and the corpus; it cannot read `verdict.matchStrength`, and the badge above was
+  // already decided. `--no-suggestions` simply leaves `suggestions` null, so the block disappears
+  // without any branch here knowing the flag exists.
+  lines.push(...renderSuggestion(suggestion, quote))
   return lines
 }
 
@@ -342,6 +446,12 @@ export const renderReport = (options: {
    * question, which renders as *not assessed* — a fourth, visible state, not a default.
    */
   readonly relevance: readonly Relevance[] | null
+  /**
+   * One suggestion pass per claim, in the same order. `null` entries are claims the pass does not
+   * apply to — a verified claim, or one with no quotation — and they render as nothing at all.
+   * Omitted entirely is the same as all-`null`, so a report assembled by hand needs no change.
+   */
+  readonly suggestions?: readonly (SuggestionBlock | null)[] | null
   readonly transcript: TranscriptSource
   readonly model: string
   readonly sourceCount: number
@@ -365,7 +475,8 @@ export const renderReport = (options: {
   // verdicts print their badge, and the missing evidence prints "no quotation to check".
   options.report.claims.forEach((verdict, index) => {
     const assessed = options.relevance === null ? undefined : options.relevance[index]
-    sections.push(...renderClaim(verdict, options.claims[index], options.sources, assessed))
+    const suggested = options.suggestions === undefined || options.suggestions === null ? null : (options.suggestions[index] ?? null)
+    sections.push(...renderClaim(verdict, options.claims[index], options.sources, assessed, suggested))
   })
   if (options.report.degraded.length > 0) sections.push(`\ndegraded: ${options.report.degraded.join(", ")}`)
   return sections.join("\n")

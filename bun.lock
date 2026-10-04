@@ -10,6 +10,7 @@
         "@mizan/corpus": "workspace:*",
         "@mizan/gate": "workspace:*",
         "@mizan/provenance": "workspace:*",
+        "@mizan/suggest": "workspace:*",
         "@mizan/verify": "workspace:*",
       },
       "devDependencies": {
@@ -26,6 +27,7 @@
         "@mizan/corpus": "workspace:*",
         "@mizan/provenance": "workspace:*",
         "@mizan/retrieval": "workspace:*",
+        "@mizan/suggest": "workspace:*",
         "@mizan/verify": "workspace:*",
       },
       "devDependencies": {
@@ -88,6 +90,7 @@
       },
       "dependencies": {
         "@mizan/core": "workspace:*",
+        "@mizan/suggest": "workspace:*",
         "effect": "4.0.0-beta.83",
       },
       "devDependencies": {
@@ -146,6 +149,17 @@
         "typescript": "5.6.3",
       },
     },
+    "packages/mizan-suggest": {
+      "name": "@mizan/suggest",
+      "version": "0.1.0",
+      "dependencies": {
+        "@mizan/core": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "1.3.14",
+        "typescript": "5.6.3",
+      },
+    },
     "packages/mizan-verify": {
       "name": "@mizan/verify",
       "version": "0.1.0",
@@ -176,6 +190,8 @@
     "@mizan/provenance": ["@mizan/provenance@workspace:packages/mizan-provenance"],
 
     "@mizan/retrieval": ["@mizan/retrieval@workspace:packages/mizan-retrieval"],
+
+    "@mizan/suggest": ["@mizan/suggest@workspace:packages/mizan-suggest"],
 
     "@mizan/verify": ["@mizan/verify@workspace:packages/mizan-verify"],
 

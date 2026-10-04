@@ -7,6 +7,7 @@ import { resolveCitations } from "@mizan/corpus"
 import { verifyAnswer } from "@mizan/verify"
 import { runSpine, transcriptProvider, type Provider, type RetrievedContext, type TranscriptFile } from "@mizan/agent"
 import { buildSourceTable, renderReport } from "./render.ts"
+import { suggestionsFor } from "./suggestions.ts"
 import { assessRelevance } from "./relevance.ts"
 import { makeRetriever } from "./retriever.ts"
 import { DEMO_QUESTIONS_RELATIVE, readDemoQuestionSet } from "./demo-questions.ts"
@@ -194,6 +195,11 @@ const runQuestion = async (
     claims: outcome.answer.claims,
     sources: buildSourceTable(resolved),
     relevance: outcome.answer.claims.map((claim) => assessRelevance(question.question, claim.quote ?? "")),
+    // The same feature the judge sees on a keyed run, over the same real snapshot, for the same
+    // rejections — a demo that dropped it would be showing the product without the part the
+    // customer asked for. It is display-only and reads no verdict, so it cannot move a badge, and
+    // the expectation checks below are computed from `report`, not from anything printed here.
+    suggestions: suggestionsFor(corpus.db, outcome.answer.claims, report.claims),
     transcript: outcome.transcript,
     model: provider.model,
     sourceCount: outcome.contexts.length,
