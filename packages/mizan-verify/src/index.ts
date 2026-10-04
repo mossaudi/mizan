@@ -5,10 +5,11 @@
  * edit-distance, no fuzzy matching, no network, no clock, no randomness, no locale.
  * Every route to a `verified` verdict terminates in `steps/containment.ts`.
  *
- * `src/diagnostics/` holds the display-only longest-run diagnostic. It is exported so
- * the report can render it, and gate **G-1** fails the build if `verify.ts` imports it.
- * That separation is the point: a judge should see how close a `rejected` quote came,
- * and no code path should be able to convert that number into a verdict.
+ * `src/diagnostics/` holds the display-only longest-run diagnostic and the display-only
+ * closeness floor that decides which records the suggestion list may print. Both are
+ * exported so the report can render them, and gate **G-1** fails the build if `verify.ts`
+ * imports them. That separation is the point: a judge should see how close a `rejected`
+ * quote came, and no code path should be able to convert that number into a verdict.
  *
  * `steps/anchor.ts` is the second, non-`verified` route: it answers "is this abridgement
  * in the record we already resolved?" with a span or with nothing. Gate **G-7** fails the
@@ -31,3 +32,10 @@ export {
   type RedTeamFixture,
 } from "./red-team.ts"
 export { longestRunFor, locatedSpanFor, type LongestRun, type LocatedSpan } from "./diagnostics/longest-run.ts"
+export {
+  MIN_SHARED_RUN_CHARS,
+  runClearsFloor,
+  runClearsFloorAt,
+  sharedRunOf,
+  type SharedRun,
+} from "./diagnostics/nearest-floor.ts"

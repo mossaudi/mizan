@@ -16,7 +16,7 @@ import { verifyAnswer } from "@mizan/verify"
 import type { Provider } from "@mizan/agent"
 import { runSpine } from "@mizan/agent"
 import { appendRunTrace } from "@mizan/provenance"
-import { buildSourceTable, renderReport, type QuestionLanguage } from "./render.ts"
+import { buildSourceTable, renderReport, renderSuggestions, type QuestionLanguage } from "./render.ts"
 import { suggestionsFor } from "./suggestions.ts"
 import { assessRelevance } from "./relevance.ts"
 import { makeRetriever } from "./retriever.ts"
@@ -205,14 +205,17 @@ const ask = async (
   })
   const verificationMs = Math.round(performance.now() - verificationStartedAt)
 
-  // After verification, and only for a rejection. The scan is a full pass over the snapshot per
-  // rejected claim (ADR-08), so it runs here rather than inside the verify budget: a suggestion
-  // must never be able to spend the time a verdict was allowed, and a run that times out must still
-  // have printed the verdict. `--no-suggestions` skips the pass entirely, so the flag costs nothing
-  // and prints nothing — not even "suggestions were disabled", because a silent absence is what the
-  // reader of an unlabelled list could not distinguish from "we found nothing".
-  const suggestions = suggest ? suggestionsFor(db, outcome.answer.claims, report.claims) : null
-
+  // AFTER verification, and only for a rejection — and after the verdicts are already on screen.
+  //
+  // The scan is a full pass over the snapshot per rejected claim (ADR-08), so it runs here rather
+  // than inside the verify budget: a suggestion must never be able to spend the time a verdict was
+  // allowed, and a run that times out must still have printed the verdict. The report is printed
+  // FIRST, without this section, and the suggestion block is appended afterwards — so the badge has
+  // already reached the terminal before a single record is read, and a suggestion failure can only
+  // add a failure notice to output that is already complete. `--no-suggestions` skips the pass
+  // entirely, so the flag costs nothing and prints nothing — not even "suggestions were disabled",
+  // because a silent absence is what the reader of an unlabelled list could not distinguish from
+  // "we found nothing".
   console.log(
     renderReport({
       prose: outcome.answer.prose,
@@ -223,7 +226,6 @@ const ask = async (
       // It cannot change a badge — gate G-7.7 forbids the relevance module from naming one — but
       // printing it is what stops a contained-but-off-topic quote reading as a responsive answer.
       relevance: outcome.answer.claims.map((claim) => assessRelevance(question, claim.quote ?? "")),
-      suggestions,
       transcript: outcome.transcript,
       model: provider.model,
       sourceCount: outcome.contexts.length,
@@ -231,6 +233,12 @@ const ask = async (
       question: asked,
     }),
   )
+
+  const suggestions = suggest ? suggestionsFor(db, outcome.answer.claims, report.claims) : null
+  if (suggestions !== null) {
+    const section = renderSuggestions(suggestions, report.claims)
+    console.log(section.length === 0 ? "" : `\n${section}`)
+  }
 
   const trusted = await record(root, buildDraft({
     runId: crypto.randomUUID(),

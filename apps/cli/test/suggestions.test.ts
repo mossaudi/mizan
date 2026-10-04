@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { Database } from "bun:sqlite"
 import { SUGGESTION_DISCLAIMER, normalizeForMatch, normalizeQuote, type Claim, type ClaimVerdict, type VerdictReport } from "@mizan/core"
 import { buildSnapshot, openSnapshot, resolveCitations, toCorpusRecord } from "@mizan/corpus"
-import { verifyAnswer } from "@mizan/verify"
+import { MIN_SHARED_RUN_CHARS, verifyAnswer } from "@mizan/verify"
 import { buildSourceTable, renderReport } from "../src/render.ts"
 import { suggestionFor, suggestionsFor, type SuggestionBlock } from "../src/suggestions.ts"
 
@@ -131,7 +131,38 @@ describe("a rejection is offered the records near its quote", () => {
     // only restate. What matters to a reader is the claim the line is making: both verbatim holders
     // precede the verse that shares almost nothing with them.
     expect(ids.slice(0, 3).sort()).toEqual(["bukhari:1", "bukhari:2", "quran:2:255"])
-    expect(ids[ids.length - 1]).toBe("quran:112:1")
+    // Surah 112 is what this assertion is FOR, and it is now not returned at all. It cleared eight
+    // shared 3-gram types — `الله`, `ولم` and friends are everywhere in Arabic — while sharing almost
+    // no contiguous characters, so the reader was shown four unrelated records with no way to tell
+    // that from four relevant ones. The display floor drops it, the list shortens rather than being
+    // padded, and the reason is a unit the reader can check on the line it would have been printed on.
+    expect(ids).not.toContain("quran:112:1")
+    expect(block.suggestion.candidates.length).toBeLessThan(5)
+    for (const candidate of block.suggestion.candidates) {
+      expect(candidate.sharedRunChars).toBeGreaterThanOrEqual(MIN_SHARED_RUN_CHARS)
+    }
+  })
+
+  test("the returned rows are dense from 1 after the floor drops some, because rank is a line number", () => {
+    // A floor that filtered would otherwise leave the ranker's own numbers on screen: 1, 3, 4 —
+    // positions in a list the reader never saw. A rank that is not the line number misdirects the
+    // correction it would support, which points a caret at a specific record.
+    const block = suggestionFor(db, FABRICATED)
+    if (block === null || block.suggestion.state !== "candidates") throw new Error("expected candidates")
+    expect(block.suggestion.candidates.map((candidate) => candidate.rank)).toEqual(
+      block.suggestion.candidates.map((_candidate, index) => index + 1),
+    )
+  })
+
+  test("the quote's own length rides the block once, and every row is measured against it", () => {
+    const block = suggestionFor(db, FABRICATED)
+    if (block === null || block.suggestion.state !== "candidates") throw new Error("expected candidates")
+    // One denominator for the whole list: the same quote cannot have two lengths, and "35 of 60"
+    // beside "8 of 62" would be two different questions.
+    expect(block.suggestion.quoteChars).toBeGreaterThan(0)
+    for (const candidate of block.suggestion.candidates) {
+      expect(candidate.sharedRunChars).toBeLessThanOrEqual(block.suggestion.quoteChars)
+    }
   })
 
   test("the two identical verses produce one line, not two", () => {
@@ -147,13 +178,20 @@ describe("a rejection is offered the records near its quote", () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
-  test("the count of records searched is printed, so the scope is visible", () => {
+  test("how many records were returned out of how many were scanned is printed, so the scope is visible", () => {
+    // "N of M records searched" implied that the N on screen was what the search kept. What a reader
+    // needs to see is the pair: what they got, and what was read to get it. A list of two out of six
+    // is a deliberate answer to a narrow question; "2 records searched" is the same two numbers
+    // describing a search that found two things and stopped.
     const block = suggestionFor(db, FABRICATED)
     if (block === null || block.suggestion.state !== "candidates") throw new Error("expected candidates")
     expect(block.suggestion.considered).toBe(6)
     const claims = [claimOf(FABRICATED)]
     const text = screen(claims, suggestionsFor(db, claims, verify(claims).claims))
-    expect(text).toContain("2 of 6 records searched")
+    // Scoped to the collection the citation named, so the six scanned records are answered by the one
+    // in that book. `2` here is the count that actually cleared the display floor, not the count the
+    // ranker produced — that distinction is the whole point of the header line.
+    expect(text).toContain("1 returned of 6 records scanned")
   })
 
   test("the disclaimer is printed, in the shared spelling", () => {
@@ -178,7 +216,7 @@ describe("scoping to the collection the citation named", () => {
   test("the scope is printed, so a reader can see which book the lines came from", () => {
     const claims = claimCiting("bukhari", "1", FABRICATED)
     const text = screen(claims, suggestionsFor(db, claims, verify(claims).claims))
-    expect(text).toContain("records searched, within bukhari")
+    expect(text).toContain("2 returned of 6 records scanned, within bukhari")
   })
 
   test("a collection with nothing near the quote widens, and says which collection came up empty", () => {
@@ -285,14 +323,24 @@ describe("the badge is untouched by every state of the feature", () => {
 })
 
 describe("the honest failure states", () => {
-  test("a quote nothing resembles says so, and counts what it searched", () => {
+  test("a quote nothing resembles says which of the two failures it was, and the block counts what it scanned", () => {
     // Surah 1, which shares less than the floor of eight shared trigram types with anything in this
     // fixture — checked rather than assumed, because "nothing resembles this" is a claim about the
     // snapshot and the snapshot grows. The English sentence this used to name is no longer an example
     // of anything: it is now near `tirmidhi:1`, which is the fixture agreeing that it is close.
+    //
+    // The reason names WHICH floor produced nothing. "Nothing was near enough to rank" and "nothing
+    // ranked was close enough to show" are different facts about a reader's quote, and one string for
+    // both would tell someone their fabrication matched nothing when five records matched it a little.
     const block = suggestionFor(db, "الحمد لله رب العالمين")
     if (block === null || block.suggestion.state !== "no_candidates") throw new Error("expected no_candidates")
-    expect(block.suggestion.reason).toContain("6 records searched")
+    expect(block.suggestion.reason).toBe("nothing in the corpus was near enough to rank")
+
+    // And the counts and the scope are on the block, which is where the renderer reads them from.
+    expect(block.suggestion.considered).toBe(6)
+    const claims = [claimOf("الحمد لله رب العالمين")]
+    const text = screen(claims, suggestionsFor(db, claims, verify(claims).claims))
+    expect(text).toContain("0 returned of 6 records scanned, whole snapshot")
   })
 
   test("an empty quote is not a search and not a failure", () => {
@@ -333,6 +381,14 @@ describe("the honest failure states", () => {
     })
     expect(text).toContain(SUGGESTION_DISCLAIMER)
     expect(text).toContain("row_undecodable")
+    // The two things the degradation matrix promises about this surface, asserted on the rendered
+    // string rather than on the reason alone. `bad:1` is the record id the failure carries and `نص` is
+    // the row's text; a matrix that documented "the tag alone" while the renderer printed either would
+    // be the same drift the cycle exists to remove, and the only way to notice is to pin both.
+    expect(text).not.toContain("bad:1")
+    expect(text).not.toContain("نص")
+    // No count either: there was no search to count, so a number on this line would describe nothing.
+    expect(text).not.toContain("records scanned")
     broken.close()
   })
 })

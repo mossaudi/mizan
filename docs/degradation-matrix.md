@@ -53,9 +53,23 @@ states, and each has one correct surface:
 
 | Suggestion state | Trigger | Correct surface | Forbidden surfaces |
 |---|---|---|---|
-| `candidates` | One or more records cleared the floor | up to three lines, under `nearest suggestions (non-authoritative) — not a verification result` | any wording that reads as a correction, a grade, or a second opinion |
-| `no_candidates` | The scan read every record and none cleared the floor | "no record in this snapshot is close to this quotation (27,234 records searched)" | a guess, a cached list, an empty section with no explanation |
-| `unavailable` | A row could not be decoded, so `considered` would be a lie | `unavailable`, naming the row id and never its text | a partial list presented as the whole search |
+| `candidates` | One or more records cleared the **display** floor of 12 shared folded characters (ADR-12) | one to five lines, each reading `shared: N of M folded characters - display only, never a verdict`, under `nearest suggestions (non-authoritative) - not a verification result`, followed on the header line by `X returned of Y records scanned` and the scope in words | any wording that reads as a correction, a grade, or a second opinion; a percentage |
+| `no_candidates` | The scan read every record and none cleared the floor | the reason first — which distinguishes *nothing was near enough to rank* from *something ranked and was not close enough to show* — then `0 returned of Y records scanned` and the scope, on one line | a guess, a cached list, an empty section with no explanation |
+| `unavailable` | The scan or the winners' re-read failed, so there is no count to report | `unavailable`, naming the failure by its `_tag` alone and never its payload — a decode failure's detail can quote the offending row, and corpus text belongs in no output of this program | a partial list presented as the whole search; a failure detail; any count, because there was no search to count |
+
+The three `unavailable` reasons are exactly `the corpus could not be searched for nearby records (<tag>)`,
+where `<tag>` is the failure's own name — `row_undecodable`, `parse_failed`, or the fixed phrase
+`a nearby record could not be re-read` for a winner that vanished between the scan and the re-read.
+Naming the tag and nothing else is deliberate: `row_undecodable` carries a record id and a detail in
+the error object, and a decode detail can quote the offending value, so both are dropped at the
+boundary. Corpus text belongs in no output of this program (AGENTS.md §13), and a failure detail is
+the one place a corpus row would otherwise reach a terminal.
+
+The counts are not decoration. `Y` is the number of records the scan actually read and `X` is what
+survived the floor, so a bound on the list is visible rather than implied — and `0 returned of 27,234
+records scanned` is a statement a reader can weigh, where an empty section is not. The two integers
+beside each record are the same measurement the floor was applied to, which is what lets a reader check
+the threshold rather than take it on trust.
 
 A suggestion failure is **never** a verdict failure: an undecodable row makes the *suggestions*
 unavailable, while the verdict that was already printed stands unchanged. The converse is also enforced —
@@ -63,8 +77,9 @@ no suggestion can change, upgrade or block a verdict, and the flag `--no-suggest
 entirely rather than silently degrading it.
 
 The cost is stated rather than hidden: one exhaustive scan of the snapshot per rejected claim, measured
-at **p50 594 ms / p95 709 ms / max 715 ms** on the committed 27,234-record corpus against a `< 50 ms`
-target that this architecture does not meet (ADR-08). That is the slowest of five consecutive runs;
+at **p50 644 ms / p95 753 ms / max 1110 ms** on the committed 27,234-record corpus
+`snapshotHash=7b3b66fbca7fb9df.` against a `< 50 ms` target that this architecture does not meet
+(ADR-08). That is the slowest of five consecutive runs;
 `docs/specs/measurements.md` is the one place the figure and the conditions it was measured under are
 recorded — corpus identity, case count, quantile rule, cache state, runtime, platform, CPU, and the
 1.5x band a rerun may differ by — and `bun run eval:suggestions` prints both in the same run.

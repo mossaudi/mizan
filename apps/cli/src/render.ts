@@ -73,6 +73,16 @@ import type { NearbyText, SuggestionBlock } from "./suggestions.ts"
  * number is always present and is plainly not what decided anything. The integers `runChars` and
  * `quoteChars` are printed; the module's `displayPercent` is deliberately not, so no number on
  * screen can be mistaken for a match score.
+ *
+ * ## The suggestion list prints the numbers it was given, and holds no closeness of its own
+ *
+ * The `run:` line above is measured here, because the source excerpt is already in hand for a claim
+ * that has one. The `shared:` line under each suggestion candidate is not: it is read off the
+ * `Suggestion` contract, measured once by `suggestions.ts` in the units the display floor is stated
+ * in. That asymmetry is deliberate. A candidate line is a decision — the row survived
+ * `MIN_SHARED_RUN_CHARS` — and a decision whose inputs are computed somewhere other than where it is
+ * printed is a decision nobody can check. The floor is in the same unit as the line, so "12" on the
+ * header means the same thing as "11" on a row that is not shown.
  */
 
 /**
@@ -242,16 +252,29 @@ const renderRelevance = (relevance: Relevance | undefined): string => {
  * dataset's own attribution (`gradeSource`, `gradeBasis`) rather than as our ruling (AGENTS.md
  * §15). A hadith collection with no grade concept prints nothing rather than printing `none`.
  */
-const renderSuggestionLine = (record: NearbyRecord, text: NearbyText | undefined, quote: string): string[] => {
+/**
+ * One candidate line, plus the numbers that let a reader check it.
+ *
+ * ## Why `sharedRunChars` is read off the contract and not measured here
+ *
+ * This used to call `longestRunFor` itself, on `textMatch`, for every row it printed. That was a
+ * second measurement of the same pair from a second module, and it meant the number under a candidate
+ * and the decision that admitted the candidate were computed independently — so nothing on screen
+ * could contradict the threshold that produced it. Now the feature module measures once, in the units
+ * the floor is stated in, and the renderer prints what it was given. One measurement, one owner
+ * (AGENTS.md §17), and a reader can compare the line against the floor because the floor is in the
+ * same unit.
+ *
+ * The text itself is still needed, for the `displayed()` truncation and the annotation strip — but
+ * never `textMatch`, which is a matching key and not a transcription.
+ */
+const renderSuggestionLine = (record: NearbyRecord, text: NearbyText | undefined, quoteChars: number): string[] => {
   const label = citationLabel(record.collection, record.number)
   const lines = [`${INDENT}${record.rank}. ${normalizeForTerminal(label)} — ${normalizeForTerminal(record.sourceUrl)}`]
   if (text !== undefined) lines.push(`${CONTINUATION}${normalizeForTerminal(displayed(text.textDisplay))}`)
-  // Display-only, exactly like the `run:` line above: two integers, no quotient, and no path to
-  // `verify.ts` from this file's imports (G-2.2).
-  if (text !== undefined) {
-    const run = longestRunFor(quote, text.textMatch)
-    lines.push(`${INDENT}        shared: ${run.runChars} of ${run.quoteChars} folded characters — display only, never a verdict`)
-  }
+  // Display-only, exactly like the `run:` line above: two whole numbers, no quotient, and no path to
+  // `verify.ts` from this file's imports (G-2.2, G-7.12).
+  lines.push(`${INDENT}        shared: ${record.sharedRunChars} of ${quoteChars} folded characters — display only, never a verdict`)
   if (!record.gradeApplicable || record.grade === null) return lines
   return [...lines, `${INDENT}        grade: ${normalizeForTerminal(record.grade)} (dataset's own grade; ${record.gradeSource}/${record.gradeBasis}, not ours)`]
 }
@@ -274,29 +297,54 @@ const scopeLine = (scope: SuggestionScope): string => {
 }
 
 /**
+ * How many records the reader got out of how many the search read.
+ *
+ * "Records searched" was the old wording and it was a small lie in the direction that matters: it
+ * implied the number on screen was what the search kept, so a list of five out of twenty thousand
+ * read as the search having found five things. The honest pair is what was RETURNED and what was
+ * SCANNED — which is also what makes a one-line list look deliberate instead of broken, and what
+ * makes an empty list attributable to the display floor rather than to the search.
+ *
+ * Zero is printed as `0` rather than elided. "no records of 27,234 scanned" is the `no_candidates`
+ * state, and eliding the numerator would print a sentence with no subject.
+ */
+const returnedOfScanned = (returned: number, scanned: number): string =>
+  `${returned} returned of ${scanned} records scanned`
+
+/**
  * One claim's suggestion pass, in every state it can be in.
  *
  * `block === null` renders nothing at all, and that is the honest surface: the pass was not run
  * because the claim was not rejected or carried no quotation. A rejected claim always gets a block,
  * so a reader is never left inferring "nothing near it" from silence.
+ *
+ * ## Why `no_candidates` now prints its counts and its scope too
+ *
+ * It carried both fields and rendered neither, which made the state read as a shrug. A reader who was
+ * told "nothing was close enough to show" and was not told that 27,234 records were scanned, or that
+ * the search had widened past the cited collection, could not tell a thorough search from a search
+ * that gave up early. Both facts were already on the contract; only the printing was missing.
+ *
+ * `unavailable` still prints no count, because there was no search to count — a number there would
+ * describe nothing, and inventing one is the fail-open this repository does not do.
  */
-const renderSuggestion = (block: SuggestionBlock | undefined | null, quote: string): string[] => {
+const renderSuggestion = (block: SuggestionBlock | undefined | null, label: string): string[] => {
   if (block === undefined || block === null) return []
   const { suggestion } = block
-  const header = `${INDENT}${SUGGESTION_DISCLAIMER}:`
+  const header = `${INDENT}${SUGGESTION_DISCLAIMER} ${label}:`
 
   if (suggestion.state === "unavailable") {
     return [header, `${CONTINUATION}${normalizeForTerminal(suggestion.reason)}`]
   }
   if (suggestion.state === "no_candidates") {
-    return [header, `${CONTINUATION}${normalizeForTerminal(suggestion.reason)}`]
+    const counts = `${returnedOfScanned(0, suggestion.considered)}, ${scopeLine(suggestion.scope)}`
+    return [header, `${CONTINUATION}${normalizeForTerminal(suggestion.reason)} — ${counts}`]
   }
 
   const texts = new Map(block.texts.map((text) => [text.recordId, text]))
-  const lines = [
-    `${INDENT}${SUGGESTION_DISCLAIMER}: ${suggestion.candidates.length} of ${suggestion.considered} records searched, ${scopeLine(suggestion.scope)}`,
-  ]
-  for (const record of suggestion.candidates) lines.push(...renderSuggestionLine(record, texts.get(record.recordId), quote))
+  const counts = `${returnedOfScanned(suggestion.candidates.length, suggestion.considered)}, ${scopeLine(suggestion.scope)}`
+  const lines = [`${INDENT}${SUGGESTION_DISCLAIMER} ${label}: ${counts}`]
+  for (const record of suggestion.candidates) lines.push(...renderSuggestionLine(record, texts.get(record.recordId), suggestion.quoteChars))
   return lines
 }
 
@@ -342,7 +390,6 @@ const renderClaim = (
   claim: Claim | undefined,
   sources: SourceTable,
   relevance: Relevance | undefined,
-  suggestion: SuggestionBlock | null,
 ): string[] => {
   const lines = [`[${displayVerdict(verdict)}] ${verdict.claimId} — ${verdict.reason} (match: ${verdict.matchStrength.kind})`]
   lines.push(renderRelevance(relevance))
@@ -356,12 +403,47 @@ const renderClaim = (
   if (claim === undefined) return lines
 
   lines.push(...sourceLines(resolveSource(verdict, claim, sources), claim, quote, verdict.verdict))
+  return lines
+}
 
-  // The suggestion block comes last, and it is offered for a rejection and for nothing else. It
-  // reads the quote and the corpus; it cannot read `verdict.matchStrength`, and the badge above was
-  // already decided. `--no-suggestions` simply leaves `suggestions` null, so the block disappears
-  // without any branch here knowing the flag exists.
-  lines.push(...renderSuggestion(suggestion, quote))
+/**
+ * The suggestion blocks, as their own section after the verdicts.
+ *
+ * ## Why they left the claim body, and what that buys
+ *
+ * They used to be pushed inside `renderClaim`, which meant the string a reader saw could not exist
+ * until a full scan of the snapshot had finished for every rejected claim. The suggestion pass reads
+ * 27,234 records and takes most of a second per rejected claim — so a slow corpus delayed the *badge*
+ * by most of a second, and any throw in the pass took the verdict with it. The magnitude is the
+ * argument; the exact figure is not quoted here on purpose. `docs/specs/measurements.md` is its one
+ * owner, it is machine-checked against the recorded artefact, and a source comment restating a copy
+ * of it is a second copy with no owner — which is the defect ADR-C10 exists to close. That is the wrong dependency direction:
+ * the suggestions are derived from the verdict, and a derived thing that can suppress its own
+ * source is not derived, it is upstream.
+ *
+ * Printing them after the verdicts makes the isolation structural instead of editorial. `main.ts`
+ * prints the report above, then runs the scan, then prints this section; the verdict text has already
+ * reached the terminal before a single record is read, and a suggestion failure can only append a
+ * failure notice to output that is already complete. The badge still cannot change — nothing in
+ * `suggestions.ts` holds a `ClaimVerdict` — but now nothing in it can even delay one.
+ *
+ * Each block is labelled with its claim id, because a section after the fact has to say which
+ * rejection it is answering or it is a list floating under unrelated badges.
+ *
+ * `--no-suggestions` leaves the array null and this returns nothing, so the flag needs no branch in
+ * any of the code above it.
+ */
+const renderSuggestionSections = (
+  suggestions: readonly (SuggestionBlock | null)[] | null | undefined,
+  verdicts: readonly ClaimVerdict[],
+): string[] => {
+  if (suggestions === undefined || suggestions === null) return []
+  const lines: string[] = []
+  suggestions.forEach((block, index) => {
+    if (block === null) return
+    const claimId = verdicts[index]?.claimId ?? `claim ${index + 1}`
+    lines.push(...renderSuggestion(block, `for ${claimId}`))
+  })
   return lines
 }
 
@@ -450,6 +532,9 @@ export const renderReport = (options: {
    * One suggestion pass per claim, in the same order. `null` entries are claims the pass does not
    * apply to — a verified claim, or one with no quotation — and they render as nothing at all.
    * Omitted entirely is the same as all-`null`, so a report assembled by hand needs no change.
+   *
+   * Rendered as its own section after the verdicts, never inside a claim body — see
+   * `renderSuggestionSections` for why the suggestion pass must not sit between a reader and a badge.
    */
   readonly suggestions?: readonly (SuggestionBlock | null)[] | null
   readonly transcript: TranscriptSource
@@ -475,11 +560,24 @@ export const renderReport = (options: {
   // verdicts print their badge, and the missing evidence prints "no quotation to check".
   options.report.claims.forEach((verdict, index) => {
     const assessed = options.relevance === null ? undefined : options.relevance[index]
-    const suggested = options.suggestions === undefined || options.suggestions === null ? null : (options.suggestions[index] ?? null)
-    sections.push(...renderClaim(verdict, options.claims[index], options.sources, assessed, suggested))
+    sections.push(...renderClaim(verdict, options.claims[index], options.sources, assessed))
   })
+  sections.push(...renderSuggestionSections(options.suggestions, options.report.claims))
   if (options.report.degraded.length > 0) sections.push(`\ndegraded: ${options.report.degraded.join(", ")}`)
   return sections.join("\n")
 }
+
+/**
+ * The suggestion section on its own, so a caller can print the verdicts first.
+ *
+ * Exported because `main.ts` genuinely needs the split: it prints the report, and only then runs the
+ * suggestion pass, so the badge cannot be delayed by a scan of 27,234 records. The string is produced
+ * by the same function `renderReport` uses, so a caller that renders both halves gets the same layout
+ * as one that renders the whole report at once — one owner for the wording, two ways to sequence it.
+ */
+export const renderSuggestions = (
+  suggestions: readonly (SuggestionBlock | null)[] | null | undefined,
+  verdicts: readonly ClaimVerdict[],
+): string => renderSuggestionSections(suggestions, verdicts).join("\n")
 
 export * as Render from "./render.ts"

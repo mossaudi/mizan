@@ -12,19 +12,35 @@ import { byCodeUnit, byNeighbourOrder, rankCandidates, type NeighbourCandidate }
  *
  * ## Why the floor is a named constant and not an argument
  *
- * `8` is anchored to the verifier's `MIN_SPAN_CHARS = 8`: a correction span must survive eight
- * canonical characters to be offered at all, and a suggestion that is weaker than the threshold for
- * mentioning a correction is noise dressed as help. It is a constant here so that
- * `rankNeighbours` cannot be called with a floor of 0 by accident — and the floor is still reachable
- * for measurement through `rankNeighboursAtFloor`, because the recorded coverage number in
+ * `8` is a **narrowing floor, not a display decision**: it says how many distinct 3-gram types a row
+ * must share with the quote before ranking is allowed to spend a sort key on it. It is a constant here
+ * so that `rankNeighbours` cannot be called with a floor of 0 by accident — and the floor is still
+ * reachable for measurement through `rankNeighboursAtFloor`, because the recorded coverage number in
  * `scripts/eval/suggest-coverage.ts` is reported at 4, 8 and 12 and a harness that could not vary
  * the floor could not keep that number honest.
+ *
+ * ## What this floor is NOT, and where the one that IS lives
+ *
+ * It is not a measure of whether a record is close enough to show. This module cannot make that call:
+ * it never sees the record's full text in folded coordinates on the far side of the display boundary,
+ * and it is forbidden from the vocabulary a decision is made of (ADR-07). Eight shared window types
+ * is reachable by accident — `MAX_ROWS_RANKED` records its consequence, 20,796 of 27,234 on a
+ * fabricated hadith — so the floor admits far more than it should display and hides nothing.
+ *
+ * The floor that decides what a reader is *shown* is `MIN_SHARED_RUN_CHARS` in
+ * `packages/mizan-verify/src/diagnostics/nearest-floor.ts`, stated in the folded characters the
+ * reader can see rather than in 3-gram types they cannot. Two floors, two jobs, two modules: this one
+ * is a cost decision about ranking, that one is a display decision about a list (ADR-12).
  *
  * Deduplication by folded text and the code-unit ordering that makes the result reproducible are
  * ADR-10, and both live in `rank.ts` and below.
  */
 
-/** Shared 3-gram types a record must reach to be offered at all. Anchored to `MIN_SPAN_CHARS`. */
+/**
+ * Shared 3-gram types a record must reach before ranking will spend a sort key on it.
+ *
+ * A narrowing and cost floor. The value 8 is unchanged; what it decides is now stated above.
+ */
 export const MIN_SHARED_TRIGRAMS = 8
 
 /** What a caller gets when it does not ask for a count: three lines, which is a readable block. */

@@ -36,7 +36,7 @@ each rate below is stated once,
 in the table, and no percentage anywhere in this file may borrow a spelling credited there — which is
 why this paragraph names no figure of its own. A count is not a rate, so the `caseCount` and
 `corpusRecordCount` rows below may never be written as percentages, and a difference is printed in
-percentage points, never as one. The other five audited documents are not held to that promise,
+percentage points, never as one. The other nine audited documents are not held to that promise,
 because none of them makes it; `ADR-C8` names the figures in them that this leaves unpoliced rather
 than leaving the limit implicit.
 

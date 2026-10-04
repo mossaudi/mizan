@@ -122,9 +122,9 @@ a second finding for the same line.
 Three limits are named here rather than left implicit, because a rule whose boundaries are unwritten is
 the thing this ADR is correcting:
 
-- **The other five audited documents are not held to the promise**, because none of them makes it.
+- **The other nine audited documents are not held to the promise**, because none of them makes it.
   `README.md`'s `41.7%` and `99%`, `INTEGRITY.md`'s `8%` and `DISCLOSURE.md`'s `19%` are heterogeneous
-  figures from unrelated commits. A rule demanding all six source every percentage would be satisfied
+  figures from unrelated commits. A rule demanding all ten source every percentage would be satisfied
   by registering more numbers or switched off; the document that actually promises something is the one
   worth holding to it. `FIGURE_PROMISE_DOCUMENTS` in `packages/mizan-gate/src/docs-check.ts` is the one
   list that says which documents those are.

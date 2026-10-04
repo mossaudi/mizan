@@ -122,7 +122,7 @@ follows when it prints `n/a` for a rate it did not compute.
 |---|---|---|---|
 | Read throughput | measured only for chain verify | untested | untested |
 | Write throughput | untested | unchanged by design | untested |
-| Verification latency | claimed <50 ms p50 in the spec, not reproduced here | must not regress | must not regress |
+| Verification latency | claimed <50 ms p50 in the spec, **not reproduced**; the nearest-quote search measured p50 644 ms, p95 753 ms, max 1110 ms on corpus `snapshotHash=7b3b66fbca7fb9df` (`docs/specs/measurements.md`) | must not regress | must not regress |
 | Determinism | asserted by the 100x gate | must still hold | must still hold |
 
 **What is missing before any of this could be measured:** a load generator that drives concurrent

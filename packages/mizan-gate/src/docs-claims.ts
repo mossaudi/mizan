@@ -59,6 +59,8 @@ export type DocsRule =
   | "live-provider-denied"
   | "gate-count-stale"
   | "benchmark-claim-unbacked"
+  | "latency-claim-unbacked"
+  | "latency-corpus-unnamed"
   | "answer-quality-claim"
   | "adr-citation-unresolved"
   | "adr-document-incomplete"

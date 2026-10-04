@@ -14,6 +14,7 @@ import { checkEvalBreadth } from "./docs-artifacts.ts"
 import { checkLiveProviderClaim } from "./docs-egress.ts"
 import { checkAnswerQualityClaim, checkBenchmarkClaimUnbacked, statementBacking, type StatedBenchmark } from "./docs-value.ts"
 import { checkExternalClaimUnbacked, externalClaimFigures, EXTERNAL_CLAIMS_PATH } from "./docs-external.ts"
+import { checkLatencyCorpusNamed, checkLatencyFigureUnbacked } from "./docs-value-latency.ts"
 import { checkExecutorLabelBlindness, EXECUTOR_PATH } from "./docs-benchmark.ts"
 import { checkVerdictPolarityInverted } from "./docs-polarity.ts"
 import { ADR_DIRECTORY, checkAdrCitationUnresolved, checkAdrDocument } from "./docs-adr.ts"
@@ -87,7 +88,16 @@ export const REQUIRED_DOCUMENTS = ["DISCLOSURE.md", "README.md", "INTEGRITY.md"]
  * other two: a fork that ships no runbook has committed no defect, and
  * `test/docs-runbook.test.ts` is what holds *this* submission to having one.
  */
-export const AUDITED_DOCUMENTS = [...REQUIRED_DOCUMENTS, ENV_EXAMPLE, VALUE_PROOF, DEMO_RUNBOOK] as const
+export const AUDITED_DOCUMENTS = [
+  ...REQUIRED_DOCUMENTS,
+  ENV_EXAMPLE,
+  VALUE_PROOF,
+  DEMO_RUNBOOK,
+  "docs/degradation-matrix.md",
+  "docs/scaling-path.md",
+  "docs/specs/measurements.md",
+  "docs/specs/adr/ADR-08.md",
+] as const
 
 /** A `Set` rather than `REQUIRED_DOCUMENTS.includes`, which will not accept a wider union. */
 const REQUIRED: ReadonlySet<string> = new Set(REQUIRED_DOCUMENTS)
@@ -376,6 +386,12 @@ export const runDocsClaimChecks = (root: string): DocsCheckResult => {
     claims.push(...checkBenchmarkClaimUnbacked(text, document, benchmark, externalFigures))
     claims.push(...checkAnswerQualityClaim(text, document))
     claims.push(...checkExternalClaimUnbacked(text, document, externalClaims, FIGURE_PROMISE_DOCUMENTS.has(document) ? { backing: statementBacking(text, benchmark) } : undefined))
+    // R18. Read from the SAME artefact as rule ten, on purpose: a second artefact would be a second
+    // answer to "what did this repository measure", and a second place for the two to disagree. It adds
+    // the tolerance and the corpus-identity requirement that rule ten has no opinion about, and nothing
+    // else — see `docs-value-latency.ts` for why this is an extension and not a copy.
+    claims.push(...checkLatencyFigureUnbacked(text, document, benchmark, externalFigures.map((entry) => entry.figure)))
+    claims.push(...checkLatencyCorpusNamed(text, document, benchmark))
     if (document === DEMO_RUNBOOK) claims.push(...checkRunbookOrder(text, document))
   }
 

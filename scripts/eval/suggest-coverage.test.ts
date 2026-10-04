@@ -5,15 +5,23 @@ import { join } from "node:path"
 import { Database } from "bun:sqlite"
 import { normalizeForMatch } from "@mizan/core"
 import { buildSnapshot, openSnapshot, toCorpusRecord } from "@mizan/corpus"
+import { MIN_SHARED_TRIGRAMS } from "@mizan/suggest"
+import { MIN_SHARED_RUN_CHARS } from "@mizan/verify"
 import {
   HARNESS_COMMAND,
   LATENCY_BAND_MULTIPLIER,
+  RUN_FLOORS,
   casesFrom,
   conditionsLines,
   coverageAt,
+  floorRecallCost,
   isHit,
   measureCase,
+  precisionAt,
   scanCost,
+  slowestOf,
+  RECORD_RUNS,
+  type CaseMeasurement,
   type MeasurementConditions,
 } from "./suggest-coverage.ts"
 
@@ -148,7 +156,7 @@ describe("the harness measures a real scan", () => {
 })
 
 describe("the reported figures cannot be flattered by a missing measurement", () => {
-  const measurement = (id: string, hit: boolean) => ({ id, ms: 10, hits: { 4: [hit, hit, hit] } })
+  const measurement = (id: string, hit: boolean) => ({ id, ms: 10, hits: { 4: [hit, hit, hit] }, gated: {} })
 
   test("a hit is counted and a miss is counted", () => {
     expect(coverageAt([measurement("a", true), measurement("b", false)], 4, 0, 2)).toBe("1/2")
@@ -158,18 +166,132 @@ describe("the reported figures cannot be flattered by a missing measurement", ()
     // The denominator is the caller's `total`, not the length of the list that happened to have an
     // entry. That is the whole point: a harness that quietly shrinks its own denominator reports a
     // better rate for a worse run.
-    expect(coverageAt([{ id: "a", ms: 1, hits: {} }], 4, 0, 3)).toBe("0/3")
+    expect(coverageAt([{ id: "a", ms: 1, hits: {}, gated: {} }], 4, 0, 3)).toBe("0/3")
   })
 
   test("the p95 comes from the sorted times, and one slow case moves it", () => {
-    const even = scanCost([{ id: "a", ms: 10, hits: {} }, { id: "b", ms: 20, hits: {} }])
+    const even = scanCost([{ id: "a", ms: 10, hits: {}, gated: {} }, { id: "b", ms: 20, hits: {}, gated: {} }])
     expect(even.max).toBe(20)
-    const odd = scanCost([{ id: "a", ms: 10, hits: {} }, { id: "b", ms: 20, hits: {} }, { id: "c", ms: 900, hits: {} }])
+    const odd = scanCost([{ id: "a", ms: 10, hits: {}, gated: {} }, { id: "b", ms: 20, hits: {}, gated: {} }, { id: "c", ms: 900, hits: {}, gated: {} }])
     expect(odd.p50).toBe(20)
     expect(odd.p95).toBe(900)
     expect(odd.max).toBe(900)
     // Sorted by value, so the declaration order of the cases cannot change the figure.
-    expect(scanCost([{ id: "b", ms: 900, hits: {} }, { id: "a", ms: 10, hits: {} }, { id: "c", ms: 20, hits: {} }]).p95).toBe(900)
+    expect(scanCost([{ id: "b", ms: 900, hits: {}, gated: {} }, { id: "a", ms: 10, hits: {}, gated: {} }, { id: "c", ms: 20, hits: {}, gated: {} }]).p95).toBe(900)
+  })
+})
+
+/**
+ * Precision is reported per rank, with its denominator stated.
+ *
+ * These are the cases the original single-number design got wrong. A list of two out of forty cases
+ * that shows the right record in both would read as `2/40` at rank 1 — indistinguishable from a list
+ * that showed two records, one right and one wrong, out of forty. The denominator has to be the cases
+ * where a row was actually printed at that position, or the display floor's effect is invisible
+ * exactly where it does its work.
+ */
+describe("precision is measured against the rows that were actually displayed", () => {
+  const shown = (id: string, shownRows: number, anchorRank: number): CaseMeasurement => ({
+    id,
+    ms: 1,
+    hits: { 8: [false, false, false] },
+    gated: { [MIN_SHARED_RUN_CHARS]: { shown: shownRows, anchorRank } },
+  })
+
+  test("rank 1 is measured against the cases that displayed a row there", () => {
+    const precision = precisionAt([shown("a", 2, 1), shown("b", 2, 1), shown("c", 1, 0)], MIN_SHARED_RUN_CHARS, 1)
+    expect(precision.displayed).toBe(3)
+    expect(precision.hits).toBe(2)
+    expect(precision.absent).toBe(0)
+  })
+
+  test("a rank the list never reached is absent, and is not folded into the denominator", () => {
+    // Every case stopped at two rows, so rank 3 has no denominator at all. Reporting `0/40` here would
+    // be the padding the product refuses to do, moved into the measurement; reporting `0/0` would print
+    // a number a reader cannot interpret. The honest answer is a count of cases that could not show it.
+    const precision = precisionAt([shown("a", 2, 1), shown("b", 2, 0)], MIN_SHARED_RUN_CHARS, 3)
+    expect(precision.displayed).toBe(0)
+    expect(precision.hits).toBe(0)
+    expect(precision.absent).toBe(2)
+  })
+
+  test("a missing floor entry is absent, never a displayed row", () => {
+    // Fail closed on the same discipline as everywhere else: an absent measurement cannot make a rank
+    // look populated, because the alternative is a figure that improves when the harness breaks.
+    const precision = precisionAt([{ id: "a", ms: 1, hits: {}, gated: {} }], MIN_SHARED_RUN_CHARS, 1)
+    expect(precision.displayed).toBe(0)
+    expect(precision.absent).toBe(1)
+  })
+
+  test("precision is deterministic: the same cases in another order give the same numbers", () => {
+    const cases = [shown("a", 3, 1), shown("b", 1, 0), shown("c", 5, 5), shown("d", 2, 2)]
+    const forward = precisionAt(cases, MIN_SHARED_RUN_CHARS, 2)
+    const reversed = precisionAt([...cases].reverse(), MIN_SHARED_RUN_CHARS, 2)
+    expect(reversed).toEqual(forward)
+  })
+})
+
+/** The floor's price, in cases, and the sweep that chooses it. */
+describe("the display floor sweep prices the floor in cases", () => {
+  const measured = (id: string, ungatedHit: boolean, gatedRank: number): CaseMeasurement => ({
+    id,
+    ms: 1,
+    hits: { [MIN_SHARED_TRIGRAMS]: [ungatedHit, ungatedHit, ungatedHit] },
+    gated: { [MIN_SHARED_RUN_CHARS]: { shown: 1, anchorRank: gatedRank } },
+  })
+
+  test("a floor that drops the anchor shows it in the difference, not in a lower rate", () => {
+    const recalled = floorRecallCost([measured("a", true, 1), measured("b", true, 0)], MIN_SHARED_RUN_CHARS)
+    expect(recalled.shipped).toBe(2)
+    expect(recalled.gated).toBe(1)
+  })
+
+  test("the shipped floor appears in the sweep, so the chosen value is one row of a measured table", () => {
+    // If `MIN_SHARED_RUN_CHARS` were not in `RUN_FLOORS`, the table would describe floors the product
+    // does not use and the choice would be unfalsifiable from the output — which is the state this
+    // table was added to end.
+    expect(RUN_FLOORS).toContain(MIN_SHARED_RUN_CHARS)
+  })
+})
+
+describe("the figure of record is the slowest of five runs, chosen by the tool", () => {
+  const cost = (p50: number, p95: number, max: number): { readonly p50: number; readonly p95: number; readonly max: number } => ({ p50, p95, max })
+
+  test("the slowest of each component wins, even when they come from different runs", () => {
+    // The case that makes "just pick one run" wrong: run 2 has the worst p95 and run 3 the worst max, so
+    // there is no single run whose three figures describe a run that actually happened.
+    const slowest = slowestOf([cost(600, 700, 900), cost(610, 1000, 950), cost(590, 800, 1100)], 3)
+    expect(slowest).toEqual(cost(610, 1000, 1100))
+  })
+
+  test("a fast run cannot make the published figure fast, so re-running cannot flatter the artefact", () => {
+    const first = slowestOf([cost(600, 700, 900), cost(620, 800, 950)], 2)
+    expect(slowestOf([cost(10, 10, 10)], 1)).toEqual(cost(10, 10, 10))
+    // The point of the function: the figure is a property of the worst run, so a later fast run does
+    // not lower it. Published latency only improves when the code or the machine does.
+    expect(first).toEqual(cost(620, 800, 950))
+  })
+
+  test("the result does not depend on the order the runs are supplied in", () => {
+    const runs = [cost(600, 700, 900), cost(620, 800, 950), cost(590, 750, 1000)]
+    expect(slowestOf(runs, 3)).toEqual(slowestOf([...runs].reverse(), 3))
+  })
+
+  test("no runs is no figure, not a zero that would read as an impossibly fast measurement", () => {
+    expect(slowestOf([], 5)).toBeNull()
+    expect(slowestOf([cost(600, 700, 900)], 0)).toBeNull()
+  })
+
+  test("the run count is the one ADR-C10 names, so changing it changes the published meaning", () => {
+    expect(RECORD_RUNS).toBe(5)
+  })
+
+  test("the published band is at least the spread the five runs actually showed on p95", () => {
+    // Measured across five runs of the shipped path: p95 spanned 705-1088 ms, so 1.54x. This does not
+    // assert the exact numbers — those belong to a machine, not to a test — but it pins the relationship
+    // that matters: a band narrower than the run-to-run spread would report a passing document as
+    // broken, and the band is what ADR-13 lets a document rely on.
+    expect(LATENCY_BAND_MULTIPLIER).toBeGreaterThanOrEqual(1.5)
   })
 })
 

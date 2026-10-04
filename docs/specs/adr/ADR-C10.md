@@ -26,12 +26,19 @@ as of the code. The `634 ms` and the `1121 ms` were both real measurements of th
 differed was the hardware and the corpus revision, and neither was recorded, so the two numbers looked
 like a disagreement about the code when they were a disagreement about the conditions.
 
-The existing claim machinery could not see any of this. `AUDITED_DOCUMENTS` holds six files, none of
-them ADR-08 or the degradation matrix, and the figure rules that do run — rule ten's artefact
-attribution and the promise rule of ADR-C8 — are scoped to `docs/value-proof.md`, the one document that
+The existing claim machinery could not see any of this. `AUDITED_DOCUMENTS` held six files, none of
+them ADR-08 or the degradation matrix, and the figure rules that did run - rule ten's artefact
+attribution and the promise rule of ADR-C8 - were scoped to `docs/value-proof.md`, the one document that
 promises its figures are sourced. Widening that list would switch on seven further rules over documents
-written without them, which is a different piece of work with a much larger blast radius than the defect
-it would be chasing.
+written without them, which was assessed as a different piece of work with a much larger blast radius
+than the defect it would be chasing.
+
+**Amendment, 2026-10-04 (ADR-13).** That assessment was recorded here as "not written yet" and it was
+correct at the time. The widening has since been done: `AUDITED_DOCUMENTS` holds ten documents, the
+triage found no drift in the four newly audited ones, and the rule that was missing here is written —
+a stated latency must resolve to a recorded figure within a published band, and must name the snapshot
+it was measured on. What is now enforced is the second half of this ADR's own decision: the conditions
+block is not decoration, because the figure beside it is checked.
 
 ## Decision
 
@@ -56,15 +63,25 @@ normal machine variance as a regression.
 **The figure of record is the slowest of the runs it summarises, not the best.** A published budget
 that is flattered is the defect this decision removes.
 
-**Two limits are recorded rather than left implicit, because a rule whose boundaries are unwritten is
-the thing this ADR corrects.** First, no multiplier can cover hardware two or three times slower than
-the machine named in the block; a band wide enough to accept any hardware also accepts a real
-regression, so the answer is the conditions themselves and a reader compares against their own run.
-Second, the block is not enforced: `check:docs` does not read ADR-08, the degradation matrix or
-`docs/specs/measurements.md`, so a stale figure in any of them still passes. `docs/specs/measurements.md`
-says so in its own text. The rule that would close that — a latency figure in an audited document
-resolving to a figure recorded in that file, within the band above — is unwritten, and is stated here
-as unwritten rather than described as a plan that is under way.
+**Two limits are recorded rather than left implicit, because a rule whose boundaries are unwritten is the
+thing this ADR corrects.** First, no multiplier can cover hardware two or three times slower than the
+machine named in the block; a band wide enough to accept any hardware also accepts a real regression, so
+the answer is the conditions themselves and a reader compares against their own run. Second, the band
+cannot catch a figure stated in a shape the rule does not recognise: a bare `709 ms` with no quantity
+beside it says which of the three figures it is not, so it is not a claim the rule can judge. The
+recognised spellings are enumerated in ADR-13, and a figure written in any other shape is not silently
+accepted — it is simply not read, which is a narrower failure than being wrong and is bounded by the
+second rule: a document that states *no* recognised latency is out of this rule's business, so a
+repository could write its figure in a shape this rule ignores. That limit is stated here rather than
+left for a reader to discover.
+
+**What was unwritten and is now written (2026-10-04).** This ADR originally closed by recording that
+nothing enforced the block: `check:docs` did not read ADR-08, the degradation matrix or
+`docs/specs/measurements.md`, so a stale figure in any of them passed. That gap is closed. Those four
+documents are audited, and two rules judge them — a stated latency must resolve to a recorded figure
+within the band above, and must name the snapshot it was measured on (ADR-13). The rule reports the
+file, the rule name, the stated figure and the measured figure; it never echoes a document's prose into
+a build log.
 
 ## Consequences
 
@@ -80,5 +97,7 @@ as unwritten rather than described as a plan that is under way.
   for a wrong number to hide in.
 - Nothing here fetches anything. The block is derived from `node:os` and the committed corpus, so
   `check:docs` stays offline and G-4's secret sweep has no new surface to read.
-- The gap that remains is a real hole with a known shape, and the fastest way to demonstrate that is to
-  state it in the document a judge would read: three documents hold this figure and none is audited.
+- The gap this ADR opened with is closed, and the closure is itself checkable: the widened
+  `AUDITED_DOCUMENTS` list is what makes it so, and a document added to that list is audited by seven
+  further rules written without it. Widening it was therefore a step with its own triage, and the
+  triage found no drift in the four documents added.

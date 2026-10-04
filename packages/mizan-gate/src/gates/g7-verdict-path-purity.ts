@@ -73,6 +73,18 @@ import { PERCENT_OWNERS, VERDICT_PATH, VERDICT_PATH_ENTRY, inAny } from "./g6-no
  *    with a friendly name, and the cheapest way to make that unwritable is to forbid the words in
  *    the one file that produces the list. Same shape and same reasoning as G-7.1 and G-7.7, and
  *    for the same reason: the capability is absent rather than merely unused.
+ *  - **G-7.12 the display contract carries exactly the two integers, and no third number.**
+ *    `NearbyRecord` declares `sharedRunChars` and `SuggestionCandidates` declares `quoteChars`, and
+ *    every number on a rendered candidate row traces to one of them or to `considered`. This is the
+ *    rule that keeps ADR-12's reversal of the no-number rule honest. `display.ts` used to say in its
+ *    own header that it carried no number at all, so a retyped field would have been a third
+ *    measurement with nothing checking it — and the cheapest way to make that unwritable is to
+ *    enumerate the keys rather than to forbid a class of shapes that could grow. A quotient is the
+ *    specific hole: `displayPercent` exists in `longest-run.ts` and is deliberately not re-exported,
+ *    so a percentage on this path would be a number computed from the same pair and shown to a reader
+ *    as a figure of precision. Same shape and reasoning as G-7.4, one level up: G-7.4 forbids
+ *    percentage-*shaped keys* on the verdict path, this forbids a third measurement on the display
+ *    contract that a renderer could reach.
  *  - **G-7.11 the suggestion package has no ambient authority.** No clock, no randomness, no
  *    network, no environment, no timer, no dynamic import anywhere in `packages/mizan-suggest/`.
  *    This is the rule G-7.8 cannot express. A dependency list is what a well-meaning PR changes,
@@ -303,6 +315,52 @@ export const checkSuggestPackageHasNoAmbientAuthority = (files: readonly SourceF
     "code+strings",
   )
 
+/** The display schema module, which is where the declared contract lives. */
+export const DISPLAY_SCHEMA_MODULE = "packages/mizan-core/src/schema/display.ts"
+
+/**
+ * G-7.12 — the numbers on a rendered candidate row, enumerated.
+ *
+ * ## Why an allowlist rather than G-7.4's ban
+ *
+ * G-7.4 reads property keys and asks "does this name a percentage?". That is the right question for the
+ * verdict path, where the answer to an unexpected key is to forbid it outright. Here the answer has to
+ * be "it must be one of these", because the failure this rule pins is not a percentage — it is a
+ * *legitimately named* third number. `suggestions.ts` computing `similarity: 0.83` would satisfy
+ * G-7.4, G-7.9 and G-7.12-as-ban, and would be exactly the ADR-03 hole wearing a neutral name. A
+ * classifier cannot see that; an enumeration can, because the honest fields are known.
+ *
+ * `considered` is on the list because it is a real count the renderer already prints, and excluding it
+ * would make the rule complain about correct code and train its readers to ignore it (AGENTS.md §14).
+ */
+export const DISPLAY_CONTRACT_NUMBERS = ["rank", "considered", "sharedRunChars", "quoteChars"] as const
+
+/** A number on the display contract that is not one of the declared four. */
+/**
+ * Case-insensitive on the suffix, because a field is as likely to be `similarity` as `similarityRatio`
+ * and a rule that only caught the capitalised spelling would be catching a naming style rather than a
+ * defect. The declared four are excluded by whole word, so `quoteChars` cannot trip the `Chars` suffix.
+ */
+/**
+ * The prefix is optional, which is what catches a bare `similarity`. A required prefix would match
+ * `closenessScore` and quietly miss `similarity` itself — a rule that only catches the qualified spelling
+ * is catching a naming style, not a defect.
+ *
+ * The declared four are excluded by whole word, so `quoteChars` cannot trip the `Chars` suffix, and
+ * `recordsSimilarTo` is out of range because it does not end in a measurement name.
+ */
+const DISPLAY_NUMBER_RULE = new RegExp(`\\b(?!(?:${DISPLAY_CONTRACT_NUMBERS.join("|")})\\b)(?:[A-Za-z_]\\w*)?(?:chars|percent|ratio|share|probability|confidence|score|similarity)\\b`, "i")
+
+/** G-7.12 — no undeclared measurement on the display contract. */
+export const checkDisplayContractNumbers = (files: readonly SourceFile[]): readonly Finding[] =>
+  findMatchingLines(
+    "G-7",
+    "G-7.12 display-contract-numbers",
+    productionFiles(files).filter((file) => file.path === DISPLAY_SCHEMA_MODULE),
+    DISPLAY_NUMBER_RULE,
+    "code+strings",
+  )
+
 /** The whole gate. */
 export const gateVerdictPathPurity = (files: readonly SourceFile[]): readonly Finding[] => [
   ...checkAnchorModuleHasNoOpinion(files),
@@ -315,6 +373,7 @@ export const gateVerdictPathPurity = (files: readonly SourceFile[]): readonly Fi
   ...checkSuggestPackageIsLeaf(files),
   ...checkSuggestPackageNamesNoOutcome(files),
   ...checkSuggestPackageHasNoAmbientAuthority(files),
+  ...checkDisplayContractNumbers(files),
 ]
 
 /** Re-exported so a caller building an overlay does not have to remember two entry points. */

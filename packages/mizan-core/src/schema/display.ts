@@ -122,12 +122,32 @@ export type Relevance = Schema.Schema.Type<typeof Relevance>
  *
  * ## Why there is no number in here
  *
- * There is no `score`, no `percent`, no `confidence`, no overlap count, and no field a caller could
- * divide to manufacture one. The ranking value stays inside `@mizan/suggest`, and the closeness a
- * reader wants is printed by the renderer from the EXISTING display-only `longestRunFor`
- * diagnostic — two integers in a sentence, no quotient. That is the same discipline as `Relevance`
- * above and `MatchStrength` itself (AGENTS.md §10), and gate G-7.4 enforces it: `percent`,
- * `confidence`, `score` and `trustScore` are banned property keys on every display module.
+ * There is no `score`, no `percent`, no `confidence`, no quotient, and no field a caller could divide
+ * to manufacture one. The ranking value stays inside `@mizan/suggest`, and the closeness a reader
+ * wants is two whole numbers in a sentence — `sharedRunChars` of `quoteChars`, measured once by the
+ * display-only `longestRunFor` diagnostic and carried here. That is the same discipline as
+ * `Relevance` above and `MatchStrength` itself (AGENTS.md §10), and gate G-7.4 enforces it:
+ * `percent`, `confidence`, `score` and `trustScore` are banned property keys on every display module.
+ *
+ * ## The two integers, and why they are on the contract at all
+ *
+ * `sharedRunChars` and `quoteChars` are a deliberate reversal of the paragraph above, written down
+ * here rather than smuggled in. This schema used to carry no number at all precisely so that the
+ * renderer could not hold one, and the renderer reached back into `@mizan/verify` to compute
+ * `longestRunFor` per candidate instead. That worked, and it had two defects.
+ *
+ * First, the measurement was made twice, in two modules, from two spellings of the same inputs, so a
+ * badge and the line under it could describe different overlaps. Second — and this is the one that
+ * put four unrelated hadiths in a judge's crosshair — **the list was filtered by a number that was not
+ * on it**. `MIN_SHARED_TRIGRAMS` is in 3-gram types, a unit the reader has never seen, so nothing on
+ * screen could contradict the threshold that admitted a row. A reader saw four unrelated records and
+ * no reason why, because the reason was expressed in a unit that is not printed anywhere.
+ *
+ * So the integers that decide display travel with the row that is displayed, the admission threshold
+ * is stated in one of them (`MIN_SHARED_RUN_CHARS`), and G-7.12 fails the build if a third number or
+ * any quotient appears here. Two integers, one denominator shared by the whole block, no percent —
+ * which keeps the sentence legible without reintroducing the thing that would let a closeness figure
+ * influence anything (ADR-12).
  *
  * `collection` and `number` are stored separately rather than as a pre-joined label because the
  * label is a *formatting* decision and belongs to the renderer that already owns it for evidence
@@ -143,6 +163,14 @@ export const NearbyRecord = Schema.Struct({
   recordId: Schema.String,
   collection: Schema.String,
   number: Schema.NullOr(Schema.String),
+  /**
+   * Length of the longest contiguous run of folded characters this record shares with the quote.
+   *
+   * One of the two integers on the line beside the record, and the unit the display floor
+   * (`MIN_SHARED_RUN_CHARS`) is stated in — so the threshold that admitted this row is readable on
+   * the row. Whole characters, never divided; see the header for why the no-number rule was reversed.
+   */
+  sharedRunChars: Schema.Number,
   /** The record's own URL, never one reconstructed from the id. */
   sourceUrl: Schema.String,
   attribution: Schema.String,
@@ -158,8 +186,9 @@ export type NearbyRecord = Schema.Schema.Type<typeof NearbyRecord>
  * The three states a suggestion search can be in, and no fourth.
  *
  *  - `candidates`      one to five nearby records were found, in rank order.
- *  - `no_candidates`   the corpus was searched and nothing cleared the floor. This is a fact about
- *                      proximity, never a fact about authenticity.
+ *  - `no_candidates`   the corpus was searched and nothing cleared the **display** floor
+ *                      (`MIN_SHARED_RUN_CHARS` shared folded characters of contiguous overlap). This is
+ *                      a fact about proximity, never a fact about authenticity.
  *  - `unavailable`     the search could not be run, and says why.
  *
  * ## The distinction that is load-bearing
@@ -208,6 +237,14 @@ export const SuggestionCandidates = Schema.Struct({
   /** Records the search examined. Printed, so a bound is visible rather than silent. */
   considered: Schema.Number,
   scope: SuggestionScope,
+  /**
+   * Length of the folded quote — the denominator of every `sharedRunChars` on every row below.
+   *
+   * Carried once on the block because it is one fact about the quote rather than one per record: the
+   * same quote cannot have two lengths, and a reader comparing "35 of 60" to "8 of 62" on two rows
+   * of one list would be comparing two different questions.
+   */
+  quoteChars: Schema.Number,
   candidates: Schema.Array(NearbyRecord),
 })
 export type SuggestionCandidates = Schema.Schema.Type<typeof SuggestionCandidates>

@@ -35,6 +35,8 @@ checkNoSimilarity,
   checkSuggestPackageIsLeaf,
   checkSuggestPackageNamesNoOutcome,
   checkSuggestPackageHasNoAmbientAuthority,
+  checkDisplayContractNumbers,
+  DISPLAY_CONTRACT_NUMBERS,
   findRepositoryRoot,
   findRoot,
   requireRepositoryRoot,
@@ -582,6 +584,51 @@ describe("G-7 verdict path purity", () => {
       // rule that protects nothing (AGENTS.md §14).
       const files = pureTree({ "packages/mizan-suggest/src/suggest.ts": 'export const cached = () => fetch("https://example.invalid")\n' })
       expect(rules(gateVerdictPathPurity(files))).toContain(rule)
+    })
+  })
+
+  describe("G-7.12 the display contract carries exactly the two integers", () => {
+    const rule = "G-7.12 display-contract-numbers"
+    const schema = (body: string): readonly SourceFile[] =>
+      pureTree({ "packages/mizan-core/src/schema/display.ts": `import { Schema } from "effect"\nexport const NearbyRecord = Schema.Struct({\n${body}\n})\n` })
+
+    test("planted: a third measurement on the record is caught", () => {
+      // The exact hole ADR-12 opened by reversing the no-number rule. A key named for a ratio rather than
+      // a percentage is invisible to G-7.4, which is why this rule enumerates instead of classifying.
+      for (const planted of ["similarity: Schema.Number", "overlapRatio: Schema.Number", "matchShare: Schema.Number", "closenessScore: Schema.Number"]) {
+        expect(rules(checkDisplayContractNumbers(schema(`  sharedRunChars: Schema.Number,\n  ${planted},`)))).toContain(rule)
+      }
+    })
+
+    test("planted: a percentage next to the integers is caught, because that is the CWE-345 shape", () => {
+      expect(rules(checkDisplayContractNumbers(schema("  sharedRunChars: Schema.Number,\n  displayPercent: Schema.Number,")))).toEqual([rule])
+    })
+
+    test("the four declared numbers pass, because a rule that flagged correct code would be ignored", () => {
+      const files = schema("  rank: Schema.Number,\n  sharedRunChars: Schema.Number,\n  considered: Schema.Number,\n  quoteChars: Schema.Number,")
+      expect(rules(checkDisplayContractNumbers(files))).toEqual([])
+    })
+
+    test("the rule reads the schema module only, so a similar name elsewhere in the core package is not its business", () => {
+      const files = pureTree({
+        "packages/mizan-core/src/schema/display.ts": "export const NearbyRecord = Schema.Struct({ sharedRunChars: Schema.Number })\n",
+        "packages/mizan-core/src/retrieval.ts": "export const closenessScore = 1\n",
+      })
+      expect(rules(checkDisplayContractNumbers(files))).toEqual([])
+    })
+
+    test("a missing schema module is not this rule's finding, so G-7.6 owns the renamed-file case", () => {
+      expect(rules(checkDisplayContractNumbers(pureTree({ "packages/mizan-core/src/other.ts": "export const x = 1\n" })))).toEqual([])
+    })
+
+    test("the rule is wired into the gate", () => {
+      expect(rules(gateVerdictPathPurity(schema("  sharedRunChars: Schema.Number,\n  similarity: Schema.Number,")))).toContain(rule)
+    })
+
+    test("the declared list is the one the renderer reads, so the enumeration and the contract cannot drift", () => {
+      // `sharedRunChars` and `quoteChars` are the reversal; `rank` and `considered` are the counts the
+      // renderer already printed before ADR-12. Excluding either pair would report honest code as broken.
+      expect([...DISPLAY_CONTRACT_NUMBERS]).toEqual(["rank", "considered", "sharedRunChars", "quoteChars"])
     })
   })
 })

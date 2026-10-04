@@ -54,11 +54,11 @@ rather than restated, because a number quoted here would be quoted by someone.
 | Apply the ranking floor during the scan | A quote shares *some* 3-gram with 26,655 of 27,234 records, so "shares something" carried the corpus | (folded into the above) |
 | Narrow to reachable rows before ranking | The floor admits a median 20,796 rows, and ranking them all costs a trigram-type set each | 979 ms → superseded |
 
-**Final measured cost: p50 594 ms, p95 709 ms, max 715 ms** per rejected claim, against a `< 50 ms`
+**Final measured cost: p50 644 ms, p95 753 ms, max 1110 ms** per rejected claim, against a `< 50 ms`
 target. That is the slowest of five consecutive runs, and the figure of record lives in exactly one
 place — `docs/specs/measurements.md` — which also carries the corpus identity it was measured on, the
 case count, the quantile rule, the cache state, the runtime, the platform, the CPU and the tolerance
-band. The short form: corpus `snapshotHash=7b3b66fb…`, 27,234 records, 40 adversarial fabricated
+band. The short form: corpus `snapshotHash=7b3b66fbca7fb9df.`, 27,234 records, 40 adversarial fabricated
 quotes, `bun run eval:suggestions`, cold process, single run of Bun 1.3.14 on one named CPU, a rerun
 may differ by up to **1.5x** on p95 and max. A figure quoted without that block is not a measurement
 (ADR-C10).

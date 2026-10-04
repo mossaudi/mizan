@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite"
 import { errorTag, type Claim, type ClaimVerdict, type CorpusRecord, type NearbyRecord, type Suggestion, type SuggestionScope } from "@mizan/core"
 import { fetchSuggestionRecords, scanSuggestionCandidates } from "@mizan/corpus"
 import { MAX_TOP_K, rankNeighbours, rankNeighboursInCollection, type RankedNeighbour, type ScannedNeighbour } from "@mizan/suggest"
+import { runClearsFloor, sharedRunOf, type SharedRun } from "@mizan/verify"
 
 /**
  * Nearest-quote suggestions: the composition, and the two rules that decide when it happens.
@@ -35,17 +36,35 @@ import { MAX_TOP_K, rankNeighbours, rankNeighboursInCollection, type RankedNeigh
  *     cited collection is therefore the default scope; the whole snapshot is searched only when that
  *     collection had nothing at all, and then the returned block says so in `scope`, so the reader is
  *     never handed a whole-corpus list wearing a scoped list's clothes.
+ *  5. **A row is printed only if it clears the display floor, and the floor is on screen.** The ranker
+ *     orders by 3-gram types, which is a unit nobody reads, so it can narrow a list to twenty
+ *     thousand rows without deciding anything about what is shown. `runClearsFloor` is the decision,
+ *     it is stated in the folded characters printed beside each candidate, and it is applied here —
+ *     once, to at most `MAX_TOP_K` rows, never to the whole scan.
+ *
+ * ## Why the floor is applied to the top few rows and not to the scan
+ *
+ * `MAX_ROWS_RANKED` records why: a floor of eight shared window types admits 20,796 of 27,234 rows for
+ * a fabricated hadith, and measuring a longest run against every one of them would turn a display aid
+ * into the slowest thing in the process. The order this module already produces puts the best row
+ * first, so measuring the first five and dropping what does not clear costs five measurements and
+ * cannot promote anything — a row outside the top five would have been dropped by the cap regardless.
+ * That is why the gate is a filter on a list of five and not a predicate inside the scan.
+ *
+ * The floor can return fewer than `MAX_TOP_K` rows and the list is never padded. Three lines where
+ * there is one real candidate is one real candidate and two blanks (ADR-12).
  *
  * ## Where the cost is
  *
- * One scan of the whole snapshot per rejected claim, measured on the committed corpus at
- * 27,234 records: p50 594 ms, p95 709 ms, max 715 ms, single-threaded, with one row in memory at a
- * time (ADR-08). That is the slowest of five consecutive runs; `docs/specs/measurements.md` is where
- * the figure and the conditions it was measured under are recorded, and
- * `bun run eval:suggestions` prints both together. This is the price of an honest, exhaustive search
- * with no sidecar index — the alternative, an FTS trigram table, was measured at 46 MB for a query p95
- * of 116 ms and it returned nothing at all for three of ten adversarial quotes, because phrase matching
- * over folded Arabic is stricter than the thing it was standing in for.
+ * One scan of the whole snapshot per rejected claim, single-threaded, with one row in memory at a
+ * time. The wall clock is the price of an honest, exhaustive search with no sidecar index, and it is
+ * **not restated here**: `docs/specs/measurements.md` is the single owner of the figure of record and
+ * the conditions it was measured under, `check:docs` compares any stated latency against the recorded
+ * artefact within a published band, and this module's copy of the number would be a second one with
+ * nothing to contradict it (AGENTS.md section 17, ADR-13). The alternative — an FTS trigram sidecar —
+ * was measured at 46 MB for a query p95 of 116 ms and it returned nothing at all for three of ten
+ * adversarial quotes, because phrase matching over folded Arabic is stricter than the thing it was
+ * standing in for.
  *
  * ## Why the texts are carried beside the contract and not inside it
  *
@@ -73,8 +92,8 @@ export type SuggestionBlock = {
 }
 
 /** The metadata a ranked neighbour becomes, from the record the ranking pointed at. */
-const nearbyFor = (ranked: RankedNeighbour, record: CorpusRecord): NearbyRecord => ({
-  rank: ranked.rank,
+const nearbyFor = (entry: GatedNeighbour, record: CorpusRecord): NearbyRecord => ({
+  rank: entry.ranked.rank,
   recordId: record.id,
   collection: record.collection,
   number: record.number,
@@ -85,6 +104,7 @@ const nearbyFor = (ranked: RankedNeighbour, record: CorpusRecord): NearbyRecord 
   gradeApplicable: record.gradeApplicable,
   gradeSource: record.gradeSource,
   gradeBasis: record.gradeBasis,
+  sharedRunChars: entry.sharedRun.sharedRunChars,
 })
 
 const textFor = (record: CorpusRecord): NearbyText => ({
@@ -123,6 +143,52 @@ const rankForQuote = (quoteFolded: string, rows: readonly ScannedNeighbour[], co
   return { ranked: rankNeighbours({ quote: quoteFolded, rows, topK: MAX_TOP_K }), scope: { kind: "snapshot", widenedFrom: collection } }
 }
 
+/** One ranked row that cleared the display floor, with the two integers the reader is shown. */
+type GatedNeighbour = {
+  /** Renumbered from 1 after the filter, because the contract's rank is a position in THIS list. */
+  readonly ranked: RankedNeighbour
+  readonly sharedRun: SharedRun
+}
+
+/**
+ * Apply the display floor, and renumber what survives.
+ *
+ * ## Why this is the only place a row is allowed to be dropped for being unlike the quote
+ *
+ * `rankForQuote` decides order and scope; this decides visibility. Splitting them is what makes the
+ * gate auditable: the ranker's output is reproducible and testable without any notion of closeness,
+ * and this function's output is a list a reader can check against the numbers printed beside it.
+ *
+ * Renumbering is not cosmetic. `NearbyRecord.rank` is documented as "dense from 1, a position in a
+ * list", and after a filter the ranker's own numbers would read 1, 3, 4 — positions in a list the
+ * reader never saw. A rank that is not the line number is a small lie about ordering, and the
+ * correction it would support (`LocatedSpan`) points at the wrong line.
+ *
+ * The measurement is taken here, once, and only its two whole-number halves travel. `LongestRun`
+ * also carries a ratio; it does not leave this function, so no consumer holds a value it could divide
+ * (AGENTS.md §10, gate G-7.12).
+ */
+const gateRanked = (ranked: readonly RankedNeighbour[], quote: string): readonly GatedNeighbour[] => {
+  const cleared = ranked
+    .map((row) => ({ ranked: row, sharedRun: sharedRunOf(quote, row.textMatch) }))
+    .filter((entry) => runClearsFloor(entry.sharedRun))
+  return cleared.map((entry, index) => ({ ranked: { ...entry.ranked, rank: index + 1 }, sharedRun: entry.sharedRun }))
+}
+
+/**
+ * Why a searched block holds no candidates, as a clause with no numbers in it.
+ *
+ * The counts and the scope are on the block and the renderer prints them, so a reason that repeated
+ * them would be a second place to drift. The two clauses are kept apart because they are different
+ * facts: nothing was near enough to *rank*, versus something ranked and was not close enough to
+ * *show*. Collapsing them would tell a reader their quote matched nothing when in fact five records
+ * matched it a little and the display floor said they were too far off to be worth printing.
+ */
+const noCandidateReason = (ranked: readonly RankedNeighbour[]): string =>
+  ranked.length === 0
+    ? "nothing in the corpus was near enough to rank"
+    : "nothing ranked was close enough to show"
+
 /**
  * Search the corpus for the records nearest a quote.
  *
@@ -147,32 +213,37 @@ export const suggestionFor = (db: Database, quote: string, collection: string | 
   // "folded once" contract true instead of leaving the reader to wonder which fold was used.
   const source = scan.value
   const { ranked, scope } = rankForQuote(source.quoteFolded, source.rows, collection ?? null)
-  if (ranked.length === 0) {
+  const gated = gateRanked(ranked, quote)
+  if (gated.length === 0) {
     return {
       suggestion: {
         state: "no_candidates",
         considered: source.considered,
         scope,
-        reason: `no record is close to this quotation (${source.considered} records searched)`,
+        reason: noCandidateReason(ranked),
       },
       texts: [],
     }
   }
 
-  const records = fetchSuggestionRecords(db, ranked.map((entry) => entry.recordId))
+  const records = fetchSuggestionRecords(db, gated.map((entry) => entry.ranked.recordId))
   if (!records.ok) return { suggestion: unavailable(errorTag(records.error)), texts: [] }
 
   const byId = new Map(records.value.map((record) => [record.id, record]))
   const candidates: NearbyRecord[] = []
   const texts: NearbyText[] = []
-  for (const entry of ranked) {
-    const record = byId.get(entry.recordId)
+  for (const entry of gated) {
+    const record = byId.get(entry.ranked.recordId)
     if (record === undefined) return { suggestion: unavailable("a nearby record could not be re-read"), texts: [] }
     candidates.push(nearbyFor(entry, record))
     texts.push(textFor(record))
   }
 
-  return { suggestion: { state: "candidates", considered: source.considered, scope, candidates }, texts }
+  // One denominator for the whole block, read off the first row. Every row measured the same quote
+  // with the same fold and the same bound, so these are equal by construction; if a future fold ever
+  // made them differ, the honest list is the one that does not pretend they match.
+  const quoteChars = gated[0]?.sharedRun.quoteChars ?? 0
+  return { suggestion: { state: "candidates", considered: source.considered, scope, quoteChars, candidates }, texts }
 }
 
 /**
@@ -186,12 +257,42 @@ export const suggestionFor = (db: Database, quote: string, collection: string | 
 const citedCollection = (claim: Claim): string | null => claim.citations[0]?.collection ?? null
 
 /**
+ * One claim's pass, with an unexpected failure degraded to `unavailable`.
+ *
+ * ## Why the try is here and not inside `suggestionFor`
+ *
+ * Every failure `suggestionFor` knows about comes back as a `Result` and is already named. What is
+ * left is the failure nobody planned for — a malformed snapshot, a closed handle, a bug — and those
+ * arrive as a thrown value. Letting one of them escape would take down a run whose verdict was
+ * already computed and already printed, which is the worst possible ratio of harm to cause: a
+ * suggestion block is the least load-bearing output in the program and it would have ended the
+ * process.
+ *
+ * The message is reduced to the error's own name. A thrown value from a database layer can carry a
+ * row in its message, and corpus text belongs in no output of this program, including this one
+ * (AGENTS.md §13). The name is enough to tell a timeout from a type error in a bug report and
+ * carries nothing a reader could misread as evidence.
+ */
+const passForClaim = (db: Database, claim: Claim): SuggestionBlock | null => {
+  try {
+    return suggestionFor(db, claim.quote ?? "", citedCollection(claim))
+  } catch (cause) {
+    const name = cause instanceof Error ? cause.name : "unknown failure"
+    return { suggestion: unavailable(`the suggestion pass failed unexpectedly (${name})`), texts: [] }
+  }
+}
+
+/**
  * One pass per claim, positional, so the renderer cannot pair a suggestion with the wrong quote.
  *
  * `null` for every claim that gets no pass — not rejected, or no quotation — and `null` is a
  * statement the renderer prints as nothing at all, because the honest surface for "we did not look"
  * is not printing. A rejected claim with a quotation always produces one of the three states, so a
  * reader is never left guessing whether silence meant "nothing near it" or "no attempt was made".
+ *
+ * This never throws: see `passForClaim`. One claim's failure degrades that claim to `unavailable`
+ * and leaves every other claim's block intact, because a failure to suggest anything is not a reason
+ * to hide the suggestions that worked.
  */
 export const suggestionsFor = (
   db: Database,
@@ -200,7 +301,7 @@ export const suggestionsFor = (
 ): readonly (SuggestionBlock | null)[] =>
   claims.map((claim, index) => {
     if (verdicts[index]?.verdict !== "rejected") return null
-    return suggestionFor(db, claim.quote ?? "", citedCollection(claim))
+    return passForClaim(db, claim)
   })
 
 export * as Suggestions from "./suggestions.ts"
