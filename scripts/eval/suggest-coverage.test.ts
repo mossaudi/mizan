@@ -476,7 +476,10 @@ describe("a measurement refuses rather than escaping as an exception", () => {
     // The reason this is not a blanket `catch` that wraps everything in one message: a corpus fault and
     // a bug in this file exit with the same code, and only the message separates them. A boundary that
     // rewrote both into one shape would destroy the one distinction a reader has.
-    expect(attempt(() => err("scan failed: ...")).error).toBe("scan failed: ...")
+    const refused = attempt(() => err("scan failed: ..."))
+    expect(isErr(refused)).toBe(true)
+    if (!isErr(refused)) return
+    expect(refused.error).toBe("scan failed: ...")
     expect(isOk(attempt(() => ok(41)))).toBe(true)
   })
 
@@ -484,11 +487,11 @@ describe("a measurement refuses rather than escaping as an exception", () => {
     // `coverageAt` counts a missing entry as a MISS and `precisionAt` reads a missing floor as zero
     // shown — both total, both deliberate, and both of which turn an incomplete table into a coverage
     // number that is quietly too low. The readers cannot be the ones to notice, so the producer is.
-    const full = Object.fromEntries(FLOORS.map((floor) => [floor, CUTOFFS.map(() => false)]))
+    const full = Object.fromEntries(FLOORS.map((floor) => [floor, CUTOFFS.map(() => false)])) as Record<number, boolean[]>
     const gated = Object.fromEntries(RUN_FLOORS.map((floor) => [floor, DISPLAYED]))
     expect(incompleteFloors(full, gated)).toBeNull()
 
-    const oneShort = { ...full, [FLOORS[2]]: CUTOFFS.slice(0, 2) }
+    const oneShort: Record<number, boolean[]> = { ...full, [FLOORS[2]]: CUTOFFS.slice(0, 2).map(() => false) }
     expect(incompleteFloors(oneShort, gated)).toContain(`${FLOORS[2]}`)
   })
 
@@ -496,7 +499,7 @@ describe("a measurement refuses rather than escaping as an exception", () => {
     // The other table, and the one whose failure would be invisible: an absent `gated` entry is read as
     // zero rows shown, which shortens the denominator and quietly improves the precision it is a
     // fraction of.
-    const full = Object.fromEntries(FLOORS.map((floor) => [floor, CUTOFFS.map(() => false)]))
+    const full = Object.fromEntries(FLOORS.map((floor) => [floor, CUTOFFS.map(() => false)])) as Record<number, boolean[]>
     const { [RUN_FLOORS[0]]: _dropped, ...gated } = Object.fromEntries(RUN_FLOORS.map((floor) => [floor, DISPLAYED]))
     expect(incompleteFloors(full, gated)).toContain(`1 of ${RUN_FLOORS.length} display floors`)
   })

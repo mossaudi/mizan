@@ -42,12 +42,12 @@ Under a `REJECTED` badge there is one more block, and it is the only thing this 
 badge that the badge does not already say:
 
 ```
-nearest suggestions (non-authoritative) — not a verification result for knowledge-fading-1: 1 returned of 2 records scanned, within abudawud
-         the shared-character floor was measured on hadith cases only — quran and tirmidhi are unmeasured
-1. abudawud 4255 — https://sunnah.com/abudawud:4255
-         حَدَّثَنَا أَحْمَدُ بْنُ صَالِحٍ، حَدَّثَنَا عَنْبَسَةُ، حَدَّثَنِي يُونُسُ، عَنِ ابْنِ شِهَابٍ، قَالَ حَدَّثَنِي حُمَيْدُ بْنُ عَبْدِ الرَّحْمَنِ، أَنَّ أَبَا هُرَيْرَةَ، قَالَ قَالَ رَسُولُ اللَّهِ صلى الله عليه وسلم ‏"‏ يَتَقَارَبُ الزَّمَانُ وَيَنْقُصُ الْعِلْمُ وَتَظْهَرُ الْفِتَنُ وَيُلْقَى الشُّحُّ وَيَكْثُرُ الْهَرْجُ ‏"‏ ‏.‏ قِيلَ يَا رَسُولَ اللَّهِ أَيَّةُ هُوَ قَالَ ‏"‏ الْقَتْلُ الْقَتْلُ ‏"‏ ‏.‏
-        shared: 35 of 60 folded characters — display only, never a verdict
-        grade: Sahih / Sahih / Sahih Muslim (157 After 2672) (dataset's own grade; quranlab/hadith/row, not ours)
+    nearest suggestions (non-authoritative) — not a verification result for knowledge-fading-1: 1 returned of 2 records scanned, within abudawud
+             the shared-character floor was measured on hadith cases only — quran and tirmidhi are unmeasured
+    1. abudawud 4255 — https://sunnah.com/abudawud:4255
+             حَدَّثَنَا أَحْمَدُ بْنُ صَالِحٍ، حَدَّثَنَا عَنْبَسَةُ، حَدَّثَنِي يُونُسُ، عَنِ ابْنِ شِهَابٍ، قَالَ حَدَّثَنِي حُمَيْدُ بْنُ عَبْدِ الرَّحْمَنِ، أَنَّ أَبَا هُرَيْرَةَ، قَالَ قَالَ رَسُولُ اللَّهِ صلى الله عليه وسلم ‏"‏ يَتَقَارَبُ الزَّمَانُ وَيَنْقُصُ الْعِلْمُ وَتَظْهَرُ الْفِتَنُ وَيُلْقَى الشُّحُّ وَيَكْثُرُ الْهَرْجُ ‏"‏ ‏.‏ قِيلَ يَا رَسُولَ اللَّهِ أَيَّةُ هُوَ قَالَ ‏"‏ الْقَتْلُ الْقَتْلُ ‏"‏ ‏.‏
+            shared: 35 of 60 folded characters — display only, never a verdict
+            grade: Sahih / Sahih / Sahih Muslim (157 After 2672) (dataset's own grade; quranlab/hadith/row, not ours)
 ```
 
 That is the real output of `bun run demo`, whose two-record corpus is built from
