@@ -1,4 +1,4 @@
-import { normalizeForMatch } from "@mizan/core"
+import { MAX_QUOTE_CHARS, MAX_RECORD_CHARS, normalizeForMatch } from "@mizan/core"
 
 /**
  * Character 3-grams over FOLDED text, and nothing else.
@@ -7,7 +7,7 @@ import { normalizeForMatch } from "@mizan/core"
  *
  * Three callers need the same notion of "a 3-gram of folded text" — the scan, the ranking and the
  * tests that pin both — and three implementations of it would be three answers to one question
- * (AGENTS.md §17). This module owns the fold, the window, and the bounds, and exports nothing else.
+ * (AGENTS.md §17). This module owns the fold and the window, and exports nothing else.
  *
  * ## Why the fold is `normalizeForMatch` and not something local
  *
@@ -37,14 +37,12 @@ import { normalizeForMatch } from "@mizan/core"
 /** The window, in characters. Fixed: the vocabulary of this package is written down here once. */
 export const TRIGRAM_CHARS = 3
 
-/**
- * Bounded so a pathological quote cannot turn a display aid into a denial of service.
- *
- * The value is the same one `packages/mizan-verify/src/diagnostics/longest-run.ts` uses, for the
- * same reason: both bounds exist so a fold is bounded before anything quadratic is done with it.
- */
-export const MAX_QUOTE_CHARS = 4_096
-export const MAX_RECORD_CHARS = 65_536
+// `MAX_QUOTE_CHARS` and `MAX_RECORD_CHARS` are re-exported from `@mizan/core`, not declared here.
+// The display-only `longestRunFor` diagnostic bounds the same two strings for the same reason, and
+// neither package may depend on the other, so core owns the numbers and both read them — a second
+// copy of either constant is a place where the two can disagree about what was compared without any
+// test failing. See `packages/mizan-core/src/normalize/bounds.ts` for the argument.
+export { MAX_QUOTE_CHARS, MAX_RECORD_CHARS }
 
 /** The quote as everything downstream must see it: folded once, then capped. */
 export const foldQuote = (rawQuote: string): string => normalizeForMatch(rawQuote).slice(0, MAX_QUOTE_CHARS)

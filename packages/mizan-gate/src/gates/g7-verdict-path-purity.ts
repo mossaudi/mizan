@@ -1,4 +1,4 @@
-import { findMatchingLines, importClosure, productionFiles, type Finding, type SourceFile } from "../scan.ts"
+import { findMatchingLines, importClosure, productionFiles, relativeSpecifiers, type Finding, type SourceFile } from "../scan.ts"
 import { tokenPattern } from "../token-pattern.ts"
 import { AMBIENT_AUTHORITY_TOKENS, SIMILARITY_TOKENS } from "./g1-no-similarity.ts"
 import { PERCENT_OWNERS, VERDICT_PATH, VERDICT_PATH_ENTRY, inAny } from "./g6-no-false-verified.ts"
@@ -20,7 +20,7 @@ import { PERCENT_OWNERS, VERDICT_PATH, VERDICT_PATH_ENTRY, inAny } from "./g6-no
  * make it a worse rule — and G-7 answers the *path* question: the transitive closure of
  * `verify.ts`, plus the display modules that reuse its relation.
  *
- * ## Ten rules
+ * ## Twelve rules
  *
  *  - **G-7.1 the anchor module has no opinion.** `steps/anchor.ts` may not contain the token
  *    `verdict` at all. This is the cheap version of "the anchor can only ever produce
@@ -67,12 +67,35 @@ import { PERCENT_OWNERS, VERDICT_PATH, VERDICT_PATH_ENTRY, inAny } from "./g6-no
  *    in prose; ADR-07 states it for the module one door away, and this rule makes it
  *    machine-checkable.
  *  - **G-7.9 the suggestion package names no outcome.** `verdict` and `verified` may not appear
- *    anywhere in `packages/mizan-suggest/`, in code or in a string. G-7.8 already forbids it
- *    importing the verifier, so this is not about the import; it is about the *shape of the
+ *    anywhere in `packages/mizan-suggest/`, in code or in a string. G-7.8 and G-7.10 already forbid
+ *    reaching the verifier — the first by package specifier, the second by relative path — so this is
+ *    not about the import; it is about the *shape of the
  *    answer*. A `rankNeighbours` that returned `{ order, verdict }` would be the CWE-345 hole
  *    with a friendly name, and the cheapest way to make that unwritable is to forbid the words in
  *    the one file that produces the list. Same shape and same reasoning as G-7.1 and G-7.7, and
  *    for the same reason: the capability is absent rather than merely unused.
+ *  - **G-7.10 the suggestion package reaches no file on the verdict path.** A relative import in
+ *    `packages/mizan-suggest/` may not climb out of its own package directory. This is the hole in
+ *    G-7.8 that G-7.8's own rule text admits: the allowlist permits relative specifiers, because
+ *    ranking a candidate against its neighbour legitimately means importing a sibling, and from
+ *    `packages/mizan-suggest/src/suggest.ts` the specifier `../../mizan-verify/src/verify.ts` is
+ *    relative, resolves on disk, typechecks, and passes every G-7.8 and G-7.9 check — while
+ *    putting the verdict computation inside the one module whose entire safety argument is that
+ *    it cannot reach one (ADR-07). G-7.8 guards the package LIST, which a PR edits; this guards
+ *    the package BOUNDARY, which a PR crosses by accident. The check is lexical and deliberately
+ *    extension-agnostic, so dropping the `.ts` does not walk around it, and it is stated over the
+ *    whole package rather than one file, so a helper added next week inherits it.
+ *  - **G-7.11 the suggestion package has no ambient authority.** No clock, no randomness, no
+ *    network, no environment, no timer, no dynamic import anywhere in `packages/mizan-suggest/`.
+ *    This is the rule G-7.8 cannot express. A dependency list is what a well-meaning PR changes,
+ *    and a dependency list is exactly what G-7.8 reads — but `fetch("https://…")`, `Date.now()` and
+ *    `process.env.X` need no import at all. They are globals, so an import-allowlist rule is blind to
+ *    them by construction: the vector this feature would be attacked with is a "cache the nearest
+ *    results" call, and that call is one bare identifier wide. The determinism claim the package
+ *    exists to extend — the same list, byte for byte, on every run and every machine — is a
+ *    property of its reachable globals, so the globals are what is checked. G-1.3 already asserts
+ *    this over the verifier; this asserts it over the module one door away, reusing the same
+ *    vocabulary from the same place (AGENTS.md §17).
  *  - **G-7.12 the display contract carries exactly the two integers, and no third number.**
  *    `NearbyRecord` declares `sharedRunChars` and `SuggestionCandidates` declares `quoteChars`, and
  *    every number on a rendered candidate row traces to one of them or to `considered`. This is the
@@ -85,17 +108,6 @@ import { PERCENT_OWNERS, VERDICT_PATH, VERDICT_PATH_ENTRY, inAny } from "./g6-no
  *    as a figure of precision. Same shape and reasoning as G-7.4, one level up: G-7.4 forbids
  *    percentage-*shaped keys* on the verdict path, this forbids a third measurement on the display
  *    contract that a renderer could reach.
- *  - **G-7.11 the suggestion package has no ambient authority.** No clock, no randomness, no
- *    network, no environment, no timer, no dynamic import anywhere in `packages/mizan-suggest/`.
- *    This is the rule G-7.8 cannot express. A dependency list is what a well-meaning PR changes,
- *    and a dependency list is exactly what G-7.8 reads — but `fetch("https://…")`, `Date.now()` and
- *    `process.env.X` need no import at all. They are globals, so an import-allowlist rule is blind to
- *    them by construction: the vector this feature would be attacked with is a "cache the nearest
- *    results" call, and that call is one bare identifier wide. The determinism claim the package
- *    exists to extend — the same list, byte for byte, on every run and every machine — is a
- *    property of its reachable globals, so the globals are what is checked. G-1.3 already asserts
- *    this over the verifier; this asserts it over the module one door away, reusing the same
- *    vocabulary from the same place (AGENTS.md §17).
  *
  * ## What G-7 does not check, stated rather than discovered
  *
@@ -289,6 +301,83 @@ export const checkSuggestPackageNamesNoOutcome = (files: readonly SourceFile[]):
   )
 
 /**
+ * G-7.10 — how many directories below the package root an importing file sits.
+ *
+ * `SUGGEST_PATH` is a prefix, so the answer is a function of the prefix's own segments: the
+ * directory `packages/mizan-suggest/src` is one level inside the package, which is exactly the one
+ * `..` a sibling import spends.
+ */
+const depthInsideSuggestPackage = (path: string): number =>
+  path.split("/").length - 1 - (SUGGEST_PATH.split("/").length - 1)
+
+/**
+ * Whether a relative specifier leaves `packages/mizan-suggest/`.
+ *
+ * ## Why lexical counting rather than path resolution
+ *
+ * Resolution would have to guess an extension to stay sound: `../../mizan-verify/src/verify`
+ * resolves on disk and typechecks, so a rule that compared only `…/verify.ts` would report the
+ * package as clean while the import sits one keystroke away from a rename. Counting the `..`
+ * segments against the importing file's depth has no extension to guess and no case to miss, and it
+ * answers the question the header actually asks — is the boundary crossed — rather than a proxy for
+ * it (`../../mizan-core/src/index.ts` is an escape too, and deserves the same finding).
+ *
+ * Only the LEADING `..`s are counted, because that is the only place a `..` can appear; the first
+ * ordinary segment ends the ascent, and a specifier that walks back down into the package has
+ * already left by then.
+ */
+const escapesSuggestPackage = (path: string, specifier: string): boolean => {
+  let climbs = 0
+  for (const segment of specifier.split("/")) {
+    if (segment === "..") climbs += 1
+    if (segment !== "..") break
+  }
+  return climbs > depthInsideSuggestPackage(path)
+}
+
+/** The specifier as a pattern, so the finding can point at the line that carries it. */
+const specifierPattern = (specifier: string): RegExp =>
+  new RegExp(specifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+
+/**
+ * G-7.10 — no file in the suggestion package imports anything outside it by a relative path.
+ *
+ * ## Why this is not G-7.8's job
+ *
+ * G-7.8 reads the dependency list and rejects every specifier that is neither relative nor
+ * `@mizan/core`. That is the right shape for the package LIST, which is what a well-meaning
+ * performance PR edits, and relative specifiers must stay legal — a ranker that cannot import its
+ * own sibling cannot rank. But "relative" is a SYNTAX, not a location: from
+ * `packages/mizan-suggest/src/suggest.ts`, `../../mizan-verify/src/verify.ts` is relative, so it
+ * passes G-7.8, and it is also the exact thing ADR-07 forbids. The allowlist's blind spot is the
+ * package boundary, and this rule is the boundary.
+ *
+ * A package specifier (`@mizan/verify`) needs no check here — G-7.8 rejects every one of them, and
+ * two rules rejecting the same import is two places for the answer to drift. This one answers only
+ * the question G-7.8 structurally cannot.
+ *
+ * ## Why the whole package, not one file
+ *
+ * Every module in the prefix computes the same kind of relation, so the escape can be made from any
+ * of them — including a helper nobody thought of as a decision path. Scanned by prefix, a new file
+ * inherits the rule without a list to remember to extend.
+ *
+ * Reported per escaping specifier with the line that carries it, so the reader is pointed at the
+ * edit rather than at the package.
+ */
+export const checkSuggestPackageReachesNoVerdictPath = (files: readonly SourceFile[]): readonly Finding[] => {
+  const suggest = productionFiles(files).filter((file) => file.path.startsWith(SUGGEST_PATH))
+  const escaping = suggest.flatMap((file) =>
+    relativeSpecifiers(file.text)
+      .filter((specifier) => escapesSuggestPackage(file.path, specifier))
+      .map((specifier) => ({ file, specifier })),
+  )
+  return escaping.flatMap(({ file, specifier }) =>
+    findMatchingLines("G-7", "G-7.10 suggest-package-reaches-no-verdict-path", [file], specifierPattern(specifier), "code+strings"),
+  )
+}
+
+/**
  * G-7.11 — no clock, randomness, network, environment, timer or dynamic import in the suggestion
  * package.
  *
@@ -335,19 +424,18 @@ export const DISPLAY_SCHEMA_MODULE = "packages/mizan-core/src/schema/display.ts"
  */
 export const DISPLAY_CONTRACT_NUMBERS = ["rank", "considered", "sharedRunChars", "quoteChars"] as const
 
-/** A number on the display contract that is not one of the declared four. */
 /**
- * Case-insensitive on the suffix, because a field is as likely to be `similarity` as `similarityRatio`
- * and a rule that only caught the capitalised spelling would be catching a naming style rather than a
- * defect. The declared four are excluded by whole word, so `quoteChars` cannot trip the `Chars` suffix.
- */
-/**
- * The prefix is optional, which is what catches a bare `similarity`. A required prefix would match
- * `closenessScore` and quietly miss `similarity` itself — a rule that only catches the qualified spelling
- * is catching a naming style, not a defect.
+ * G-7.12's pattern: a measurement-shaped name that is not one of the declared four.
  *
- * The declared four are excluded by whole word, so `quoteChars` cannot trip the `Chars` suffix, and
- * `recordsSimilarTo` is out of range because it does not end in a measurement name.
+ * Three deliberate shapes, each closing a hole the obvious spelling leaves:
+ *
+ *  - **The suffix is optional**, so a bare `similarity` is caught. A required suffix would match
+ *    `closenessScore` and quietly miss `similarity` itself — a rule that only catches the qualified
+ *    spelling is catching a naming style, not a defect.
+ *  - **Case-insensitive**, because a field is as likely to be `similarity` as `Similarity` and a
+ *    rule that only caught the capitalised spelling would be the same naming-style rule again.
+ *  - **The declared four are excluded by whole word**, so `quoteChars` cannot trip the `Chars`
+ *    suffix and `recordsSimilarTo` stays out of range because it does not end in a measurement name.
  */
 const DISPLAY_NUMBER_RULE = new RegExp(`\\b(?!(?:${DISPLAY_CONTRACT_NUMBERS.join("|")})\\b)(?:[A-Za-z_]\\w*)?(?:chars|percent|ratio|share|probability|confidence|score|similarity)\\b`, "i")
 
@@ -372,6 +460,7 @@ export const gateVerdictPathPurity = (files: readonly SourceFile[]): readonly Fi
   ...checkRelevanceModuleHasNoOutcome(files),
   ...checkSuggestPackageIsLeaf(files),
   ...checkSuggestPackageNamesNoOutcome(files),
+  ...checkSuggestPackageReachesNoVerdictPath(files),
   ...checkSuggestPackageHasNoAmbientAuthority(files),
   ...checkDisplayContractNumbers(files),
 ]

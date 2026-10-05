@@ -261,8 +261,19 @@ export const importClosure = (files: readonly SourceFile[], entryPath: string): 
   return [...seen].sort().flatMap((path) => (byPath.has(path) ? [byPath.get(path)!] : []))
 }
 
-/** `from "./x.ts"` / `from '../y/z.ts'`, and `import("./x.ts")`. Package specifiers are ignored. */
-const relativeSpecifiers = (text: string): readonly string[] => {
+/**
+ * `from "./x.ts"` / `from '../y/z.ts'`, and `import("./x.ts")`. Package specifiers are ignored.
+ *
+ * Exported rather than private because two gates read a file's relative specifiers and the answer
+ * must be one answer: `importClosure` resolves them transitively and G-7.10 asks whether one of them
+ * leaves its package. A second copy of this pattern would be two definitions of "a relative
+ * import" that could disagree on `export … from` or `import(` (AGENTS.md section 17).
+ *
+ * Comments are not stripped, so a commented-out import is still reported. That is the
+ * fail-closed direction: a reader who wrote the specifier in the file is one edit away from
+ * uncommenting it.
+ */
+export const relativeSpecifiers = (text: string): readonly string[] => {
   const specifiers: string[] = []
   const pattern = /(?:from|import)\s*\(?\s*["'](\.[^"']*)["']/g
   for (const match of text.matchAll(pattern)) {

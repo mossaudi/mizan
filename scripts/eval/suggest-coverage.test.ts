@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Database } from "bun:sqlite"
-import { normalizeForMatch } from "@mizan/core"
+import { normalizeForMatch, isErr, isOk, unwrapOrThrow } from "@mizan/core"
 import { buildSnapshot, openSnapshot, toCorpusRecord } from "@mizan/corpus"
 import { MIN_SHARED_TRIGRAMS } from "@mizan/suggest"
 import { MIN_SHARED_RUN_CHARS } from "@mizan/verify"
@@ -123,21 +123,30 @@ describe("a hit is the folded text, not the record id", () => {
 })
 
 describe("the harness measures a real scan", () => {
+  /**
+   * Measure a case against the fixture, or fail the test with the harness's own reason.
+   *
+   * Every call here is on a fixture the test just built, so a failure is a defect rather than an
+   * unreadable corpus — which is exactly the distinction `measureCase` now draws, and reusing its
+   * reason keeps this helper from inventing a second error vocabulary.
+   */
+  const measured = (id: string, quote: string, anchorFolded: string): CaseMeasurement =>
+    unwrapOrThrow(measureCase(db, { id, quote, anchorFolded }), `measureCase(${id})`)
+
   test("a quote fabricated from the verse is found in the corpus", () => {
     const fabricated = `${VERSE} العظيم`
-    const measured = measureCase(db, { id: "fixture-1", quote: fabricated, anchorFolded: normalizeForMatch(VERSE) })
+    const measurement = measured("fixture-1", fabricated, normalizeForMatch(VERSE))
     // Floor 4 is the loosest configuration, floor 12 the strictest; the fixture is small enough
     // that the strictest still admits the verse, which is what makes the cut-off test below mean
     // something rather than pass by being empty.
-    expect(measured.hits[4]?.[0]).toBe(true)
-    expect(measured.ms).toBeGreaterThan(0)
+    expect(measurement.hits[4]?.[0]).toBe(true)
+    expect(measurement.ms).toBeGreaterThan(0)
   })
 
   test("cut-offs are prefixes of one ranking, so hits never disappear as the list grows", () => {
-    const fabricated = `${VERSE} العظيم`
-    const measured = measureCase(db, { id: "fixture-1", quote: fabricated, anchorFolded: normalizeForMatch(VERSE) })
+    const measurement = measured("fixture-1", `${VERSE} العظيم`, normalizeForMatch(VERSE))
     for (const floor of [4, 8, 12]) {
-      const [top1, top3, top5] = measured.hits[floor] ?? []
+      const [top1, top3, top5] = measurement.hits[floor] ?? []
       expect(top1).toBe(true)
       expect(top3).toBe(true)
       expect(top5).toBe(true)
@@ -145,13 +154,54 @@ describe("the harness measures a real scan", () => {
   })
 
   test("a quote with no near record is a miss at every floor, and that is a number not a failure", () => {
-    const measured = measureCase(db, { id: "fixture-2", quote: "nothing in this corpus resembles these words", anchorFolded: normalizeForMatch(VERSE) })
-    expect(measured.hits[4]?.flat().every((hit) => hit === false)).toBe(true)
+    const measurement = measured("fixture-2", "nothing in this corpus resembles these words", normalizeForMatch(VERSE))
+    expect(measurement.hits[4]?.flat().every((hit) => hit === false)).toBe(true)
   })
 
   test("the identical verse is listed once, so a second id cannot be counted twice", () => {
-    const measured = measureCase(db, { id: "fixture-1", quote: `${VERSE} العظيم`, anchorFolded: normalizeForMatch(VERSE) })
-    expect(measured.hits[4]?.[2]).toBe(true)
+    const measurement = measured("fixture-1", `${VERSE} العظيم`, normalizeForMatch(VERSE))
+    expect(measurement.hits[4]?.[2]).toBe(true)
+  })
+})
+
+/**
+ * A corpus failure is a `Result`, not a crash — and the distinction is the point.
+ *
+ * The scan already reports an unreadable row rather than throwing (AGENTS.md §2), so a scan failure
+ * used to reach `main` as an exception: exit code 1, a stack trace, and — worst — no guarantee that
+ * the run had printed nothing first. Now the failure is a value the caller must handle, which is what
+ * makes "prints no partial figures" a property of the code rather than of the order two statements
+ * happen to appear in.
+ */
+describe("an unmeasurable case is reported, not thrown", () => {
+  test("a closed database is an `err`, so the caller can refuse to publish rather than crash", () => {
+    const closed = openFixture()
+    closed.close()
+    const result = measureCase(closed, { id: "fixture-closed", quote: `${VERSE} العظيم`, anchorFolded: normalizeForMatch(VERSE) })
+    expect(isErr(result)).toBe(true)
+    if (isOk(result)) return
+    expect(result.error).toContain("scan failed")
+  })
+
+  test("the reason names the failure mode rather than a record's text", () => {
+    // `row_undecodable` is the one corpus failure that carries an id, and it is the one failure a
+    // reader of a coverage report can act on. The rest are named by tag alone, because a log line in a
+    // product that logs hashes only has no business carrying corpus text (AGENTS.md §13).
+    const closed = openFixture()
+    closed.close()
+    const result = measureCase(closed, { id: "fixture-closed", quote: VERSE, anchorFolded: normalizeForMatch(VERSE) })
+    expect(isErr(result)).toBe(true)
+    if (isOk(result)) return
+    expect(result.error).not.toContain(VERSE)
+  })
+
+  test("no measurement is returned alongside the reason, so a caller cannot read a figure out of a failed case", () => {
+    const closed = openFixture()
+    closed.close()
+    const result = measureCase(closed, { id: "fixture-closed", quote: VERSE, anchorFolded: normalizeForMatch(VERSE) })
+    expect(result).not.toHaveProperty("value")
+    expect(result).not.toHaveProperty("hits")
+    expect(result).not.toHaveProperty("ms")
   })
 })
 

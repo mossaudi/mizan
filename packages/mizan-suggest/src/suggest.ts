@@ -129,7 +129,12 @@ export type RowOverlap = {
 export type SearchHandle = {
   /** The quote as everything downstream must see it. Exposed so the caller never folds twice. */
   readonly quoteFolded: string
-  /** True when the folded quote is too short to yield a single 3-gram, so nothing can be measured. */
+  /**
+   * True when the folded quote is too short to yield a single 3-gram, so nothing can be measured.
+   *
+   * Consulted by the scan, and the reason is in {@link openSearch}: containment on a quote shorter
+   * than the window is an accident of two characters, not evidence.
+   */
   readonly quoteTooShort: boolean
   /** Measure one folded record against this quote. Pure, and cheap enough for every row. */
   readonly overlapOf: (foldedRecordText: string) => RowOverlap
@@ -143,18 +148,34 @@ export type SearchHandle = {
  * It answers two questions about one record — does it contain the quote, and how many distinct
  * 3-gram types does it share with it — and nothing about whether the record should be shown. That
  * decision belongs to `rankNeighbours`, so a scan cannot widen or narrow the floor it is feeding.
+ *
+ * ## Why a quote shorter than the window is not contained in anything
+ *
+ * A folded quote of one or two characters yields no 3-gram at all, so `shared` is 0 against every
+ * record — and containment, which is the one signal that bypasses the floor, would still fire for
+ * every record that happens to contain those two characters. Arabic makes that thousands of records.
+ * So a two-letter quote would arrive at the reader as a top candidate, `contained`, at a display
+ * percent of 100, on the strength of two characters.
+ *
+ * That is the fabrication-shaped hole this package exists to not have: a trivially satisfied
+ * containment, presented as though the corpus confirmed something. So `contained` is false whenever
+ * the quote has no 3-gram — including for the empty quote, which is why the old
+ * `quoteFolded.length > 0` guard is subsumed rather than replaced. The refusal belongs here rather
+ * than in the scan because `overlapOf` is the measurement: a caller that forgot to consult
+ * `quoteTooShort` would otherwise get a confident answer with nothing behind it.
  */
 export const openSearch = (rawQuote: string): SearchHandle => {
   const quoteFolded = foldQuote(rawQuote)
   const quoteTrigrams = trigramsOf(quoteFolded)
+  const tooShortToMeasure = quoteTrigrams.size === 0
   return {
     quoteFolded,
-    quoteTooShort: quoteTrigrams.size === 0,
+    quoteTooShort: tooShortToMeasure,
     overlapOf: (foldedRecordText: string) => {
       // Bounded once, then measured: bounding twice would re-walk a 65 KB record for no reason.
       const bounded = boundRecordText(foldedRecordText)
       return {
-        contained: quoteFolded.length > 0 && bounded.includes(quoteFolded),
+        contained: !tooShortToMeasure && bounded.includes(quoteFolded),
         shared: sharedTrigramTypes(bounded, quoteTrigrams),
       }
     },

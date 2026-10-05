@@ -48,6 +48,41 @@ describe("opening a search", () => {
     expect(search.overlapOf(VERSE).shared).toBe(0)
     expect(search.overlapOf(VERSE).contained).toBe(false)
   })
+
+  test("a quote shorter than the window is contained in nothing, however present it is", () => {
+    // The planted violation. `"هو"` folds to TWO characters and is in `VERSE` and in most of the
+    // corpus, so a containment check that only asked `includes` would call this a match and hand the
+    // reader a 100% candidate on the strength of one two-letter word. There is no 3-gram, so there was
+    // never a measurement to make.
+    const search = openSearch("هو")
+    expect(search.quoteTooShort).toBe(true)
+    expect(search.overlapOf(VERSE).contained).toBe(false)
+    expect(search.overlapOf(VERSE).shared).toBe(0)
+  })
+
+  test("a two-letter Arabic word is not the refusal, because it is two letters: the window is on FOLDED length", () => {
+    // The boundary the planted violation above could get wrong in the other direction. `الله` is a
+    // four-letter word that FOLDS to four characters, so it does carry windows and is measurable; the
+    // refusal is not "a short Arabic word", it is "fewer folded characters than the window". Pinning
+    // both sides stops a fix for the test above from refusing a quote that can be measured.
+    expect(openSearch("الله").quoteTooShort).toBe(false)
+    expect(openSearch("الله").overlapOf(VERSE).shared).toBeGreaterThan(0)
+  })
+
+  test("the refusal is the window's, not the quote's characters: two Latin letters behave the same", () => {
+    // Arabic is not the special case. `ab` folds to two characters, and a record containing `ab` must
+    // not be reported as containing the quote.
+    const search = openSearch("ab")
+    expect(search.quoteTooShort).toBe(true)
+    expect(search.overlapOf("xxabyy").contained).toBe(false)
+  })
+
+  test("the shortest measurable quote still measures containment", () => {
+    // One character below the refusal, so the boundary is pinned from both sides: a three-character
+    // quote does contain itself, and the rule above is about the window rather than about short words.
+    expect(openSearch("abc").quoteTooShort).toBe(false)
+    expect(openSearch("abc").overlapOf("xxabcxx").contained).toBe(true)
+  })
 })
 
 describe("the floor", () => {

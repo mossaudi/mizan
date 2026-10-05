@@ -34,6 +34,7 @@ checkNoSimilarity,
   checkRelevanceModuleHasNoOutcome,
   checkSuggestPackageIsLeaf,
   checkSuggestPackageNamesNoOutcome,
+  checkSuggestPackageReachesNoVerdictPath,
   checkSuggestPackageHasNoAmbientAuthority,
   checkDisplayContractNumbers,
   DISPLAY_CONTRACT_NUMBERS,
@@ -548,6 +549,81 @@ describe("G-7 verdict path purity", () => {
     })
     expect(rules(checkSuggestPackageNamesNoOutcome(files))).toEqual([])
     expect(rules(checkSuggestPackageIsLeaf(files))).toEqual([])
+  })
+
+  describe("G-7.10 the suggestion package reaches nothing outside itself", () => {
+    const rule = "G-7.10 suggest-package-reaches-no-verdict-path"
+
+    test("planted: a relative specifier that climbs into the verifier is caught", () => {
+      // The shape G-7.8 cannot express: `../` is legal to its allowlist and this is what it buys.
+      const files = pureTree({
+        "packages/mizan-suggest/src/suggest.ts": [
+          'import { verifyAnswer } from "../../mizan-verify/src/verify.ts"',
+          "export const rank = verifyAnswer",
+        ].join("\n"),
+      })
+      const findings = checkSuggestPackageReachesNoVerdictPath(files)
+      expect(rules(findings)).toEqual([rule])
+      expect(findings[0]?.line).toBe(1)
+    })
+
+    test("planted: dropping the extension does not walk around the rule", () => {
+      // A resolver-based rule would compare `…/verify.ts` and report the tree clean while the
+      // import is one rename away from resolving. The lexical climb has no extension to guess.
+      const files = pureTree({
+        "packages/mizan-suggest/src/suggest.ts": ['import { verifyAnswer } from "../../mizan-verify/src/verify"', "export const rank = verifyAnswer"].join("\n"),
+      })
+      expect(rules(checkSuggestPackageReachesNoVerdictPath(files))).toEqual([rule])
+    })
+
+    test("planted: an escape from a deeper module is caught, so the depth arithmetic is real", () => {
+      // `src/` spends one `..` to stay inside the package; `src/nested/` spends two. A rule that
+      // assumed one depth would pass this and fail the file above it, or the reverse.
+      const files = pureTree({
+        "packages/mizan-suggest/src/nested/helper.ts": ['import { verifyAnswer } from "../../../mizan-verify/src/verify.ts"', "export const rank = verifyAnswer"].join("\n"),
+      })
+      expect(rules(checkSuggestPackageReachesNoVerdictPath(files))).toEqual([rule])
+      expect(rules(checkSuggestPackageIsLeaf(files))).toEqual([])
+    })
+
+    test("planted: the two `..` that are still inside the package are not an escape", () => {
+      // From `src/nested/`, `../../trigrams.ts` is the package root — the deepest legal ascent.
+      const files = pureTree({ "packages/mizan-suggest/src/nested/helper.ts": 'import { fold } from "../../trigrams.ts"\nexport const rank = fold\n' })
+      expect(rules(checkSuggestPackageReachesNoVerdictPath(files))).toEqual([])
+    })
+
+    test("planted: a re-export that escapes is caught, because it still reaches the import", () => {
+      const files = pureTree({ "packages/mizan-suggest/src/index.ts": 'export { verifyAnswer } from "../../mizan-verify/src/verify.ts"\n' })
+      expect(rules(checkSuggestPackageReachesNoVerdictPath(files))).toEqual([rule])
+    })
+
+    test("planted: a dynamic import that escapes is caught", () => {
+      const files = pureTree({ "packages/mizan-suggest/src/suggest.ts": 'export const load = () => import("../../mizan-verify/src/verify.ts")\n' })
+      expect(rules(checkSuggestPackageReachesNoVerdictPath(files))).toEqual([rule])
+    })
+
+    test("a package specifier is G-7.8's finding and not this rule's, so the answer has one owner", () => {
+      const files = pureTree({ "packages/mizan-suggest/src/suggest.ts": 'import { verifyAnswer } from "@mizan/verify"\nexport const rank = verifyAnswer\n' })
+      expect(rules(checkSuggestPackageIsLeaf(files))).toEqual(["G-7.8 suggest-package-is-leaf"])
+      expect(rules(checkSuggestPackageReachesNoVerdictPath(files))).toEqual([])
+    })
+
+    test("the ranking module's own imports are not findings, because ranking needs them", () => {
+      const files = pureTree({
+        "packages/mizan-suggest/src/rank.ts": [
+          'import { foldQuote } from "./trigrams.ts"',
+          'import { byCodeUnit } from "./compare.ts"',
+          "export const shared = foldQuote",
+          "export const order = byCodeUnit",
+        ].join("\n"),
+      })
+      expect(rules(checkSuggestPackageReachesNoVerdictPath(files))).toEqual([])
+    })
+
+    test("the rule is wired into the gate", () => {
+      const files = pureTree({ "packages/mizan-suggest/src/suggest.ts": 'import { verifyAnswer } from "../../mizan-verify/src/verify.ts"\nexport const rank = verifyAnswer\n' })
+      expect(rules(gateVerdictPathPurity(files))).toContain(rule)
+    })
   })
 
   describe("G-7.11 the suggestion package has no ambient authority", () => {

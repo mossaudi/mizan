@@ -16,6 +16,7 @@ import {
   type DocsClaim,
   type SourceFile,
 } from "../src/index.ts"
+import { LATENCY_KEYS } from "../src/docs-value-latency.ts"
 
 /**
  * Tests for D-1, the documentation-claims check.
@@ -888,6 +889,128 @@ describe("runDocsClaimChecks — the runner, end to end", () => {
       tree({ ...honest, "README.md": "Two cases never share a span. The 2 golden cases draw on 200 records.\nThere is no live model provider.\n" }),
     )
     expect(rules(drifted.claims)).toEqual(["eval-breadth-overstated", "eval-breadth-overstated", "live-provider-denied"])
+  })
+
+  /**
+   * R18 end to end — the latency rules reach the documents through the sweep `check:docs` runs.
+   *
+   * ## Why this is not the reach test in `docs-value-latency.test.ts`
+   *
+   * That file calls `checkLatencyFigureUnbacked` directly, which proves the rule recognises a spelling
+   * but not that the primary claim sweep ever reads the documents a figure is written in. Those are two
+   * different claims, and only the second one would have caught the drift ADR-C10 records — a stale
+   * figure surviving a green build because no rule was pointed at the file holding it. So the wiring is
+   * exercised here, against `runDocsClaimChecks`, which is the function `bun run check:docs` calls.
+   *
+   * The artefact is synthetic rather than the committed one on purpose: this test is about *reach*, and
+   * the numbers it plants have to be the ones the document states. Reading the real artefact would couple
+   * the wiring test to whatever the harness last recorded, which is the fixture-shaped dependency the
+   * constitution forbids (AGENTS.md §14 — a guard that cannot fail is not a guard).
+   *
+   * ## Why the assertions are on `claims`, not on an `error` string
+   *
+   * `DocsCheckResult` has no error string. The document a finding belongs to is the `file` field of a
+   * `DocsClaim`, so "the error message identifies the offending document" is expressed as the finding
+   * carrying it — a claim whose `file` is the planted path. An assertion against a rendered string would
+   * have tested the printer, and the printer is not what fails closed.
+   */
+  describe("R18, through the sweep that `check:docs` runs", () => {
+    /** A plausible snapshot fingerprint: the short form the rule accepts is its first 16 characters. */
+    const FINGERPRINT = "7b3b66fbca7fb9df471b49524f31409391addea87f8d0f262d84f7812a48240d"
+    const SHORT = FINGERPRINT.slice(0, 16)
+
+    /** Flat and top-level, because `readFigures` collects nothing else (see `docs-value-latency.ts`). */
+    const RECORDED_P50 = 600
+    const RECORDED_P95 = 700
+    const RECORDED_MAX = 1_100
+    const artefact = JSON.stringify({
+      [LATENCY_KEYS.p50]: RECORDED_P50,
+      [LATENCY_KEYS.p95]: RECORDED_P95,
+      [LATENCY_KEYS.max]: RECORDED_MAX,
+      [LATENCY_KEYS.band]: 1.5,
+      [LATENCY_KEYS.fingerprint]: FINGERPRINT,
+    })
+
+    /** Every finding this sweep raised for `path`, so a test never has to reason about the others. */
+    const forFile = (result: DocsCheckResult, path: string) => result.claims.filter((found) => found.file === path)
+
+    const withArtefact = (files: Readonly<Record<string, string>>) => tree({ ...clean, "data/benchmark/vs-search.json": artefact, ...files })
+
+    /** A latency-bearing ADR. The four structural sections are what `checkAdrDocument` requires, so the only finding this document can raise is the planted one. */
+    const adr = (figure: string, corpus: string): string =>
+      [
+        "# ADR-08 — The cost of one exhaustive scan",
+        "",
+        "- **Status:** Accepted",
+        "",
+        "## Context",
+        "",
+        "Finding the records nearest a fabricated quote means comparing it against the whole corpus.",
+        "",
+        "## Decision",
+        "",
+        `The shipped path costs ${figure} per rejected claim, recorded in \`data/benchmark/vs-search.json\`.${corpus}`,
+        "",
+        "## Consequences",
+        "",
+        "Two or three rejected claims in one answer therefore add one to two seconds.",
+        "",
+      ].join("\n")
+
+    /** A latency-bearing degradation matrix, which is a surface rather than an ADR. */
+    const matrix = (figure: string, corpus: string): string =>
+      [
+        "# Degradation matrix",
+        "",
+        "| Failure | What is printed |",
+        "| --- | --- |",
+        `| Slow corpus scan | \`no sources found\` after ${figure}${corpus} |`,
+        "",
+      ].join("\n")
+
+    test("a stale figure planted in the ADR fails the sweep, naming document, rule, stated, measured and band", () => {
+      const stale = RECORDED_P95 * 4
+      const planted = withArtefact({ "docs/specs/adr/ADR-08.md": adr(`p95 ${stale} ms`, ` on snapshotHash=${SHORT}.`) })
+      const result = runDocsClaimChecks(planted)
+
+      expect(result.ok).toBe(false)
+      // Read as a document, not skipped: a rule pointed at a file the sweep never read is the ADR-10
+      // shape, and this is the assertion that says the sweep did read it.
+      expect(checkedPaths(result)).toContain("docs/specs/adr/ADR-08.md")
+      const found = forFile(result, "docs/specs/adr/ADR-08.md")
+      expect(rules(found)).toEqual(["latency-claim-unbacked"])
+      expect(details(found)).toContain(`p95 ${stale}ms`)
+      expect(details(found)).toContain(String(RECORDED_P95))
+      expect(details(found)).toContain("1.5x")
+    })
+
+    test("the same figure planted in the degradation matrix fails it too", () => {
+      const stale = RECORDED_P95 * 4
+      const result = runDocsClaimChecks(withArtefact({ "docs/degradation-matrix.md": matrix(`p95 ${stale} ms`, ` on snapshotHash=${SHORT}`) }))
+      expect(result.ok).toBe(false)
+      expect(rules(forFile(result, "docs/degradation-matrix.md"))).toEqual(["latency-claim-unbacked"])
+    })
+
+    test("a figure inside the band passes, so the planted violation is the figure and not the document", () => {
+      const result = runDocsClaimChecks(withArtefact({ "docs/specs/adr/ADR-08.md": adr("p95 700 ms", ` on snapshotHash=${SHORT}.`) }))
+      expect(details(forFile(result, "docs/specs/adr/ADR-08.md"))).toBe("")
+    })
+
+    test("the corpus-identity rule is reached too, on a figure that agrees perfectly", () => {
+      // The half that is easy to forget: a figure can match the artefact exactly and still describe a
+      // corpus this repository no longer serves. The artefact carries the fingerprint, so deleting it from
+      // the document is enough to fail the build — through this sweep, not through a direct rule call.
+      const result = runDocsClaimChecks(withArtefact({ "docs/degradation-matrix.md": matrix("p95 700 ms", "") }))
+      expect(result.ok).toBe(false)
+      const found = forFile(result, "docs/degradation-matrix.md")
+      expect(rules(found)).toEqual(["latency-corpus-unnamed"])
+      expect(details(found)).toContain(SHORT)
+    })
+
+    test("a document carrying no latency needs no corpus identity, so the sweep stays quiet", () => {
+      const result = runDocsClaimChecks(withArtefact({ "docs/degradation-matrix.md": matrix("a visible notice", "") }))
+      expect(details(forFile(result, "docs/degradation-matrix.md"))).toBe("")
+    })
   })
 
   test("the report names each input once, and .env.example is audited", () => {

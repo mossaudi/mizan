@@ -1,3 +1,4 @@
+import { MAX_QUOTE_CHARS, MAX_RECORD_CHARS } from "@mizan/core"
 import { foldQuote } from "../steps/containment.ts"
 
 /**
@@ -21,11 +22,14 @@ import { foldQuote } from "../steps/containment.ts"
  *
  * That is why `MatchStrength` is `exact | none` and why this file is a separate module
  * the verifier cannot see. AGENTS.md section 10.
+ *
+ * ## Why the two bounds are imported rather than declared
+ *
+ * `MAX_QUOTE_CHARS` and `MAX_RECORD_CHARS` bound the same two strings in `@mizan/suggest`, for the
+ * same reason — a bound before anything quadratic — and this package may not depend on that one, so
+ * `@mizan/core` owns both numbers. Two local copies would be two answers to "how much text does this
+ * product look at", and the disagreement would be silent (AGENTS.md §17).
  */
-
-/** Bounded so a pathological input cannot turn a display aid into a denial of service. */
-const MAX_QUOTE_CHARS = 4_096
-const MAX_RECORD_CHARS = 65_536
 
 export type LongestRun = {
   /** Length of the longest common contiguous run, in folded characters. */

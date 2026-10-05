@@ -269,15 +269,28 @@ const describeCorpusError = (error: CorpusError): string => {
  * section 13). The sweep reuses the runs measured inside the clock, so it costs comparisons and not
  * a second pass over 27,234 records.
  *
- * Throws on a scan failure rather than counting it as a miss: a row that could not be decoded means
- * the corpus is not the corpus this figure is about, and a coverage number computed over a corpus we
- * could not read is not a coverage number (AGENTS.md section 16). The caller has already checked the
- * attestation, so the honest outcome is a loud failure.
+ * ## Why a scan failure is a `Result` and not a throw
+ *
+ * A row that could not be decoded means the corpus is not the corpus this figure is about, and a
+ * coverage number computed over a corpus we could not read is not a coverage number (AGENTS.md
+ * section 16). The refusal is unchanged — the run publishes nothing — but the channel is not.
+ *
+ * `throw` here would have crossed out of this function into `main`'s loop and out of that as an
+ * uncaught exception: a stack trace on stderr and exit code 1, which is the same number an ordinary
+ * bug produces. The failure a corpus error represents is the one state where a figure must NOT be
+ * printed, and a caller that can neither see nor branch on it cannot be relied on to stay quiet.
+ * Every other fallible step in `main` already returns a `Result` — `readCommittedAttestation`,
+ * `attestSnapshot`, `decodeOrFail` — and this was the one that had not been converted, so a reader
+ * auditing the harness could not know which failures it handles. It now handles all of them, and the
+ * type system says so at every call site.
+ *
+ * The error is a `string` rather than a tagged union because it is a harness diagnostic, not a
+ * contract: nothing branches on its shape, and a tag would invent a taxonomy with one member.
  */
-export const measureCase = (db: Database, testCase: CoverageCase): CaseMeasurement => {
+export const measureCase = (db: Database, testCase: CoverageCase): Result<CaseMeasurement, string> => {
   const startedAt = performance.now()
   const scanned = scanSuggestionCandidates(db, testCase.quote, SCAN_FLOOR)
-  if (!isOk(scanned)) throw new Error(`scan failed: ${describeCorpusError(scanned.error)}`)
+  if (!isOk(scanned)) return err(`scan failed: ${describeCorpusError(scanned.error)}`)
   const source = scanned.value
 
   // The scan's own fold is handed back rather than folding a second time. `foldQuote` is idempotent,
@@ -307,7 +320,7 @@ export const measureCase = (db: Database, testCase: CoverageCase): CaseMeasureme
   for (const runFloor of RUN_FLOORS) {
     gated[runFloor] = runFloor === MIN_SHARED_RUN_CHARS ? shipped : displayedAt(measured, testCase.anchorFolded, runFloor)
   }
-  return { id: testCase.id, ms, hits, gated }
+  return ok({ id: testCase.id, ms, hits, gated })
 }
 
 /** `hits/cases` for one floor and one cut-off index. A missing entry counts as a miss, not as a skip. */
@@ -676,21 +689,38 @@ const main = (): number => {
     // record is chosen by the tool rather than by whoever is reading the output. Measured spread on the
     // recorded machine is ~1.5x on p95 — the whole width of the tolerance band — so "pick the worst of
     // five" cannot be left to memory. A plain run measures once and publishes nothing.
+    //
+    // The run loop stops at the end of the first run that could not measure every case, and every reason
+    // that run produced is reported together. Two properties, both load-bearing: the loop does not spend
+    // four more minutes re-measuring a corpus it has already failed to read, and a five-run `--record`
+    // does not print the same unreadable case five times. Nothing below this block runs if `reasons` is
+    // non-empty, so a run with an unreadable case publishes no figure at all rather than a table of 39.
     const runs = record ? RECORD_RUNS : 1
     const measurements: CaseMeasurement[] = []
     const costs: Cost[] = []
-    for (let run = 0; run < runs; run += 1) {
+    const reasons = new Set<string>()
+    for (let run = 0; run < runs && reasons.size === 0; run += 1) {
       console.error(`# run ${run + 1} of ${runs}`)
       const perRun: CaseMeasurement[] = []
       for (const testCase of cases) {
-        perRun.push(measureCase(db, testCase))
-        console.error(`  ${testCase.id} ${perRun[perRun.length - 1]?.ms.toFixed(0) ?? "0"}ms`)
+        const measured = measureCase(db, testCase)
+        if (!isOk(measured)) {
+          reasons.add(`${testCase.id}: ${measured.error}`)
+          continue
+        }
+        perRun.push(measured.value)
+        console.error(`  ${testCase.id} ${measured.value.ms.toFixed(0)}ms`)
       }
       // Only the first run's quality figures are reported: they are deterministic, so printing the
       // tables five times would be five copies of one answer, and a reader comparing them for movement
       // would be comparing identical numbers and wondering why they match.
       if (run === 0) measurements.push(...perRun)
       costs.push(scanCost(perRun))
+    }
+    if (reasons.size > 0) {
+      for (const reason of reasons) console.error(`FAIL ${reason}`)
+      console.error("No figures were computed.")
+      return EXIT_UNTRUSTED
     }
     const slowest = slowestOf(costs, runs)
     if (slowest === null) return EXIT_UNTRUSTED

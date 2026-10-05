@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Database } from "bun:sqlite"
-import { SUGGESTION_DISCLAIMER, normalizeForMatch, normalizeQuote, type Claim, type ClaimVerdict, type VerdictReport } from "@mizan/core"
+import { SUGGESTION_DISCLAIMER, SUGGESTION_MEASUREMENT_SCOPE, normalizeForMatch, normalizeQuote, type Claim, type ClaimVerdict, type VerdictReport } from "@mizan/core"
 import { buildSnapshot, openSnapshot, resolveCitations, toCorpusRecord } from "@mizan/corpus"
 import { MIN_SHARED_RUN_CHARS, verifyAnswer } from "@mizan/verify"
 import { buildSourceTable, renderReport } from "../src/render.ts"
@@ -198,6 +198,74 @@ describe("a rejection is offered the records near its quote", () => {
     const claims = [claimOf(FABRICATED)]
     const text = screen(claims, suggestionsFor(db, claims, verify(claims).claims))
     expect(text).toContain(SUGGESTION_DISCLAIMER)
+  })
+})
+
+/**
+ * What the floor under every printed row was measured over, stated on screen.
+ *
+ * `data/eval/redteam-fabricated.json` — the set `bun run eval:suggestions` chose
+ * `MIN_SHARED_RUN_CHARS` from — has forty anchors and every one is a hadith (`abudawud`,
+ * `ibnmajah`, `malik`). A reader who sees `shared: 11 of 60` beside a quranic record has no way to
+ * know the threshold was never checked against a quranic case, and the honest surface for a
+ * measurement nobody took is to say so (AGENTS.md §16).
+ *
+ * These tests pin the disclosure AND its boundary: it must not claim the SEARCH was hadith-only,
+ * because the scan reads every served collection and a quranic record is in the list above it.
+ */
+describe("the measurement coverage is disclosed, and is not confused with the search scope", () => {
+  const textFor = (claims: readonly Claim[]): string => screen(claims, suggestionsFor(db, claims, verify(claims).claims))
+
+  test("a candidate list says the floor was measured on hadith cases only", () => {
+    expect(textFor([claimOf(FABRICATED)])).toContain(SUGGESTION_MEASUREMENT_SCOPE)
+  })
+
+  test("the disclosure names the collections that are unmeasured, rather than implying the list is narrow", () => {
+    const text = textFor([claimOf(FABRICATED)])
+    expect(text).toContain("hadith cases only")
+    expect(text).toContain("quran and tirmidhi are unmeasured")
+  })
+
+  test("a quranic record in the list does not make the search hadith-only, and the copy must not say it is", () => {
+    // The distinction the line exists to keep. The scope line already states the truth about the
+    // search — `whole snapshot` — and a disclosure that contradicted it would be a worse defect than
+    // the silence it replaced. `suggestionFor(..., null)` is what a claim citing nothing produces.
+    const claims = [claimOf(FABRICATED)]
+    const text = screen(claims, [suggestionFor(db, FABRICATED, null)])
+    expect(text).toContain(SUGGESTION_MEASUREMENT_SCOPE)
+    expect(text).toContain("whole snapshot")
+  })
+
+  test("no_candidates is disclosed too, because the floor is what decided it", () => {
+    const nothing: readonly Claim[] = [
+      { id: "c1", text: "prose", quote: normalizeQuote("نص لا يوجد في هذه المجموعة إطلاقا أبدا"), citations: [citation("bukhari", "1")] },
+    ]
+    const text = screen(nothing, suggestionsFor(db, nothing, verify(nothing).claims))
+    expect(text).toContain(SUGGESTION_MEASUREMENT_SCOPE)
+  })
+
+  test("a state where no floor was applied makes no measurement claim", () => {
+    // `unavailable` means the corpus could not be searched. A coverage disclosure there would describe
+    // a measurement that never happened, which is the same over-claiming as an invented count.
+    const broken = new Database(":memory:")
+    broken.exec("CREATE TABLE records (id TEXT, collection TEXT, textMatch TEXT)")
+    broken.exec("INSERT INTO records (id, collection, textMatch) VALUES ('bad:1', 'x', NULL)")
+    const claims = [claimOf(FABRICATED)]
+    const text = renderReport({
+      prose: "answer",
+      report: verify(claims),
+      claims,
+      sources: new Map(),
+      relevance: null,
+      suggestions: [suggestionFor(broken, FABRICATED)],
+      transcript: "live",
+      model: "test",
+      sourceCount: 0,
+      snapshotHash: SNAPSHOT_HASH,
+    })
+    expect(text).toContain(SUGGESTION_DISCLAIMER)
+    expect(text).not.toContain(SUGGESTION_MEASUREMENT_SCOPE)
+    broken.close()
   })
 })
 

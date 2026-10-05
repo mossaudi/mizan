@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite"
 import { isOk, unresolved, type Citation, type CorpusRecord, type ResolvedCitation } from "@mizan/core"
-import { decodeRecordRow, recordSelect, rowId, type RawRow } from "./rows.ts"
+import { decodeFailureSummary, decodeRecordRow, recordSelect, rowId, type RawRow } from "./rows.ts"
 
 /**
  * Citation resolution — the seam between "a model said `bukhari:1`" and "here is the row".
@@ -45,9 +45,12 @@ const rowsToRecords = (rows: readonly RawRow[]): { readonly records: readonly Co
   for (const row of rows) {
     const decoded = decodeRecordRow(row)
     if (!isOk(decoded)) {
+      // Redacted through the same owner the candidate scan uses: a decode detail quotes the value
+      // that failed, and these problems are printed by the CLI and pasted into issues, so a row of
+      // corpus text forwarded here would reach a stderr line (AGENTS.md §13).
       problems.push({
         citation: { collection: row.collection, number: row.number, grade: null, raw: row.id },
-        detail: `row ${rowId(row)} does not match CorpusRecord: ${decoded.error.detail}`,
+        detail: `row ${rowId(row)} ${decodeFailureSummary(decoded.error)}`,
       })
       continue
     }

@@ -29,6 +29,7 @@ export { elapsedMs, isExpired, nowIso, startDeadline, withDeadline, withDeadline
 
 export { matchesExactly, normalize, normalizeForMatch, normalizeForRender, normalizeForTerminal, isNonBlank } from "./normalize/normalize.ts"
 export { BIDI_CONTROL_MARKS, COMBINING_MARKS, FOLD_PIPELINE, FOLD_STAGE_NOTES, type FoldStage } from "./normalize/fold-table.ts"
+export { MAX_QUOTE_CHARS, MAX_RECORD_CHARS } from "./normalize/bounds.ts"
 export { displayWidth, isBareControl, stripTerminalControls, ESC, ZERO_WIDTH } from "./normalize/terminal.ts"
 
 export { decodeOrFail, decodeSync, describeDecodeFailure, type Decodable, type DecodeFailure } from "./schema/decode.ts"
@@ -36,7 +37,7 @@ export { ANCHOR_PROTOCOL_VERSION, AnchorAdjudication, AnchorAdjudicationSet, Anc
 export { Answer, Citation, Claim, emptyClaim, normalizeQuote } from "./schema/claim.ts"
 export { BaselineDeclaration, BenchmarkOutcome, BenchmarkResult, BENCHMARK_SCHEMA_VERSION, HONEST_BASELINE, PRE_REGISTERED_HYPOTHESIS, METHOD_NOT_PUBLISHED, PEER_REGISTER_VERSION, PeerFigure, PeerMethod, PeerRegister, peerStatesAFigure } from "./schema/benchmark.ts"
 export { COVERAGE_SCHEMA_VERSION, CollectionCoverage, CoverageTotals, QuarantineCoverage, SourceCoverage } from "./schema/coverage.ts"
-export { Correction, CorrectionSpan, LocatedCorrection, NearbyRecord, Relevance, RelevanceState, SUGGESTION_DISCLAIMER, Suggestion, SuggestionCandidates, SuggestionNoCandidates, SuggestionScope, SuggestionUnavailable, UnverifiableCorrection, type SuggestionState } from "./schema/display.ts"
+export { Correction, CorrectionSpan, LocatedCorrection, NearbyRecord, Relevance, RelevanceState, SUGGESTION_DISCLAIMER, SUGGESTION_MEASUREMENT_SCOPE, Suggestion, SuggestionCandidates, SuggestionNoCandidates, SuggestionScope, SuggestionUnavailable, UnverifiableCorrection, type SuggestionState } from "./schema/display.ts"
 export { DEMO_ANCHOR_SET_VERSION, DEMO_QUESTION_SET_VERSION, DemoAnchor, DemoAnchorSet, DemoExpectation, DemoQuestion, DemoQuestionSet } from "./schema/demo.ts"
 export { DivergenceResolution, EvalAnchor, EvalCase, EvalSet, KnownDivergence } from "./schema/eval.ts"
 export { ResolvedCitation, unresolved } from "./schema/resolved.ts"

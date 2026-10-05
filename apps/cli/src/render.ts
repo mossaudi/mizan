@@ -1,5 +1,5 @@
 import type { Claim, ClaimVerdict, DetectionBasis, NearbyRecord, Relevance, ResolvedCitation, SuggestionScope, VerdictReport } from "@mizan/core"
-import { SUGGESTION_DISCLAIMER, badgeFor, normalizeForTerminal, transcriptLabel } from "@mizan/core"
+import { SUGGESTION_DISCLAIMER, SUGGESTION_MEASUREMENT_SCOPE, badgeFor, normalizeForTerminal, transcriptLabel } from "@mizan/core"
 import type { TranscriptSource } from "@mizan/agent"
 import { longestRunFor, resolutionKey } from "@mizan/verify"
 import { correctionFor, renderCorrection } from "./correction.ts"
@@ -246,6 +246,10 @@ const renderRelevance = (relevance: Relevance | undefined): string => {
  * for the badge. Nothing here can change the badge: the badge above was printed from
  * `ClaimVerdict`, and this function is handed a `Suggestion` with no verdict in it.
  *
+ * `SUGGESTION_MEASUREMENT_SCOPE` is imported for the same reason and is a *separate* sentence,
+ * because it is about coverage rather than authority — see `measurementScopeLine` below for why the
+ * two may not be merged.
+ *
  * ## The grade line is conditional
  *
  * `gradeApplicable` decides whether a grade is printed at all, and the grade is shown as the
@@ -312,6 +316,24 @@ const returnedOfScanned = (returned: number, scanned: number): string =>
   `${returned} returned of ${scanned} records scanned`
 
 /**
+ * The line that says what the floor under each candidate was measured over.
+ *
+ * ## Why a separate line and not a clause on the scope line
+ *
+ * `scopeLine` is about the SEARCH — which collections the rows on screen were drawn from. What is
+ * measured is the THRESHOLD those rows were filtered by, and the two have genuinely different
+ * coverage: the scan reads every served collection, while `data/eval/redteam-fabricated.json` — the
+ * set the floor was chosen from — is hadith-only. A quranic record can appear in this list, and the
+ * sentence that discloses the coverage gap must therefore be about the floor, or it contradicts the
+ * list printed under it.
+ *
+ * Printed on both searched states, and not on `unavailable` at all. On `unavailable` no floor was
+ * applied — there was no search to count and no number to qualify — so a coverage disclosure there
+ * would describe a measurement that never happened.
+ */
+const measurementScopeLine = (): string => `${CONTINUATION}${normalizeForTerminal(SUGGESTION_MEASUREMENT_SCOPE)}`
+
+/**
  * One claim's suggestion pass, in every state it can be in.
  *
  * `block === null` renders nothing at all, and that is the honest surface: the pass was not run
@@ -338,12 +360,12 @@ const renderSuggestion = (block: SuggestionBlock | undefined | null, label: stri
   }
   if (suggestion.state === "no_candidates") {
     const counts = `${returnedOfScanned(0, suggestion.considered)}, ${scopeLine(suggestion.scope)}`
-    return [header, `${CONTINUATION}${normalizeForTerminal(suggestion.reason)} — ${counts}`]
+    return [header, `${CONTINUATION}${normalizeForTerminal(suggestion.reason)} — ${counts}`, measurementScopeLine()]
   }
 
   const texts = new Map(block.texts.map((text) => [text.recordId, text]))
   const counts = `${returnedOfScanned(suggestion.candidates.length, suggestion.considered)}, ${scopeLine(suggestion.scope)}`
-  const lines = [`${INDENT}${SUGGESTION_DISCLAIMER} ${label}: ${counts}`]
+  const lines = [`${INDENT}${SUGGESTION_DISCLAIMER} ${label}: ${counts}`, measurementScopeLine()]
   for (const record of suggestion.candidates) lines.push(...renderSuggestionLine(record, texts.get(record.recordId), suggestion.quoteChars))
   return lines
 }

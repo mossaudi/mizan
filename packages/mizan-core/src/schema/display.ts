@@ -280,4 +280,34 @@ export type SuggestionState = Suggestion["state"]
  */
 export const SUGGESTION_DISCLAIMER = "nearest suggestions (non-authoritative) — not a verification result"
 
+/**
+ * What the number printed beside each candidate was measured over, and what was not.
+ *
+ * ## Why this is a second sentence rather than a longer `SUGGESTION_DISCLAIMER`
+ *
+ * They are two different facts about two different things, and merging them would make one of them
+ * false:
+ *
+ *  - `SUGGESTION_DISCLAIMER` is about AUTHORITY. Nothing here is a verdict, and nothing here can
+ *    change the badge above it.
+ *  - This is about COVERAGE. The display floor — the number of shared folded characters a row needs
+ *    before it is printed — was chosen from `data/eval/redteam-fabricated.json`, and every anchor in
+ *    that set is a hadith (`abudawud`, `ibnmajah`, `malik`). No quranic and no tirmidhi case is in it.
+ *
+ * ## The distinction this line exists to keep, stated precisely
+ *
+ * The SEARCH is not hadith-only. The scan reads every served collection, so a quranic record can and
+ * does appear in the list. What is hadith-only is the MEASUREMENT that chose the floor those rows are
+ * filtered by. Printing "hadith-only" beside a quranic candidate without that distinction would be a
+ * false statement about the list, and omitting the line entirely leaves a reader who reads `shared: 11
+ * of 60` believing the threshold was checked against everything it is applied to — which is the
+ * over-claiming AGENTS.md §12 warns about, in the one product whose asset is integrity.
+ *
+ * A reader on other hardware is told the same thing by `docs/specs/measurements.md`: the band is the
+ * spread of five runs on the recorded machine, and the right response to a machine that disagrees is to
+ * run the harness, not to widen the number.
+ */
+export const SUGGESTION_MEASUREMENT_SCOPE =
+  "the shared-character floor was measured on hadith cases only — quran and tirmidhi are unmeasured"
+
 export * as DisplaySchema from "./display.ts"

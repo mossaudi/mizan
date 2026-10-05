@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite"
 import { err, isOk, ok, type CorpusError, type CorpusRecord, type Result } from "@mizan/core"
 import { MAX_TOP_K, MIN_SHARED_TRIGRAMS, openSearch, type ScannedNeighbour } from "@mizan/suggest"
-import { CANDIDATE_COLUMNS, decodeRecordRow, recordSelect, rowId, type RawCandidateRow, type RawRow } from "./rows.ts"
+import { CANDIDATE_COLUMNS, decodeFailureSummary, decodeRecordRow, recordSelect, rowId, type RawCandidateRow, type RawRow } from "./rows.ts"
 
 /**
  * Reading the corpus for nearest-quote suggestions — I/O here, judgement nowhere.
@@ -123,6 +123,16 @@ const readCandidates = (
  * save. Rows that clear it are all carried, because whether they are *worth showing* — the order, the
  * dedup, the cap — is a judgement, and the judgement is not made here.
  *
+ * ## Why a quote too short to measure still has its rows read
+ *
+ * A folded quote of one or two characters has no 3-gram, so `openSearch` reports it as
+ * `quoteTooShort` and measures it as contained in nothing. This scan consults that and admits no row.
+ * What it does NOT do is skip the corpus: `considered` is printed next to the result as "0 returned of
+ * N records scanned", so an early return would print `0 of 0` and assert an empty corpus that is
+ * there. Reading the rows keeps the sentence true, keeps a malformed row failing the scan instead of
+ * being silently skipped, and costs two string comparisons per row — the `overlapOf` call, the only
+ * part worth skipping, is skipped.
+ *
  * @param rawQuote the quote exactly as the user or model wrote it. Folded once, here.
  * @param minShared the ranking floor, supplied by the caller. Defaults to `MIN_SHARED_TRIGRAMS`.
  * @returns `err(row_undecodable)` if any row fails its schema, `err(parse_failed)` if the table
@@ -151,8 +161,12 @@ export const scanSuggestionCandidates = (
     if (typeof row.collection !== "string") {
       return { _tag: "row_undecodable", recordId: rowId(row), detail: "collection is not a string" }
     }
-    const overlap = search.overlapOf(textMatch)
     considered += 1
+    // Nothing to measure, so nothing to admit. `overlapOf` would also report `contained: false` for
+    // this quote — the guard is here so the floor cannot be reached by a caller who passed
+    // `minShared: 0`, and so 27,234 `includes` calls are not spent proving it.
+    if (search.quoteTooShort) return null
+    const overlap = search.overlapOf(textMatch)
     // Containment bypasses the floor here exactly as it does in the ranking: a record that holds the
     // quote outright is the answer to "what did they mean?" whatever its 3-gram overlap says.
     if (!overlap.contained && overlap.shared < minShared) return null
@@ -179,6 +193,15 @@ export const scanSuggestionCandidates = (
  * likes, and a caller that assumed otherwise would render a shuffled list on a different engine
  * version. Missing rows are a failure, not a short list: a vanished record means the snapshot changed
  * under us, and the honest output is `unavailable`.
+ *
+ * ## Why the query is guarded
+ *
+ * The same reason the scan's two queries are, and for the same reason `AGENTS.md §2` is not
+ * negotiable: `db.query` throws when a selected column is absent, and this is an ordinary outcome for
+ * a file written by an older ingest. An unguarded throw here crosses the package boundary as a
+ * `throw`, where it reaches the reader as a stack trace instead of the one honest sentence this
+ * feature has for it (`unavailable`, AGENTS.md §16). The driver's message is dropped for the same
+ * reason the scan's is: it describes the schema of the file we were handed.
  */
 export const fetchSuggestionRecords = (db: Database, recordIds: readonly string[]): Result<readonly CorpusRecord[], CorpusError> => {
   if (recordIds.length === 0) return ok([])
@@ -187,12 +210,20 @@ export const fetchSuggestionRecords = (db: Database, recordIds: readonly string[
   }
 
   const placeholders = recordIds.map(() => "?").join(", ")
-  const rows = db.query<RawRow, string[]>(recordSelect(` WHERE id IN (${placeholders}) ORDER BY id`)).all(...recordIds)
+  let rows: RawRow[]
+  try {
+    rows = db.query<RawRow, string[]>(recordSelect(` WHERE id IN (${placeholders}) ORDER BY id`)).all(...recordIds)
+  } catch {
+    return err({ _tag: "parse_failed", source: "suggestions", detail: "the records behind the suggestions could not be re-read from the snapshot" })
+  }
 
   const records: CorpusRecord[] = []
   for (const row of rows) {
     const decoded = decodeRecordRow(row)
-    if (!isOk(decoded)) return err({ _tag: "row_undecodable", recordId: rowId(row), detail: decoded.error.detail })
+    // The failure names the row and the schema it failed, never the value that failed — a decode
+    // detail quotes the offending value, and a row of corpus text belongs in no error message a human
+    // will read (AGENTS.md §13). See `decodeFailureSummary` for the measurement behind that sentence.
+    if (!isOk(decoded)) return err({ _tag: "row_undecodable", recordId: rowId(row), detail: decodeFailureSummary(decoded.error) })
     records.push(decoded.value)
   }
 
