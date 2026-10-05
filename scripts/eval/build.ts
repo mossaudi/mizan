@@ -25,6 +25,7 @@ import {
 } from "./anchors.ts"
 import { arabic_indic_digits, digit_substituted, elide_middle, injection_appended, letter_transposed, replaceWord, tatweel_spacing, undiacriticized, word_inserted, SUBSTITUTIONS, type Mutation } from "./mutations.ts"
 import { CASE_CLASSES, expectedCounts, type CaseClass } from "./plan.ts"
+import { interleaveByCollection } from "./selection.ts"
 
 /**
  * Builds the golden and red-team case lists from the real corpus.
@@ -91,7 +92,14 @@ export type EvalAnchor = CorpusRecordMeta & { readonly textDisplay: string; read
 
 const sha256Hex = (value: string): string => createHash("sha256").update(value, "utf8").digest("hex")
 
-type SpanRef = { readonly record: CorpusRecord; readonly span: string }
+/**
+ * A drawn anchor: the corpus record, the span quoted from it, and the collection it belongs to.
+ *
+ * `collection` is carried beside the record rather than read back off `record.collection` at each
+ * call site because `interleaveByCollection` buckets by exactly that name, and a pool whose key is
+ * one hop from its payload is a pool whose key can be wrong at one call site and right at the next.
+ */
+type SpanRef = { readonly record: CorpusRecord; readonly span: string; readonly collection: string }
 
 /* ------------------------------------------------------------------ small helpers */
 
@@ -180,7 +188,9 @@ export const countDifferingWords = (left: string, right: string): number => {
 const MAIN_ANCHORS_PER_COLLECTION = 5
 
 const mainAnchors = (db: Database): readonly SpanRef[] =>
-  collectionsOf(db).flatMap((collection) => anchorsWithSpans(rowsIn(db, collection), MAIN_ANCHORS_PER_COLLECTION).map(([record, span]) => ({ record, span })))
+  collectionsOf(db).flatMap((collection) =>
+    anchorsWithSpans(rowsIn(db, collection), MAIN_ANCHORS_PER_COLLECTION).map(([record, span]) => ({ record, span, collection })),
+  )
 
 /** Hadith only: an English injection appended to a Qur'anic verse would be a category error. */
 const hadithAnchors = (db: Database): readonly SpanRef[] => mainAnchors(db).filter((entry) => entry.record.collection !== "quran")
@@ -196,7 +206,9 @@ const hadithAnchors = (db: Database): readonly SpanRef[] => mainAnchors(db).filt
 const DIGIT_SPANS_PER_RECORD = 4
 
 const digitAnchors = (db: Database): readonly SpanRef[] =>
-  recordsWithDigits(db).flatMap((record) => findSpans(record.textDisplay, DIGIT_SPANS_PER_RECORD, containsAsciiDigit).map((span) => ({ record, span })))
+  recordsWithDigits(db).flatMap((record) =>
+    findSpans(record.textDisplay, DIGIT_SPANS_PER_RECORD, containsAsciiDigit).map((span) => ({ record, span, collection: record.collection })),
+  )
 
 /* ------------------------------------------------------------------ per-class builders */
 
@@ -334,23 +346,44 @@ const buildTwoWord = (db: Database, count: number): readonly Built[] => {
   return built
 }
 
-/** Transposition and insertion need no substitution, so they run off the main pool. */
-const buildSimple = (db: Database, classId: string, mutate: (span: string) => string, count: number): readonly Built[] => {
+/**
+ * Transposition and insertion need no substitution, so they run off the main pool.
+ *
+ * ## ADR-15: drawn round-robin, not sliced
+ *
+ * This used to be `mainAnchors(db).slice(0, count)`. `mainAnchors` is
+ * `collectionsOf(db).flatMap(...)`, so it arrives grouped by collection — five abudawud anchors, then
+ * five ibnmajah, then malik — and slicing the front of a grouped list is slicing the first one or two
+ * collections. With `count = 8`, both classes drew from abudawud and ibnmajah alone, and nasai, quran
+ * and tirmidhi were never once asked to be falsified by a pool-free mutation. The committed set
+ * reported forty correct fabrications and covered half the served corpus.
+ *
+ * `interleaveByCollection` fixes the ORDER rather than the size, which is the property that was
+ * missing: every collection contributes before any contributes twice. `offset` gives each class a
+ * disjoint window of the interleaved sequence, so `letter_transposed` and `word_inserted` do not
+ * quote the same twelve words twice — with five anchors per collection a window of 8 is the smallest
+ * that keeps them apart.
+ *
+ * Only these two call sites changed. `buildMainClasses`, `buildElide` and `buildInjection` keep
+ * their offsets, because the golden set's 200 cases and their `golden-NNN` ids are load-bearing:
+ * `data/eval/adjudication.json` is keyed by those ids, and reordering the golden set would invalidate
+ * forty human rulings to fix a defect that does not exist there (it draws 30 anchors per collection
+ * and every class is applied to all of them).
+ */
+const buildSimple = (db: Database, classId: string, mutate: (span: string) => string, count: number, offset: number): readonly Built[] => {
   const klass = classById(classId)
-  return mainAnchors(db)
-    .slice(0, count)
-    .map((entry) => ({
-      classId,
-      mutation: klass.mutation,
-      note:
-        classId === "letter_transposed"
-          ? `Two adjacent letters swapped in ${entry.record.id}. One edit from the source under a Damerau metric; a different string under containment.`
-          : `One extra word inserted into a span of ${entry.record.id}, lengthening it past the source.`,
-      quote: mutate(entry.span),
-      citation: cite(entry.record.collection, entry.record.number ?? ""),
-      record: entry.record,
-      ...from(klass),
-    }))
+  return interleaveByCollection(mainAnchors(db), count, offset).map((entry) => ({
+    classId,
+    mutation: klass.mutation,
+    note:
+      classId === "letter_transposed"
+        ? `Two adjacent letters swapped in ${entry.record.id}. One edit from the source under a Damerau metric; a different string under containment.`
+        : `One extra word inserted into a span of ${entry.record.id}, lengthening it past the source.`,
+    quote: mutate(entry.span),
+    citation: cite(entry.record.collection, entry.record.number ?? ""),
+    record: entry.record,
+    ...from(klass),
+  }))
 }
 
 /** How far past a collection's highest number an `identifier_unresolved` citation is placed. */
@@ -427,11 +460,15 @@ export const buildRedTeam = (db: Database): readonly Built[] => [
   // Offset 4 so the red-team file draws different records from the golden file's one-word cases.
   ...buildOneWord(db, "one_word_changed", redTeamCountOf("one_word_changed"), 4),
   ...buildTwoWord(db, redTeamCountOf("two_word_changed")),
-  ...buildSimple(db, "letter_transposed", letter_transposed, redTeamCountOf("letter_transposed")),
+  // ADR-15. The two windows of 8 are the interleaved sequence at offsets 0 and 8, which is the
+  // smallest pair that keeps the two classes' anchors disjoint while every served collection
+  // receives one case from each. Both classes keep their declared counts, so the set is still 40.
+  ...buildSimple(db, "letter_transposed", letter_transposed, redTeamCountOf("letter_transposed"), 0),
   // Offset 2: the digit pool holds six spans, four cases per class, and the classes must not
-  // be the same four sentences twice.
+  // be the same four sentences twice. This class stays on the digit pool because the corpus holds
+  // only six usable digit spans, all from two records — a corpus constraint, recorded in DIGIT_FACTS.
   ...buildDigit(db, "digit_substituted", digit_substituted, 2, redTeamCountOf("digit_substituted")),
-  ...buildSimple(db, "word_inserted", word_inserted, redTeamCountOf("word_inserted")),
+  ...buildSimple(db, "word_inserted", word_inserted, redTeamCountOf("word_inserted"), 8),
 ]
 
 /* ------------------------------------------------------------------ validation */

@@ -138,6 +138,51 @@ a finding that the claim became faithful; a locator that fails can only ever yie
 `rejected`. `falseVerifiedDelta` is the zero-`verified` bar restated as a field, so a change to the
 locator has to change a number here in the open.
 
+## Which books those 40 fabrications were tried against
+
+A red-team number says how a fabrication was caught. It does not say which books anyone was defending,
+and the difference is the whole gap this section exists to close: a set of 40 fabrications drawn from
+hadith alone would report `40 of 40` while three of the six served collections — more than half the
+corpus — had never been asked to falsify anything. That sentence would pass `check:docs`, because the
+figure is right and the set really does contain forty cases. It is the *breadth* that would be a lie,
+and no figure in the document contradicts it.
+
+The committed set is spread across all six, in a fixed round-robin (ADR-15):
+
+| collection | cases | rejected | verified | served records | coverage |
+| --- | --- | --- | --- | --- | --- |
+| abudawud | 15 | 15 | 0 | 5272 | measured |
+| ibnmajah | 13 | 13 | 0 | 4336 | measured |
+| malik | 5 | 5 | 0 | 1829 | measured |
+| nasai | 3 | 3 | 0 | 5672 | measured |
+| quran | 2 | 2 | 0 | 6236 | measured |
+| tirmidhi | 2 | 2 | 0 | 3889 | measured |
+
+**Measured** means at least one fabrication was attempted against that collection, and every served
+collection carries at least two — the floor ADR-15 sets, enforced by `checkCollectionCoverage` and by the
+two directions it checks: a served collection below the floor, and a case naming a collection the
+attestation does not serve, which cannot have been resolved against anything.
+
+The `rejected` and `verified` columns are the per-book form of `falseVerifiedCount: 0`. That aggregate
+was the *only* place this repository said how many fabrications it caught, which meant a collection
+nobody asked about was indistinguishable from a collection where nothing was caught — the same
+conflation the table above exists to break, one level down. `rejected` equals `cases` in every row
+because every case in the set is adjudicated to `rejected`, and `check:docs` fails if one ever stops
+saying so, so these are derived from the set's own adjudication rather than typed in beside it. The
+decomposed retrieval figures for the same rows are in `docs/specs/measurements.md`.
+
+Two caveats the table states rather than omits. `quran` and `tirmidhi` sit **exactly on the floor** of
+two cases: measured, and nowhere near a sample, which is why the nearest-quote retrieval figures beside
+this table are decomposed the same way in `docs/specs/measurements.md`. And `quran` is the largest
+collection in the corpus at 6236 records — the thinnest measurement sits under the largest book, so
+"measured" is a floor and not a description of depth.
+
+The per-collection case counts, containment counts and presence figures are recorded flat in
+`data/benchmark/vs-search.json` as `suggestionCoverageCases<Collection>`,
+`suggestionCoverageRejected<Collection>`, `suggestionCoverageVerified<Collection>` and
+`suggestionCoveragePresenceTop<N><Collection>`; `check:docs` compares every cell of this table against
+those keys, and `docs/specs/measurements.md` prints the decomposition this table summarises.
+
 ## The receipt
 
 Every run appends to `data/runs.jsonl`, a hash-chained ledger. An entry carries hashes and verdicts

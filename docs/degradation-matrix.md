@@ -77,7 +77,7 @@ no suggestion can change, upgrade or block a verdict, and the flag `--no-suggest
 entirely rather than silently degrading it.
 
 The cost is stated rather than hidden: one exhaustive scan of the snapshot per rejected claim, measured
-at **p50 644 ms / p95 753 ms / max 1110 ms** on the committed 27,234-record corpus
+at **p50 686 ms / p95 1156 ms / max 1555 ms** on the committed 27,234-record corpus
 `snapshotHash=7b3b66fbca7fb9df.` against a `< 50 ms` target that this architecture does not meet
 (ADR-08). That is the slowest of five consecutive runs;
 `docs/specs/measurements.md` is the one place the figure and the conditions it was measured under are

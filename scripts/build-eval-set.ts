@@ -37,23 +37,26 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { Database } from "bun:sqlite"
-import { decodeOrFail, decodeSync, isOk, AnchorAdjudicationSet, EvalSet as EvalSetSchema } from "@mizan/core"
+import { decodeOrFail, decodeSync, isOk, AnchorAdjudicationSet, EvalSet as EvalSetSchema, type CollectionCoverageRow } from "@mizan/core"
 import { anchorsOf, anchorProblems, buildGolden, buildRedTeam, finalise, unassigned, validate } from "./eval/build.ts"
 import { indexCorpus, loadFoldedCorpus } from "./eval/anchors.ts"
 import { ADJUDICATION_ROWS, ADJUDICATION_TARGET, redTeamMovement } from "./eval/adjudication.ts"
 import { adjudicationLookup, buildAdjudicationBody, checkStaleAdjudication, validateAdjudications } from "./eval/adjudication-loader.ts"
 import { anchorCoverageProblems, CLAIM_ANCHOR_TEXTS } from "./eval/anchor-texts.ts"
 import { DIGIT_FACTS, expectedCounts, GOLDEN_TARGET, goldenTotal } from "./eval/plan.ts"
+import { coverageRowProblems, coverageRowsOf, identityOf, EXCLUDED_FIELD } from "./eval/identity.ts"
 
 const CORPUS_PATH = "data/corpus.db"
 const OUT_DIR = "data/eval"
 const ADJUDICATION_PATH = join(OUT_DIR, "adjudication.json")
 /*
- * 2: `EvalCase.anchorText` added, the per-case `divergence` stamp removed, and `EvalSet.knownDivergence`
- * made optional because MIZ-106 closed the gap it recorded. Bumped rather than left alone because a
- * field a reader cannot rely on anymore is exactly what a version number exists to announce.
+ * 3: `datasetDigest` and `coverageRows` added, both REQUIRED. Bumped rather than left alone because
+ * the pair is what lets anyone tell whether two reports describe the same evidence — and a reader
+ * cannot rely on a field a set may simply omit. See `scripts/eval/identity.ts` for the material the
+ * digest covers, and `packages/mizan-gate/src/docs-coverage.ts` for the rule that recomputes
+ * coverage from `cases` rather than believing these rows.
  */
-const SCHEMA_VERSION = 2
+const SCHEMA_VERSION = 3
 
 /** Why the sets are hand-adjudicated, printed into both files so nobody has to ask. */
 const EXPECTATION_SOURCE = "Hand-adjudicated in scripts/eval/plan.ts from the documented behaviour of the fold table. Never observed from @mizan/verify: a set whose expectations were recorded from the code under test is a regression test of the code against itself."
@@ -69,7 +72,8 @@ const EXPECTATION_SOURCE = "Hand-adjudicated in scripts/eval/plan.ts from the do
 const LICENCE_NOTICE =
   "Quoted spans are real source text, reproduced verbatim under each collection's own licence and attribution, as recorded per anchor. Fabricated spans (classes one_word_changed, two_word_changed, letter_transposed, digit_substituted, word_inserted, injection_appended) and elided spans are synthetic test data. They are not hadith, they assert nothing, and no case may be cited as a source. Qur'an text is under no-derivatives terms and is reproduced without modification."
 
-const DETERMINISM = "Same snapshot in, byte-identical files out. Every selection is ordered (records by id, collections by name, classes by the table order in plan.ts) and no clock, locale or randomness is consulted."
+const DETERMINISM =
+  "Same snapshot in, byte-identical files out. Every selection is ordered (records by id, collections by name, cases drawn round-robin across collections per ADR-15) and no clock, locale or randomness is consulted. datasetDigest is the ds1 digest of this document with the datasetDigest key removed, so any reader can recompute it."
 
 /** Counts by class and by expected verdict, so a reviewer can see the shape without parsing. */
 const tally = (cases: readonly { readonly classId: string; readonly expectedVerdict: string }[]): { readonly byClass: Record<string, number>; readonly byVerdict: Record<string, number> } => {
@@ -90,7 +94,13 @@ const tally = (cases: readonly { readonly classId: string; readonly expectedVerd
  */
 const anchorLookup = (): ReadonlyMap<string, string> => new Map(Object.entries(CLAIM_ANCHOR_TEXTS))
 
-const buildSet = (name: string, title: string, purpose: string, cases: ReturnType<typeof finalise>, anchors: ReturnType<typeof anchorsOf>) => {
+const buildSet = (
+  name: string,
+  title: string,
+  purpose: string,
+  cases: ReturnType<typeof finalise>,
+  anchors: ReturnType<typeof anchorsOf>,
+): Omit<Record<string, unknown>, typeof EXCLUDED_FIELD> & Record<string, unknown> => {
   const { byClass, byVerdict } = tally(cases)
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -101,6 +111,7 @@ const buildSet = (name: string, title: string, purpose: string, cases: ReturnTyp
     regenerateWith: "bun run build:eval",
     determinism: DETERMINISM,
     expectationSource: EXPECTATION_SOURCE,
+    coverageRows: coverageRowsOf(cases),
     digitFacts: DIGIT_FACTS,
     classCounts: byClass,
     verdictCounts: byVerdict,
@@ -109,6 +120,24 @@ const buildSet = (name: string, title: string, purpose: string, cases: ReturnTyp
     anchors,
     cases,
   }
+}
+
+/**
+ * Attach the identity, then check that the published rows are the ones the cases imply.
+ *
+ * Two steps in one function because they are one commitment: the digest is taken over the material,
+ * and the rows are a *claim* the writer has just made about that material. A writer that published
+ * rows without checking them would produce a set whose self-description is untested — which is
+ * precisely the shape `docs-coverage.ts` refuses to trust.
+ *
+ * `identityOf` can refuse (a non-finite number has no canonical form), so the refusal is surfaced as
+ * a build problem and nothing is written. A set published without an identity is the defect this
+ * whole seam exists to remove.
+ */
+const identify = (body: Record<string, unknown>, cases: ReturnType<typeof finalise>): Record<string, unknown> => {
+  const identity = identityOf(body)
+  if (!isOk(identity)) throw new Error(`${String(body["set"])}: content cannot be canonicalised, so it has no identity: ${identity.error.detail}`)
+  return { ...body, datasetDigest: identity.value }
 }
 
 /**
@@ -183,6 +212,41 @@ const main = (): number => {
   if (goldenTotal() !== GOLDEN_TARGET) problems.push(`plan.ts: the class table sums to ${goldenTotal()}, not the ${GOLDEN_TARGET} the architecture names`)
   if (redTeam.some((entry) => entry.expectedVerdict === "verified")) problems.push("redteam: contains a case expected to verify, which defeats its purpose")
 
+  const goldenBody = identify(
+    buildSet(
+      "golden",
+      "Golden normalization and verification set",
+      `${GOLDEN_TARGET} cases over ${Object.keys(expectedCounts("golden")).length} classes: four renderings of a correct quotation that must all verify, then the ways a text stops being a quotation, then the two citation shapes that make a verdict impossible rather than wrong. Run against the real resolver and the real verifier; nothing is mocked.`,
+      golden,
+      goldenAnchors,
+    ),
+    golden,
+  )
+  const redTeamBody = identify(
+    buildSet(
+      "redteam",
+      "Red-team set: fabrications that must never verify",
+      "Every case is a fabrication of a real corpus span. A single `verified` here is a false positive on invented religious text, which is the failure this repository exists to prevent, so the gate is exactly zero rather than the golden set's accuracy bar. Drawn round-robin across every served collection (ADR-15), so no collection is exempt from being falsified.",
+      redTeam,
+      redTeamAnchors,
+    ),
+    redTeam,
+  )
+
+  /*
+   * The set's own account of its coverage, checked against its cases before either is written.
+   *
+   * `docs-coverage.ts` recomputes the same counts at `check:docs` time and would catch a mismatch
+   * eventually. Checking here as well is not duplication: this reports it as a build failure naming
+   * the collection, on the machine that caused it, while the docs rule reports it on a repository
+   * nobody is currently thinking about. The arithmetic itself is shared, in `coverageRowsOf`.
+   */
+  for (const [name, body] of [["golden", goldenBody], ["redteam", redTeamBody]] as const) {
+    for (const problem of coverageRowProblems(body["coverageRows"] as CollectionCoverageRow[], name === "golden" ? golden : redTeam)) {
+      problems.push(`${name}: ${problem}`)
+    }
+  }
+
   if (problems.length > 0) {
     for (const problem of problems) console.error(`FAIL ${problem}`)
     console.error(`\n${problems.length} problem(s). Nothing was written.`)
@@ -191,28 +255,8 @@ const main = (): number => {
 
   const files = [
     { path: ADJUDICATION_PATH, body: adjudicationBody, count: ADJUDICATION_ROWS.length },
-    {
-      path: join(OUT_DIR, "golden-normalization.json"),
-      count: golden.length,
-      body: buildSet(
-        "golden",
-        "Golden normalization and verification set",
-        `${GOLDEN_TARGET} cases over ${Object.keys(expectedCounts("golden")).length} classes: four renderings of a correct quotation that must all verify, then the ways a text stops being a quotation, then the two citation shapes that make a verdict impossible rather than wrong. Run against the real resolver and the real verifier; nothing is mocked.`,
-        golden,
-        goldenAnchors,
-      ),
-    },
-    {
-      path: join(OUT_DIR, "redteam-fabricated.json"),
-      count: redTeam.length,
-      body: buildSet(
-        "redteam",
-        "Red-team set: fabrications that must never verify",
-        "Every case is a fabrication of a real corpus span. A single `verified` here is a false positive on invented religious text, which is the failure this repository exists to prevent, so the gate is exactly zero rather than the golden set's accuracy bar.",
-        redTeam,
-        redTeamAnchors,
-      ),
-    },
+    { path: join(OUT_DIR, "golden-normalization.json"), body: goldenBody, count: golden.length },
+    { path: join(OUT_DIR, "redteam-fabricated.json"), body: redTeamBody, count: redTeam.length },
   ]
 
   /*
@@ -249,6 +293,8 @@ const main = (): number => {
   console.log(`adjudications    : ${adjudicationBody.decidedCount} decided, ${adjudicationBody.undecidedCount} undecided`)
   console.log(`anchored claims  : golden ${golden.filter((entry) => entry.anchorText !== undefined).length}, redteam ${redTeam.filter((entry) => entry.anchorText !== undefined).length}`)
   console.log(`movement (claim) : ${JSON.stringify(redTeamMovement())} rejected -> unverifiable, published in adjudication.json`)
+  console.log(`dataset digest   : golden ${String(goldenBody["datasetDigest"])}, redteam ${String(redTeamBody["datasetDigest"])}`)
+  console.log(`coverage         : ${JSON.stringify(coverageRowsOf(redTeam))}`)
   return 0
 }
 

@@ -281,6 +281,51 @@ export type SuggestionState = Suggestion["state"]
 export const SUGGESTION_DISCLAIMER = "nearest suggestions (non-authoritative) — not a verification result"
 
 /**
+ * The collections the shared-character floor was measured over.
+ *
+ * ## Why this list exists rather than prose
+ *
+ * The sentence below used to be a hand-written string saying the floor "was measured on hadith cases
+ * only — quran and tirmidhi are unmeasured". That sentence was true when every anchor in
+ * `data/eval/redteam-fabricated.json` was a hadith, and it became **false the moment the red-team set was
+ * derived across all six served collections** — a stale over-claim in the one product whose asset is
+ * integrity, printed under every suggestion block in the CLI.
+ *
+ * Declaring the set as a value fixes the part that rots. A named list cannot quietly disagree with
+ * itself, and the count in the sentence is read off the list rather than typed beside it, so adding a
+ * seventh served collection makes the sentence wrong loudly (one collection short) instead of quietly
+ * (still saying "all six"). `SUGGESTION_THIN_COLLECTIONS` being a subset of this list is asserted by a
+ * test in `@mizan/core`, so the two declarations cannot drift apart either.
+ *
+ * ## Why no case COUNT appears in the sentence
+ *
+ * The counts are the artefact's job — `suggestionCoverageCases<Key>` in `data/benchmark/vs-search.json`,
+ * published by `bun run eval:suggestions --record` and judged by `checkPresenceCollectionNamed` — and a
+ * number typed into product copy is a number nothing can contradict. So the sentence names the two
+ * collections that rest on a minimal sample and points at the file for the counts. A judge who wants the
+ * denominator has one command; a judge who is told "four" by a string literal has a wrong figure nobody
+ * will ever correct.
+ */
+export const SUGGESTION_MEASURED_COLLECTIONS = [
+  "abudawud",
+  "ibnmajah",
+  "malik",
+  "nasai",
+  "quran",
+  "tirmidhi",
+] as const
+
+/**
+ * The measured collections whose sample is too small to call generous.
+ *
+ * `quran` and `tirmidhi` carry the floor per served collection and no more. Naming them is the honest
+ * half of the sentence: a reader who is told the floor was measured over six collections would otherwise
+ * reasonably assume every one of them was measured well, and two cases is not "well". Their exact counts
+ * live in the artefact for the reason given above.
+ */
+export const SUGGESTION_THIN_COLLECTIONS = ["quran", "tirmidhi"] as const
+
+/**
  * What the number printed beside each candidate was measured over, and what was not.
  *
  * ## Why this is a second sentence rather than a longer `SUGGESTION_DISCLAIMER`
@@ -291,23 +336,25 @@ export const SUGGESTION_DISCLAIMER = "nearest suggestions (non-authoritative) �
  *  - `SUGGESTION_DISCLAIMER` is about AUTHORITY. Nothing here is a verdict, and nothing here can
  *    change the badge above it.
  *  - This is about COVERAGE. The display floor — the number of shared folded characters a row needs
- *    before it is printed — was chosen from `data/eval/redteam-fabricated.json`, and every anchor in
- *    that set is a hadith (`abudawud`, `ibnmajah`, `malik`). No quranic and no tirmidhi case is in it.
+ *    before it is printed — was chosen from `data/eval/redteam-fabricated.json`, and that set is derived
+ *    across every served collection.
  *
  * ## The distinction this line exists to keep, stated precisely
  *
- * The SEARCH is not hadith-only. The scan reads every served collection, so a quranic record can and
- * does appear in the list. What is hadith-only is the MEASUREMENT that chose the floor those rows are
- * filtered by. Printing "hadith-only" beside a quranic candidate without that distinction would be a
- * false statement about the list, and omitting the line entirely leaves a reader who reads `shared: 11
- * of 60` believing the threshold was checked against everything it is applied to — which is the
- * over-claiming AGENTS.md §12 warns about, in the one product whose asset is integrity.
+ * The SEARCH is not restricted to any collection. The scan reads every served record, so a quranic record
+ * can and does appear in the list. What the sentence is about is the MEASUREMENT that chose the floor those
+ * rows are filtered by — and that measurement now covers the same six collections the search serves. So the
+ * line has changed from naming a gap to naming a thin sample, which is a different claim and needed a
+ * different sentence: "measured over all six" without the thinness note would be the over-claiming
+ * AGENTS.md §12 warns about, in the one product whose asset is integrity.
  *
  * A reader on other hardware is told the same thing by `docs/specs/measurements.md`: the band is the
  * spread of five runs on the recorded machine, and the right response to a machine that disagrees is to
  * run the harness, not to widen the number.
  */
 export const SUGGESTION_MEASUREMENT_SCOPE =
-  "the shared-character floor was measured on hadith cases only — quran and tirmidhi are unmeasured"
+  `the shared-character floor was measured over all ${SUGGESTION_MEASURED_COLLECTIONS.length} served ` +
+  `collections (${SUGGESTION_MEASURED_COLLECTIONS.join(", ")}); ${SUGGESTION_THIN_COLLECTIONS.join(" and ")} ` +
+  "are in that set on a minimal sample — per-collection case counts are in `data/benchmark/vs-search.json`"
 
 export * as DisplaySchema from "./display.ts"

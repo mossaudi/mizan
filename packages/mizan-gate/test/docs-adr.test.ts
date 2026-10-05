@@ -188,13 +188,21 @@ describe("the repository's own ADRs — the acceptance criteria, against the rea
       .sort()
     // Six legacy identifiers and the thirteen recorded since — ADR-C1 through ADR-C9, then ADR-07
     // through ADR-10 for the nearest-quote suggestions — plus ADR-C10 and ADR-C11 from the Sprint 1
-    // precision cycle (measurement conditions; the pinned Effect beta), and ADR-12 through ADR-14 (the
-    // display floor; the published-latency claim rule; the Effect deferral seam). The count is asserted rather
+    // precision cycle (measurement conditions; the pinned Effect beta), ADR-12 through ADR-14 (the
+    // display floor; the published-latency claim rule; the Effect deferral seam), and ADR-15 and
+    // ADR-17 (per-collection anchor derivation and the fabrication coverage floor; recall as a
+    // precondition before any index). The count is asserted rather
     // than left open because a new decision that does not land here is a decision no citation can
     // resolve, and that is exactly what rule twelve exists to prevent. It is the one count in this
     // file that stays typed, deliberately: rule twelve above proves every citation resolves, so what is
     // left for this to catch is a file added to the directory without anyone reading it.
-    expect(files).toHaveLength(24)
+    //
+    // The identifier immediately before ADR-17 is absent, and deliberately: it was retired between
+    // drafts, and renumbering an accepted decision to close the hole would invalidate the citations
+    // already pointing at its neighbours. Its number is therefore never written literally in this
+    // file — rule twelve sweeps this file too, and a prose mention of a retired identifier would be
+    // read as a citation to a document that does not exist.
+    expect(files).toHaveLength(26)
     const incomplete: string[] = []
     for (const name of files) {
       const claims = checkAdrDocument(readFileSync(join(ADR_ROOT, name), "utf8"), `${ADR_DIRECTORY}/${name}`)

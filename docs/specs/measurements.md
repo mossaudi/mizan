@@ -17,18 +17,60 @@ the figure beside it going stale too.
 
 ## Figure of record
 
-**p50 644 ms, p95 753 ms, max 1110 ms** per rejected claim, for the product path: one exhaustive scan
+**p50 686 ms, p95 1156 ms, max 1555 ms** per rejected claim, for the product path: one exhaustive scan
 of the snapshot plus one ranking plus the display filter, on the corpus named below, for the 40
 adversarial fabricated quotes in `data/eval/redteam-fabricated.json`.
 
 It is the **slowest of five consecutive runs**, componentwise. A published budget that is flattered is
 the defect this file removes, so the figure of record is the one no observed run beat — and
 `bun run eval:suggestions --record` now chooses it in the tool rather than leaving a person to read
-five p95s off a screen and type the largest one (ADR-13). Measured on 2026-10-04.
+five p95s off a screen and type the largest one (ADR-13). Measured on 2026-10-05.
 
 The three figures come from three different runs, which is the point of taking them componentwise: on
 this machine the worst p50, the worst p95 and the worst max were not in one run, so publishing any
 single run would describe a run that never happened.
+
+**Recall over the same run: 40 of 40 at top-5 presence, and 40 of 40 gated at the display floor** — measured over every served collection, `abudawud` 15 cases, `ibnmajah` 13, `malik` 5, `nasai` 3, `quran` 2, `tirmidhi` 2, and nothing outside those six. The denominator `40` is that total and not any one book's, so every collection is named on this line: "40 of 40" beside an unstated set is a figure a reader will take for the 27,234-record corpus, and `checkPresenceCollectionNamed` fails any audited document that states that fraction without naming all six. It is recorded here beside the latency rather than in a document of its own because ADR-17 makes it a precondition rather than a figure: a latency number published next to a search that quietly stopped finding the record is the failure the whole verifier exists to prevent. `--record` refuses the write if either recall figure drops below these, and refuses first if the case set is not the one this baseline was measured over — the denominator is recorded as `suggestionEvalSetDigest` in `data/benchmark/vs-search.json`.
+
+## What the 40 cases are, per collection
+
+The recall above is an aggregate over six books, and an aggregate hides which books carried it. This
+table is the same run decomposed, from the `## presence per collection` block the harness prints:
+
+| collection | cases | top-1 | top-3 | top-5 | rejected | verified | served records |
+|---|---|---|---|---|---|---|---|
+| abudawud | 15 | 14/15 | 15/15 | 15/15 | 15 | 0 | 5272 |
+| ibnmajah | 13 | 10/13 | 11/13 | 13/13 | 13 | 0 | 4336 |
+| malik | 5 | 5/5 | 5/5 | 5/5 | 5 | 0 | 1829 |
+| nasai | 3 | 3/3 | 3/3 | 3/3 | 3 | 0 | 5672 |
+| quran | 2 | 2/2 | 2/2 | 2/2 | 2 | 0 | 6236 |
+| tirmidhi | 2 | 2/2 | 2/2 | 2/2 | 2 | 0 | 3889 |
+
+The `rejected` and `verified` columns answer a different question from `top-N`. `top-N` is a
+**ranking** figure — where the adjudicated record landed. `rejected` is a **containment** figure — how
+many of that collection's fabrications the quoted span failed to match at the cited identifier, which is
+the thing a customer is actually buying. `rejected` equals `cases` in every row above because every case
+in `data/eval/redteam-fabricated.json` is a fabrication and every one of them is adjudicated to
+`rejected`; `bun run check:docs` fails if a case in that set ever stops saying so, so the column is a
+derived measurement rather than a retyped constant. `verified` is `0` in every row, and its being `0`
+per collection is what `falseVerifiedCount: 0` says in aggregate.
+
+Read down the top-1 column and the aggregate stops being one number: **36 of 40 at top-1**, because
+`abudawud` and `ibnmajah` account for every miss. A reader who is told "40 of 40" and nothing else
+would have concluded the retriever places the cited record first every time, over every book, and it
+does not — 90% of cases, not 100%, and the shortfall is concentrated in two books rather than spread
+across six.
+
+Two honest caveats, both visible in the table rather than in a footnote. `quran` and `tirmidhi` carry
+**two cases each**: measured, above the floor of two, and nowhere near a sample. And the `served
+records` column is corpus size, not evidence — 6236 quranic records were served and two of them were
+asked about, which is the honest statement of coverage for a table that says `2/2`.
+
+The distinction the whole table exists to keep: **measured** means at least one case ran, while the ADR-15
+gate requires **two** per served collection. Both numbers are 2 for `quran` and `tirmidhi`, so this
+recording sits exactly on the floor and no lower. The per-collection counts and presence figures are
+recorded flat in `data/benchmark/vs-search.json` under `suggestionCoverageCases<Collection>` and
+`suggestionCoveragePresenceTop<N><Collection>`, which is where a rerun compares them.
 
 ## The conditions that figure was measured under
 
@@ -55,16 +97,17 @@ The five runs behind the figure of record, printed by `--record` in the run that
 
 | run | p50 | p95 |
 |---|---|---|
-| 1 | 644 ms | 753 ms |
-| 2 | 633 ms | 745 ms |
-| 3 | 616 ms | 714 ms |
-| 4 | 614 ms | 720 ms |
-| 5 | 620 ms | 703 ms |
+| 1 | 686 ms | 1156 ms |
+| 2 | 637 ms | 740 ms |
+| 3 | 645 ms | 757 ms |
+| 4 | 631 ms | 744 ms |
+| 5 | 625 ms | 731 ms |
 
-The p95 spread across those runs is **1.07x** (703 ms to 753 ms). Across a longer sample on this machine,
-including runs of earlier commits of this harness, the slowest p95 observed was **1.44x** the fastest
-(705 ms to 1011 ms) — and on one occasion a single run reached **2.84x** its own five-run figure, which
-is why `max` is treated separately below.
+The p95 spread across those runs is **1.58x** (731 ms to 1156 ms) — run 1 was slow on every component,
+which is what makes it the figure of record rather than an outlier to discard. Across a longer sample on
+this machine, including runs of earlier commits of this harness, the slowest p95 observed was **1.44x**
+the fastest (705 ms to 1011 ms) — and on one occasion a single run reached **2.84x** its own five-run
+figure, which is why `max` is treated separately below.
 
 That wider spread is why the tolerance is 1.5x and not 1.05x, and why `max` is the figure that
 disagrees most: a single sample has no noise suppression, so one slow case *is* the maximum. A band

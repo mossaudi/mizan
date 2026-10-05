@@ -36,6 +36,13 @@ import { Verdict, VerdictReason } from "./verdict.ts"
  * with the real normalizer. A fixture that shipped its own folded text could make a fabrication
  * verify itself by editing one string, which is the single most damaging edit to this artefact.
  * What remains is `textHash`, so editing `textDisplay` is still detected.
+ *
+ * ## `schemaVersion` 3 added `datasetDigest` and `coverageRows`
+ *
+ * Both required, for the same reason the header fields above are: they are what make a set auditable
+ * as *evidence about a particular corpus* rather than as a list of cases. A set that could omit them
+ * would let a regenerated set be compared against a baseline it has nothing in common with, and the
+ * comparison would read green.
  */
 export const EvalAnchor = Schema.Struct({
   ...CorpusRecordMeta.fields,
@@ -139,6 +146,36 @@ export type EvalCase = Schema.Schema.Type<typeof EvalCase>
 /** A count map: class name to case count, or verdict to case count. */
 const CountMap = Schema.Record(Schema.String, Schema.Number)
 
+/**
+ * One collection's slice of a set, published so a reader sees the shape without counting.
+ *
+ * ## Why this is a claim and not the evidence
+ *
+ * `packages/mizan-gate/src/docs-coverage.ts` deliberately recomputes these counts from `cases` and
+ * ignores this field. A published row is therefore something a rule can contradict — which is the
+ * only reason it is worth publishing at all. A row the rule trusted would be a number agreeing with
+ * itself, and `redTeamMovement` would learn from a count the set wrote about its own coverage.
+ *
+* `caseCount` and `anchorCount` are separate because they answer different questions. Six cases may
+ * quote one record, which is the re-rendering design of the golden set; a reader checking how many
+ * *books* were touched needs the first, and one asking how much *text* was checked needs the second,
+ * * and conflating them is how a 200-case set reads as 200 independent subjects.
+ *
+ * `collection` is the CITATION's collection, verbatim — so a set carrying `ambiguous_collection` cases
+ * publishes one row whose name is the empty string. That is not a defect and is not normalised away:
+ * those twenty cases deliberately cite number 1 with no collection, so the empty name is the accurate
+ * record of what they did, and renaming it to something like `"(none)"` would be a label the corpus
+ * has never heard of. `packages/mizan-gate/src/docs-coverage.ts` refuses to count it, which is why the
+ * golden set's rows sum to more than its served collections and its red-team rows sum to exactly its
+ * forty.
+ */
+export const CollectionCoverageRow = Schema.Struct({
+  collection: Schema.String,
+  caseCount: Schema.Number,
+  anchorCount: Schema.Number,
+})
+export type CollectionCoverageRow = Schema.Schema.Type<typeof CollectionCoverageRow>
+
 export const EvalSet = Schema.Struct({
   schemaVersion: Schema.Number,
   set: Schema.String,
@@ -151,6 +188,31 @@ export const EvalSet = Schema.Struct({
   expectationSource: Schema.String,
   /** Optional as of `schemaVersion` 2: the divergence it recorded has been mechanised away. */
   knownDivergence: Schema.optional(KnownDivergence),
+  /**
+   * The identity of this set's content: a versioned `ds1:<64 hex>` digest.
+   *
+   * ## Why required as of `schemaVersion` 3
+   *
+   * A relative gate comparing today's number against a baseline number has two ways to be wrong, and
+   * only one is visible. The visible one is the number moving. The invisible one is the *data*
+   * moving underneath a number that did not: the aggregate can stay identical, the comparison reports
+   * a pass, and the evidence was never comparable. Requiring the field makes "same data?" answerable
+   * before "did it move?" — `scripts/eval/identity.ts` owns which fields are the material.
+   *
+   * Computed with this key REMOVED, which is the only self-consistent reading available: a digest
+   * over a document containing itself has no fixed point to converge on. The consequence is that the
+   * check is available to any reader with no private knowledge — read the file, drop the one key,
+   * digest the rest, compare.
+   */
+  datasetDigest: Schema.String,
+  /**
+   * Per-collection slices, sorted by collection.
+   *
+   * Required rather than optional for the same reason `datasetDigest` is: a set that could be
+   * published without them would be a set whose coverage could not be cited without re-running a
+   * script, and "the artefact does not say" is how a collection quietly stops being tested.
+   */
+  coverageRows: Schema.Array(CollectionCoverageRow),
   digitFacts: CountMap,
   classCounts: CountMap,
   verdictCounts: CountMap,

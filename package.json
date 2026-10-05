@@ -30,6 +30,7 @@
     "verify:runs": "bun run scripts/verify-runs.ts",
     "verify:chain": "bun run scripts/verify-chain.ts",
     "check:docs": "bun run scripts/check-docs-claims.ts",
+    "accept:customer": "bun run scripts/accept-customer.ts",
     "benchmark": "bun run scripts/benchmark.ts",
     "mcp": "bun run packages/mizan-mcp/src/main.ts"
   },

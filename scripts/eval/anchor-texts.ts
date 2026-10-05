@@ -35,6 +35,20 @@ import { ADJUDICATED_CASE_IDS } from "./adjudication.ts"
  *
  * 66 entries: the 40 red-team fabrications and the 26 golden elisions, keyed by case id, and
  * nothing else. `ADJUDICATED_CASE_IDS` is the authority on which ids those are.
+ *
+ * ## Redrawn when ADR-15 moved the red-team cases
+ *
+ * Fifteen of these — `redteam-022`..`028` (`letter_transposed`) and `redteam-033`..`040`
+ * (`word_inserted`) — were redrawn when ADR-15 replaced the positional slice in `buildSimple` with a
+ * round-robin draw. Those classes' cases now quote different records, so their spans had to move with
+ * them; `anchorProblems` rejects a span that is not a folded substring of both its own quote and the
+ * record it cites, so a span carried over from the old case fails the build rather than silently
+ * locating in the wrong book.
+ *
+ * They were redrawn to the rule in this header — 3-8 words cut verbatim from the case's own quote,
+ * contiguous in the cited record — and remain literals a review reads line by line. A span is a
+ * human choice about *which* words to point the locator at; it is not a derived value, and deriving
+ * it would have made the table a function of the corpus rather than a record of a decision.
  */
 
 /**
@@ -65,25 +79,25 @@ export const CLAIM_ANCHOR_TEXTS: Readonly<Record<string, string>> = {
   "redteam-019": "اللَّهِ هَذَا السَّلاَمُ عَلَيْكَ قَدْ عَرَفْنَاهُ فَكَيْفَ",
   "redteam-020": "عَلَيْكَ فَكَيْفَ نُصَلِّي عَلَيْكَ فَقَالَ",
   "redteam-021": "صلى الله عليه وسلم كَانَ إِذَا ذَهَبَ الْمَذْهَبَ",
-  "redteam-022": "نَهَى رَسُولُ اللَّهِ صلى الله عليه وسلم أَنْ",
-  "redteam-023": "جَاءَنَا رَسُولُ اللَّهِ صلى الله عليه وسلم فَأَخْرَجْنَا",
-  "redteam-024": "دَخَلَ عَلَيْنَا رَسُولُ اللَّهِ صلى الله عليه وسلم",
-  "redteam-025": "أَمَرَنَا النَّبِيُّ صلى الله عليه وسلم أَنْ نَرُدَّ",
-  "redteam-026": "عَنِ الأَعْمَشِ عَنْ أَبِي صَالِحٍ عَنْ أَبِي هُرَيْرَةَ",
-  "redteam-027": "يَزَالُ طَائِفَةٌ مِنْ أُمَّتِي عَلَى الْحَقِّ مَنْصُورِينَ لاَ",
-  "redteam-028": "أَهْلِ الْجَنَّةِ مِنَ الأَوَّلِينَ وَالآخِرِينَ إِلاَّ النَّبِيِّينَ",
-  "redteam-029": "مَوْلَى بَنِي هَاشِمٍ وَطَلْقُ بْنُ حَبِيبٍ عَنِ ابْنِ",
+"redteam-022": "عَنِ الأَعْمَشِ عَنْ أَبِي صَالِحٍ عَنْ أَبِي هُرَيْرَةَ",
+  "redteam-023": "يَوْمًا فَدَخَلَ عَلَيْهِ عُرْوَةُ بْنُ الزُّبَيْرِ فَأَخْبَرَهُ أَنَّ",
+  "redteam-024": "أَحَدُكُمْ مِنْ نَوْمِهِ فَلاَ يَغْمِسْ يَدَهُ فِي وَضُوئِهِ",
+  "redteam-025": "يُؤْمِنُونَ بِٱلْغَيْبِ وَيُقِيمُونَ ٱلصَّلَوٰةَ وَمِمَّا رَزَقْنَٰهُمْ يُنفِقُونَ",
+  "redteam-026": "بْنُ أُسَامَةَ اسْمُهُ عَامِرٌ وَيُقَالُ زَيْدُ بْنُ أُسَامَةَ",
+  "redteam-027": "نَهَى رَسُولُ اللَّهِ صلى الله عليه وسلم أَنْ",
+  "redteam-028": "يَزَالُ طَائِفَةٌ مِنْ أُمَّتِي عَلَى الْحَقِّ مَنْصُورِينَ لاَ",
+  "redteam-029": "مَوْلَى بَنِي هَاشِمٍ وَطَلْقُ بْنُ حَبِيبٍ عَنْ ابْنِ",
   "redteam-030": "وَكَذَلِكَ رَوَاهُ مَعْقِلٌ الْخَثْعَمِيُّ عَنْ عَلِيٍّ رَضِيَ اللَّهُ",
   "redteam-031": "إِذَا بِيعَتْ. لِأَنَّ ذلِكَ غَرَرٌ. لاَ يُدْرَى أَذَكَرٌ",
   "redteam-032": "بِيعَتْ. لِأَنَّ ذلِكَ غَرَرٌ. لاَ يُدْرَى أَذَكَرٌ هُوَ",
-  "redteam-033": "النَّبِيَّ صلى الله عليه وسلم كَانَ إِذَا ذَهَبَ",
-  "redteam-034": "نَهَى رَسُولُ اللَّهِ صلى الله عليه وسلم أَنْ",
-  "redteam-035": "جَاءَنَا رَسُولُ اللَّهِ صلى الله عليه وسلم فَأَخْرَجْنَا",
-  "redteam-036": "دَخَلَ عَلَيْنَا رَسُولُ اللَّهِ صلى الله عليه وسلم",
-  "redteam-037": "أَمَرَنَا النَّبِيُّ صلى الله عليه وسلم أَنْ نَرُدَّ",
-  "redteam-038": "شَرِيكٌ عَنِ الأَعْمَشِ عَنْ أَبِي صَالِحٍ عَنْ أَبِي",
-  "redteam-039": "يَزَالُ طَائِفَةٌ مِنْ أُمَّتِي عَلَى الْحَقِّ مَنْصُورِينَ لاَ",
-  "redteam-040": "وَ بَكْرٍ وَعُمَرُ سَيِّدَا كُهُولِ أَهْلِ الْجَنَّةِ مِنَ",
+  "redteam-033": "قَالَ كُنَّا نُصَلِّي الْعَصْرَ ثُمَّ يَخْرُجُ الإِنْسَانُ إِلَى",
+  "redteam-034": "مِنَ الْفِطْرَةِ قَصُّ الشَّارِبِ وَنَتْفُ الإِبْطِ وَتَقْلِيمُ الأَظْفَارِ",
+  "redteam-035": "أَخَذْنَا مِيثَٰقَكُمْ وَرَفَعْنَا فَوْقَكُمُ ٱلطُّورَ خُذُوا۟ مَآ ءَاتَيْنَٰكُم",
+  "redteam-036": "جَابِرٍ عَنِ النَّبِيِّ صلى الله عليه وسلم أَصَحُّ",
+  "redteam-037": "جَاءَنَا رَسُولُ اللَّهِ صلى الله عليه وسلم فَأَخْرَجْنَا",
+  "redteam-038": "وَ بَكْرٍ وَعُمَرُ سَيِّدَا كُهُولِ أَهْلِ الْجَنَّةِ مِنَ",
+  "redteam-039": "إِذَا اغْتَسَلَ مِنَ الْجَنَابَةِ بَدَأَ فَأَفْرَغَ عَلَى يَدِهِ",
+  "redteam-040": "سَبَلاَنُ قَالَ وَكَانَتْ عَائِشَةُ تَسْتَعْجِبُ بِأَمَانَتِهِ وَتَسْتَأْجِرُهُ فَأَرَتْنِي",
   "golden-095": "أَنَّ النَّبِيَّ صلى الله",
   "golden-096": "قَالَ نَهَى رَسُولُ اللَّهِ صلى",
   "golden-097": "قَالَ جَاءَنَا رَسُولُ اللَّهِ صلى",

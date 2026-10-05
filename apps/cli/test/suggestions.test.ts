@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Database } from "bun:sqlite"
-import { SUGGESTION_DISCLAIMER, SUGGESTION_MEASUREMENT_SCOPE, normalizeForMatch, normalizeQuote, type Claim, type ClaimVerdict, type VerdictReport } from "@mizan/core"
+import { SUGGESTION_DISCLAIMER, SUGGESTION_MEASURED_COLLECTIONS, SUGGESTION_MEASUREMENT_SCOPE, SUGGESTION_THIN_COLLECTIONS, normalizeForMatch, normalizeQuote, type Claim, type ClaimVerdict, type VerdictReport } from "@mizan/core"
 import { buildSnapshot, openSnapshot, resolveCitations, toCorpusRecord } from "@mizan/corpus"
 import { MIN_SHARED_RUN_CHARS, verifyAnswer } from "@mizan/verify"
 import { buildSourceTable, renderReport } from "../src/render.ts"
@@ -216,14 +216,28 @@ describe("a rejection is offered the records near its quote", () => {
 describe("the measurement coverage is disclosed, and is not confused with the search scope", () => {
   const textFor = (claims: readonly Claim[]): string => screen(claims, suggestionsFor(db, claims, verify(claims).claims))
 
-  test("a candidate list says the floor was measured on hadith cases only", () => {
+  test("a candidate list says the floor was measured over every served collection", () => {
     expect(textFor([claimOf(FABRICATED)])).toContain(SUGGESTION_MEASUREMENT_SCOPE)
   })
 
-  test("the disclosure names the collections that are unmeasured, rather than implying the list is narrow", () => {
+  test("the disclosure names every served collection, so no figure reads as corpus-wide", () => {
+    // The regression this pins: the sentence used to say "hadith cases only — quran and tirmidhi are
+    // unmeasured", which was FALSE from the moment the red-team set was derived across all six. It was
+    // the one line in the product that a judge could falsify by running one command.
     const text = textFor([claimOf(FABRICATED)])
-    expect(text).toContain("hadith cases only")
-    expect(text).toContain("quran and tirmidhi are unmeasured")
+    for (const collection of SUGGESTION_MEASURED_COLLECTIONS) expect(text).toContain(collection)
+    expect(text).toContain("all 6 served collections")
+    expect(text).not.toContain("hadith cases only")
+    expect(text).not.toContain("are unmeasured")
+  })
+
+  test("the disclosure names the collections measured on a minimal sample, rather than implying all six were measured well", () => {
+    const text = textFor([claimOf(FABRICATED)])
+    for (const collection of SUGGESTION_THIN_COLLECTIONS) expect(text).toContain(collection)
+    expect(text).toContain("minimal sample")
+    // The counts are the artefact's job, and the sentence points at it rather than typing a number that
+    // nothing could contradict.
+    expect(text).toContain("data/benchmark/vs-search.json")
   })
 
   test("a quranic record in the list does not make the search hadith-only, and the copy must not say it is", () => {

@@ -65,6 +65,24 @@
  * runs by accident: an artefact rewritten by every measurement would be an artefact nobody could
  * attribute, and the git diff of a latency change is the point.
  *
+ * ## `--record` is gated on recall, because latency is the only figure an index could improve
+ *
+ * ADR-08 rejected the one implementation that met the sub-50 ms target — a 46 MB FTS5 sidecar — on the
+ * grounds that it returned nothing at all for three of ten adversarial quotes. A change that trades
+ * recall for latency is exactly the failure this product exists to prevent, and the FTS spike proved it
+ * is the change a performance-minded engineer reaches for.
+ *
+ * So `recallRegression` runs before anything is written: this run's top-5 presence and gated recall are
+ * compared against the recorded baseline, and a regression refuses the write. Note the asymmetry — the
+ * latency tolerance band (`LATENCY_BAND_MULTIPLIER`) exists because wall clock is a property of the
+ * *machine*, so a rerun on a different laptop must not read as a regression. Recall is a property of the
+ * *code*, so no band belongs on it and none is applied here. An artefact carrying no recall baseline is
+ * a refusal rather than a pass: a gate that cannot read its own baseline has verified nothing.
+ *
+ * The latency figures are still printed before this check, because they are a measurement anyone may
+ * read. What is refused is *recording* them over a search that lost a record — the latency number would
+ * outlive the behaviour it described (ADR-17).
+ *
  * ## Every figure is printed with the conditions it was measured under
  *
  * The last section is the conditions block: corpus identity, case count, what the clock covered and
@@ -77,7 +95,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { arch, cpus, platform } from "node:os"
 import { Database } from "bun:sqlite"
-import { decodeOrFail, decodeSync, describeDecodeFailure, isErr, isOk, ok, err, normalizeForMatch, EvalSet, type CorpusError, type Result } from "@mizan/core"
+import { decodeOrFail, decodeSync, describeDecodeFailure, isErr, isOk, ok, err, normalizeForMatch, EvalSet, type CorpusError, type Result, type Verdict } from "@mizan/core"
 import {
   attestSnapshot,
   attestSnapshotUnchanged,
@@ -90,6 +108,7 @@ import {
 } from "@mizan/corpus"
 import { MAX_TOP_K, MIN_SHARED_TRIGRAMS, rankNeighboursAtFloor, type RankedNeighbour } from "@mizan/suggest"
 import { MIN_SHARED_RUN_CHARS, runClearsFloorAt, sharedRunOf, type SharedRun } from "@mizan/verify"
+import { coverageClaim, coverageFigures, renderCoverage, type PresenceProbe } from "./coverage-tables.ts"
 
 const CORPUS_PATH = "data/corpus.db"
 const ATTESTATION_PATH = "attestation.json"
@@ -160,9 +179,29 @@ export const SCAN_FLOOR = Math.min(...FLOORS)
 /** The cut-offs a reader actually sees: the first line, a readable block, the hard ceiling. */
 export const CUTOFFS = [1, 3, MAX_TOP_K] as const
 
-/** One case, reduced to what this measurement needs. No question, no expected verdict, no prose. */
+/**
+ * One case, reduced to what this measurement needs. No question text, no prose.
+ *
+ * `expectedVerdict` is present because the per-collection containment figures are derived from it, not
+ * because this harness has an opinion about the verifier. The figure a reader wants — "how many
+ * fabrications did this book catch" — has no other source that is not a retyped constant, and the set's
+ * adjudication is the one authority for it. The gate's `eval-fabrication-not-rejected` rule is what keeps
+ * that derivation honest: a case expecting `verified` fails the build rather than inflating the rejected
+ * column of the table.
+ */
 export type CoverageCase = {
   readonly id: string
+  readonly expectedVerdict: Verdict
+  /**
+   * The citation's collection — which book this fabrication was attempted against.
+   *
+   * The citation, not the anchor. A case's `anchorId` is the record it quotes, which for
+   * `identifier_unresolved` and `collection_ambiguous` is not the collection the citation names, and
+   * `collection_ambiguous` names none at all. Per-collection coverage answers "which book was this
+   * attempted against", and the anchor answers "which record was it built from"; the two differ whenever
+   * a citation was deliberately ambiguous, which is the case class that most needs to be counted honestly.
+   */
+  readonly collection: string
   readonly quote: string
   /** The record the quote was mutated from, as FOLDED text. The only ground truth used here. */
   readonly anchorFolded: string
@@ -178,6 +217,8 @@ export type CoverageCase = {
 export const casesFrom = (set: EvalSet): readonly CoverageCase[] =>
   set.cases.map((testCase) => ({
     id: testCase.id,
+    expectedVerdict: testCase.expectedVerdict,
+    collection: testCase.citation.collection,
     quote: testCase.quote,
     anchorFolded: normalizeForMatch(testCase.anchorText ?? testCase.anchorId),
   }))
@@ -221,6 +262,39 @@ export type CaseMeasurement = {
 type Measured = {
   readonly row: RankedNeighbour
   readonly run: SharedRun
+}
+
+/**
+ * The per-collection view of a run: which book each case was attempted against, and whether its anchor
+ * reached each cut-off.
+ *
+ * Built from the measurements already taken rather than from a second pass over the corpus: the hit
+ * tables are indexed by case, the cases carry their citation's collection, and pairing the two is a
+ * `Map` lookup per case. This is what makes the per-collection figures free (ADR: the breakdown "costs no
+ * additional scans"), and the pairing is asserted rather than trusted — a probe whose case id is not in
+ * this run's measurements is refused below, because a per-collection figure computed over an incomplete
+ * pairing would be a rate with a denominator nobody published.
+ *
+ * The cut-off index is `MIN_SHARED_TRIGRAMS`'s row, the product's ranker floor, because presence at any
+ * other floor is the harness's own experiment and not the list a reader was shown.
+ */
+export const probesFrom = (
+  measurements: readonly CaseMeasurement[],
+  cases: readonly CoverageCase[],
+): Result<readonly PresenceProbe[], string> => {
+  const byId = new Map(measurements.map((entry) => [entry.id, entry]))
+  const probes: PresenceProbe[] = []
+  for (const testCase of cases) {
+    const measured = byId.get(testCase.id)
+    if (measured === undefined) return err(`${testCase.id} was measured at no ranker floor, so it has no per-collection presence to report`)
+    // The whole hit row, in `CUTOFFS` order — not a single boolean. Collapsing it to one would make a
+    // `Top3` figure describe top-5, which is the keying bug that once published `suggestionPresenceTop2`
+    // describing top-3 and left it in the artefact permanently.
+    const reached = measured.hits[MIN_SHARED_TRIGRAMS]
+    if (reached === undefined) return err(`${testCase.id} recorded no hit row at ranker floor ${MIN_SHARED_TRIGRAMS}, so it has no per-collection presence to report`)
+    probes.push({ collection: testCase.collection, reached, expected: testCase.expectedVerdict })
+  }
+  return ok(probes)
 }
 
 /** True when the candidate's folded text holds the anchor's folded span. */
@@ -522,10 +596,12 @@ export const slowestOf = (costs: readonly Cost[], count: number): Cost | null =>
  * reason `vs-search.json` was flat to begin with and this keeps that true rather than working around
  * it.
  *
- * The one non-numeric key is `suggestionCorpusFingerprint`, and it is there because a latency number
- * without the corpus it was measured on is a number about nothing. The claim rule reads it directly
- * rather than through `readFigures`, which is why it is named explicitly rather than swept up with the
- * rest.
+ * There are exactly two non-numeric keys, and both are identities. `suggestionCorpusFingerprint` is
+ * there because a latency number without the corpus it was measured on is a number about nothing;
+ * `suggestionEvalSetDigest` is there because a recall *rate* without the case set it is a rate of is
+ * worse — it looks comparable to the one before it and is not. The claim rule reads the corpus
+ * fingerprint directly rather than through `readFigures`, which is why it is named explicitly rather
+ * than swept up with the rest.
  *
  * Key names are the contract between this harness and `checkLatencyFigureUnbacked`. They are
  * namespaced under `suggestion` so they cannot collide with the retrieval figures already in the file,
@@ -535,12 +611,20 @@ export const suggestionFigures = (
   measurements: readonly CaseMeasurement[],
   cost: { readonly p50: number; readonly p95: number; readonly max: number },
   identity: SnapshotIdentity,
+  evalSetDigest: string,
+  probes: readonly PresenceProbe[] = [],
+  served: Readonly<Record<string, number>> = {},
 ): Readonly<Record<string, number | string>> => {
   const total = measurements.length
   const figures: Record<string, number | string> = {
     suggestionCaseCount: total,
     suggestionCorpusRecordCount: identity.recordCount,
     suggestionCorpusFingerprint: identity.snapshotHash,
+    // The denominator, recorded beside the ratio it is a ratio of. `recallRegression` refuses a run
+    // whose digest differs from this one, so a regenerated case set cannot be compared against a
+    // baseline that was measured over a different one — the shift that reports a pass over evidence
+    // nobody could have compared (ADR-17).
+    [BASELINE_IDENTITY_KEY]: evalSetDigest,
     suggestionFloorNarrowingTrigrams: MIN_SHARED_TRIGRAMS,
     suggestionFloorRunChars: MIN_SHARED_RUN_CHARS,
     suggestionLatencyP50Ms: Math.round(cost.p50),
@@ -566,11 +650,192 @@ export const suggestionFigures = (
   const recalled = floorRecallCost(measurements, MIN_SHARED_RUN_CHARS)
   figures.suggestionRecallShippedTop5 = recalled.shipped
   figures.suggestionRecallGatedTop5 = recalled.gated
+  // Per-collection figures, spread last so they cannot displace a key above them. Present only when the
+  // run had a served set to measure against — an empty object would publish `sharePercent: 0` and read as
+  // "measured nothing", which is a different statement from "this harness was not asked".
+  if (Object.keys(served).length > 0) Object.assign(figures, coverageFigures(probes, CUTOFFS, served))
   return figures
 }
 
 /** The artefact the claim sweep reads, and the path it writes. */
 export const ARTEFACT_PATH = "data/benchmark/vs-search.json"
+
+/**
+ * The recall keys a recorded run must carry before another run may be recorded against it.
+ *
+ * Named once, and read from the artefact rather than hardcoded, because the whole point is that the
+ * precondition is stated by the artefact and not by this file: a gate whose floor is a literal here is
+ * a floor the next engineer changes without noticing the baseline it was defending.
+ */
+export const RECALL_BASELINE_KEYS = ["suggestionPresenceTop5", "suggestionRecallGatedTop5"] as const
+
+/**
+ * The identity key a recorded run must carry before another run may be compared against it.
+ *
+ * The baseline is a count over a case set, and a count without its denominator is not a measurement —
+ * it is an integer. `vs-search.json` already records the *corpus* fingerprint, which covers the data
+ * being searched; this covers the questions being asked of it. Regenerating the red-team set changes
+ * the denominator, which is the failure ADR-17 names as the dangerous one: the aggregate can land on
+ * the same value, the comparison reports a pass, and the output is indistinguishable from a real one.
+ *
+ * A distinct constant rather than a third entry in `RECALL_BASELINE_KEYS`, because it is a different
+ * kind of check — a string equality, not a floor — and lumping the two together would let a future edit
+ * relax one while appearing to preserve the other.
+ */
+export const BASELINE_IDENTITY_KEY = "suggestionEvalSetDigest"
+
+/**
+ * Whether this run lost recall against the recorded baseline, or a typed reason it cannot tell.
+ *
+ * ## Why recall gates the record and latency does not gate itself
+ *
+ * ADR-17: the sidecar ADR-08 rejected was the only option fast enough, and it returned nothing for
+ * three of ten adversarial quotes. A change that trades recall for latency is the failure this product
+ * exists to prevent, so it may not be *recorded* — and `--record` is the only way a number reaches the
+ * artefact a document is checked against, which makes the precondition here rather than in review.
+ *
+ * The asymmetry is deliberate and it is the reason the tolerance band applies to latency alone: wall
+ * clock is a property of the machine, so `LATENCY_BAND_MULTIPLIER` exists to absorb a different
+ * laptop. Recall is a property of the code, so a dropped record is a regression with no machine that
+ * explains it away, and **no tolerance band belongs on it**.
+ *
+ * ## Identity is checked before recall, because a floor over the wrong denominator is not a floor
+ *
+ * Order is the whole point, and it is why this is one function rather than two called at the call site:
+ * comparing 40/40 against a 40-case set with the current 41-case set would pass while describing two
+ * different experiments. So the recorded `suggestionEvalSetDigest` is compared first, and a changed set
+ * refuses here rather than producing a recall verdict that would read as a pass.
+ *
+ * ## Three refusals, and why absent is one of them
+ *
+ * An artefact carrying neither key is treated as a refusal, not as a pass. That is `identityMismatch`'s
+ * reasoning applied to a floor: "I cannot tell" and "it is fine" are different answers, and a gate
+ * that cannot read its own baseline has not verified anything (AGENTS.md section 3). A baseline written
+ * before recall was recorded therefore blocks the first new record rather than waving it through.
+ *
+ * ## Why every refusal names `--rebaseline` and never a hand edit
+ *
+ * The first version of these messages told the operator to add a number to `vs-search.json` by hand.
+ * That is the same defect as `checkSnapshotArithmetic` reading a figure a person typed: the value is
+ * now unfalsifiable, because the only thing that ever measured it was a person deciding what it should
+ * be. It also made the *legitimate* case — the eval set was legitimately regenerated, so the recorded
+ * floor describes a different denominator — indistinguishable from a real regression, and the only way
+ * through was to edit the file.
+ *
+ * `--rebaseline` is that legitimate case as a command: it re-measures over the set on disk and
+ * rewrites the baseline from that measurement, so the value is still one a run produced. It is a
+ * separate mode rather than a flag on `--record` because it is the only path that may move a floor
+ * down, and a flag would let that reach the artefact without its own name in the invocation.
+ */
+export const recallRegression = (
+  baseline: Readonly<Record<string, unknown>>,
+  figures: Readonly<Record<string, number | string>>,
+  evalSetDigest: string,
+): Result<string, string> => {
+  const recordedIdentity = baseline[BASELINE_IDENTITY_KEY]
+  if (typeof recordedIdentity !== "string") {
+    return err(`${ARTEFACT_PATH} records no \`${BASELINE_IDENTITY_KEY}\`, so this run's recall has no denominator to be compared against. That key was added when every eval set gained a \`datasetDigest\`, and an artefact written before it cannot be compared to anything. Run \`bun run eval:suggestions --rebaseline\` to measure over the set on disk and record the result`)
+  }
+  if (recordedIdentity !== evalSetDigest) {
+    return err(`the eval set is not the one this baseline was measured over: ${SET_PATH} is \`${evalSetDigest}\` and ${ARTEFACT_PATH} recorded \`${recordedIdentity}\`. A recall rate over a different case set is not a pass or a regression, it is a different measurement — run \`bun run eval:suggestions --rebaseline\` to re-measure over the current set`)
+  }
+  for (const key of RECALL_BASELINE_KEYS) {
+    const recorded = baseline[key]
+    if (typeof recorded !== "number") {
+      return err(`${ARTEFACT_PATH} records no \`${key}\`, so this run's recall cannot be compared against a baseline, and a figure with no floor is not a measurement. Run \`bun run eval:suggestions --rebaseline\` to measure and record this run's \`${key}\``)
+    }
+    const current = figures[key]
+    if (typeof current !== "number") {
+      return err(`this run computed no \`${key}\`, so it cannot be compared against the recorded ${recorded}`)
+    }
+    if (current < recorded) {
+      return err(`recall regressed: \`${key}\` is ${current} against a recorded ${recorded}. A record that is no longer found is worse than a slow one (ADR-17), and no latency figure may be recorded over it — fix the search, and do not rebaseline this away`)
+    }
+  }
+  return ok("recall holds")
+}
+
+/**
+ * What `--rebaseline` moved, printed before the write so the movement is on the record.
+ *
+ * ## Why this exists at all
+ *
+ * Because `--rebaseline` is the one command that may lower a floor, and a floor that moved with no
+ * explanation is indistinguishable from a regression someone waved through. Printing old -> new for
+ * every key it touches, with the digest it is now measured over, means the next reader of the artefact
+ * sees the movement in the commit that made it rather than having to diff two JSON files to find out.
+ *
+ * A key the artefact did not carry reads `none` rather than being skipped, because "the floor did not
+ * exist before this run" is the more useful half of the report when somebody is reading it to decide
+ * whether the baseline was quietly replaced.
+ */
+export const rebaselineReport = (
+  before: Readonly<Record<string, unknown>>,
+  after: Readonly<Record<string, number | string>>,
+  evalSetDigest: string,
+): readonly string[] => {
+  const rows = [
+    ...RECALL_BASELINE_KEYS.map((key) => {
+      const was = before[key]
+      const recorded = typeof was === "number" ? String(was) : "none"
+      return `  ${key}: ${recorded} -> ${after[key] ?? "uncomputed"}`
+    }),
+    `  ${BASELINE_IDENTITY_KEY}: ${typeof before[BASELINE_IDENTITY_KEY] === "string" ? String(before[BASELINE_IDENTITY_KEY]) : "none"} -> ${evalSetDigest}`,
+  ]
+  return [
+    "",
+    `REBASELINED — the recall floor was NOT compared against before this run, and it has now been rewritten from this measurement.`,
+    `Every floor above moved to whatever this run measured, including a drop. If that is wrong, revert this run's commit; do not re-record over it.`,
+    ...rows,
+    "",
+  ]
+}
+
+/**
+ * What this invocation is allowed to do.
+ *
+ * Four modes, and the point of naming them is that the *default* and the *gate* are different commands.
+ * A plain run prints measurements and writes nothing, so a reader who runs the harness "to see the
+ * numbers" cannot silently move the baseline every document is checked against. `--check` is the gate:
+ * it compares against the recorded baseline and writes nothing, which is what the acceptance step needs
+ * and what a CI job needs. `--record` is the only path into the artefact, and `--rebaseline` is the one
+ * mode that may move a baseline *down*.
+ */
+export type CoverageMode = "measure" | "check" | "record" | "rebaseline"
+
+export const COVERAGE_MODE_FLAGS: Readonly<Record<CoverageMode, string>> = {
+  measure: "",
+  check: "--check",
+  record: "--record",
+  rebaseline: "--rebaseline",
+}
+
+/**
+ * The mode this argv asks for, or the reason it cannot be told.
+ *
+ * ## Why an unrecognised flag refuses instead of being ignored
+ *
+ * Because `--chek` is a typo, and a harness that ignored it would run in `measure`, print a table, and
+ * exit 0 — which the acceptance step would read as a pass. A refusal names the four flags that exist.
+ * This is the same fail-closed line as everywhere else (AGENTS.md section 3), and it is cheap here
+ * because the accepted set is four strings.
+ *
+ * Two modes at once refuses for the same reason with one extra word: `--record --rebaseline` reads like
+ * "record, and it's fine", and the combination that means something is only obvious to whoever typed it.
+ */
+export const parseCoverageMode = (argv: readonly string[]): Result<CoverageMode, string> => {
+  const requested = argv.filter((arg) => arg.startsWith("--"))
+  const modes = requested.filter((flag) => (Object.values(COVERAGE_MODE_FLAGS) as readonly string[]).includes(flag))
+  if (modes.length > 1) return err(`this run asked for two modes at once (${modes.join(", ")}); pass exactly one of --check, --record, --rebaseline, or none to measure`)
+  const unknown = requested.filter((flag) => !(Object.values(COVERAGE_MODE_FLAGS) as readonly string[]).includes(flag))
+  if (unknown.length > 0) return err(`unknown flag ${unknown.join(", ")}; this harness takes --check, --record, --rebaseline, or none`)
+  if (argv.length !== requested.length) return err(`this harness takes flags, not positional arguments (${argv.filter((arg) => !arg.startsWith("--")).join(", ")})`)
+  const mode = modes[0]
+  if (mode === undefined) return ok("measure")
+  if (mode === COVERAGE_MODE_FLAGS.check) return ok("check")
+  if (mode === COVERAGE_MODE_FLAGS.record) return ok("record")
+  return ok("rebaseline")
+}
 
 /**
  * Replace every `suggestion*` key in the benchmark artefact with this run's figures.
@@ -641,6 +906,19 @@ const parseJsonObject = (text: string, path: string): Result<Readonly<Record<str
     return err(`${path} is not a JSON object, so there is nothing here to read as one`)
   }
   return ok(parsed as Readonly<Record<string, unknown>>)
+}
+
+/**
+ * The recorded artefact as it stands, or the reason it cannot be read.
+ *
+ * Read BEFORE the figures are recorded so `recallRegression` has a baseline to compare against. A
+ * missing artefact is a refusal rather than a pass: there is no baseline, so there is nothing the
+ * recall gate could have verified (AGENTS.md section 3).
+ */
+export const readBaseline = (path: string = ARTEFACT_PATH): Result<Readonly<Record<string, unknown>>, string> => {
+  const read = readTextFile(path)
+  if (!isOk(read)) return err(read.error)
+  return parseJsonObject(read.value, path)
 }
 
 /**
@@ -806,6 +1084,11 @@ const refuse = (reason: string): number => {
 }
 
 const main = (): number => {
+  // The mode first, before anything is measured. An argv this harness cannot read is refused without
+  // touching the corpus, because a typo'd flag that quietly became a `measure` run would print a table
+  // that reads as a result to whoever ran it.
+  const mode = parseCoverageMode(process.argv.slice(2))
+  if (!isOk(mode)) return refuse(mode.error)
   if (!existsSync(CORPUS_PATH)) {
     console.error(`FAIL ${CORPUS_PATH} is missing, so there is no corpus to measure against. Run \`bun run ingest\` first.`)
     return EXIT_UNTRUSTED
@@ -815,7 +1098,7 @@ const main = (): number => {
     return EXIT_UNTRUSTED
   }
 
-  const record = process.argv.slice(2).includes("--record")
+  const record = mode.value === "record" || mode.value === "rebaseline"
   // Opened through the `Result` rather than constructed here: a corpus file that is present and is not
   // a database is a precondition this harness can state, and a constructor throw would answer it with
   // a stack trace and exit code 1.
@@ -843,6 +1126,10 @@ const main = (): number => {
     if (!isOk(set)) return refuse(set.error)
 
     const cases = casesFrom(set.value)
+    // The served set, from the attestation that was just verified against the on-disk corpus. Read from
+    // the attestation and nowhere else, so the population every per-collection figure is a share of has
+    // exactly one authority (AGENTS.md section 17).
+    const served = attested.value.collectionCounts
 
     // `--record` runs the measurement RECORD_RUNS times and publishes the slowest, so the figure of
     // record is chosen by the tool rather than by whoever is reading the output. Measured spread on the
@@ -886,6 +1173,8 @@ const main = (): number => {
     const slowest = slowestOf(costs, runs)
     if (slowest === null) return EXIT_UNTRUSTED
     const cost = runs === 1 ? (costs[0] ?? slowest) : slowest
+    const probes = probesFrom(measurements, cases)
+    if (!isOk(probes)) return refuse(probes.error)
     console.log(`# nearest-quote coverage — ${cases.length} adversarial cases from ${SET_PATH}`)
     console.log(`# corpus ${onDisk}`)
     console.log("# a hit is the anchor's folded span CONTAINED IN a candidate's folded text, not a record id (ADR-10)\n")
@@ -897,6 +1186,12 @@ const main = (): number => {
     console.log(renderTable(measurements, cases.length))
     console.log(`\n## precision at the display floor of ${MIN_SHARED_RUN_CHARS} shared folded characters`)
     console.log(renderPrecision(measurements, MIN_SHARED_RUN_CHARS))
+    // Per collection BEFORE the aggregate recall sentence, and immediately above it, because the sentence
+    // below is the one a customer quotes and the table is the only thing that tells them what it is over.
+    // The claim sentence is generated from the same probes as the table and the recorded keys, so the
+    // product's disclosure and the artefact cannot become two descriptions of one measurement.
+    console.log(`\n## presence per collection — ${coverageClaim(probes.value, served)}`)
+    console.log(renderCoverage(probes.value, CUTOFFS, served))
     console.log(`\n## display floor sweep — the recall each candidate floor costs, in cases`)
     console.log(renderSweep(measurements))
     console.log("\n## latency")
@@ -917,14 +1212,42 @@ const main = (): number => {
       return EXIT_UNTRUSTED
     }
 
-    if (!record) return 0
+    // `measure` ends here: it printed the figures above and wrote nothing. Returning *before* the
+    // baseline is read is what makes the default mode safe — there is no code path below this line that
+    // can write, and therefore no default invocation that can move a floor.
+    if (mode.value === "measure") return 0
     // Recorded only after the end-of-run attestation re-read, so a corpus rewritten mid-run cannot
     // have its figures written into the artefact a document is checked against.
     //
     // A write that fails is reported and exits 3, not swallowed: the figures above were printed, and a
     // reader who is told nothing would quote a number that no artefact carries and no rule can then
     // check. The word "recorded" is only true when this line prints (AGENTS.md §16).
-    const written = recordFigures(ARTEFACT_PATH, suggestionFigures(measurements, cost, identity))
+    const figures = suggestionFigures(measurements, cost, identity, set.value.datasetDigest, probes.value, served)
+    const baseline = readBaseline()
+    if (!isOk(baseline)) return refuse(baseline.error)
+    // ADR-17: recall is a PRECONDITION, not a figure. The latency figures above are already printed
+    // — they are a measurement anyone may read — but they may not be *recorded* over a search change
+    // that lost the record it was derived from. `--record` and `--check` are the only paths into the
+    // artefact a document is checked against, so this is the place the gate belongs: a search that
+    // traded recall for the sub-50 ms target passes every other check in this repository, and this is
+    // the one that refuses it.
+    //
+    // `--check` takes this same refusal and turns it into the exit code, writing nothing — which is what
+    // the acceptance step and a CI job need, and what `measure` cannot give them because `measure`
+    // refuses to read a baseline at all.
+    if (mode.value === "rebaseline") {
+      for (const line of rebaselineReport(baseline.value, figures, set.value.datasetDigest)) console.log(line)
+    } else {
+      const recall = recallRegression(baseline.value, figures, set.value.datasetDigest)
+      if (!isOk(recall)) return refuse(recall.error)
+      // `--check` stops one line below the write. Read a baseline, compare, and publish a verdict —
+      // with no path from here to `recordFigures`, so a check that passed cannot have moved a floor.
+      if (mode.value === "check") {
+        console.log(`\n${recall.value} — measured against ${ARTEFACT_PATH} over the set digest \`${set.value.datasetDigest}\`. Nothing was written; run \`bun run eval:suggestions --record\` to publish these figures.`)
+        return 0
+      }
+    }
+    const written = recordFigures(ARTEFACT_PATH, figures)
     if (!isOk(written)) return refuse(written.error)
     console.log(`\nrecorded flat suggestion figures into ${written.value} — the artefact \`check:docs\` judges a stated latency against`)
     return 0

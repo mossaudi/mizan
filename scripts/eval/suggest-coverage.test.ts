@@ -6,28 +6,39 @@ import { Database } from "bun:sqlite"
 import { err, normalizeForMatch, isErr, isOk, ok, unwrapOrThrow } from "@mizan/core"
 import { buildSnapshot, openSnapshot, toCorpusRecord } from "@mizan/corpus"
 import { MIN_SHARED_TRIGRAMS } from "@mizan/suggest"
+import { caseCountsByCollection, verdictCountsByCollection, type PresenceProbe } from "./coverage-tables.ts"
 import { MIN_SHARED_RUN_CHARS } from "@mizan/verify"
 import {
   CUTOFFS,
+  ARTEFACT_PATH,
   FLOORS,
   HARNESS_COMMAND,
+  BASELINE_IDENTITY_KEY,
   LATENCY_BAND_MULTIPLIER,
+  RECALL_BASELINE_KEYS,
   RUN_FLOORS,
-  attempt,
+attempt,
   casesFrom,
+  COVERAGE_MODE_FLAGS,
   conditionsLines,
   coverageAt,
   floorRecallCost,
   incompleteFloors,
   isHit,
   measureCase,
+  parseCoverageMode,
   precisionAt,
+  readBaseline,
+  rebaselineReport,
+  recallRegression,
   recordFigures,
   scanCost,
   slowestOf,
   suggestionFigures,
   RECORD_RUNS,
   type CaseMeasurement,
+  type CoverageCase,
+  type CoverageMode,
   type Displayed,
   type MeasurementConditions,
 } from "./suggest-coverage.ts"
@@ -143,7 +154,7 @@ describe("the harness measures a real scan", () => {
    * reason keeps this helper from inventing a second error vocabulary.
    */
   const measured = (id: string, quote: string, anchorFolded: string): CaseMeasurement =>
-    unwrapOrThrow(measureCase(db, { id, quote, anchorFolded }), `measureCase(${id})`)
+    unwrapOrThrow(measureCase(db, { id, expectedVerdict: "rejected", collection: "tirmidhi", quote, anchorFolded }), `measureCase(${id})`)
 
   test("a quote fabricated from the verse is found in the corpus", () => {
     const fabricated = `${VERSE} العظيم`
@@ -189,7 +200,7 @@ describe("an unmeasurable case is reported, not thrown", () => {
   test("a closed database is an `err`, so the caller can refuse to publish rather than crash", () => {
     const closed = openFixture()
     closed.close()
-    const result = measureCase(closed, { id: "fixture-closed", quote: `${VERSE} العظيم`, anchorFolded: normalizeForMatch(VERSE) })
+    const result = measureCase(closed, { id: "fixture-closed", expectedVerdict: "rejected", collection: "tirmidhi", quote: `${VERSE} العظيم`, anchorFolded: normalizeForMatch(VERSE) })
     expect(isErr(result)).toBe(true)
     if (isOk(result)) return
     expect(result.error).toContain("scan failed")
@@ -201,7 +212,7 @@ describe("an unmeasurable case is reported, not thrown", () => {
     // product that logs hashes only has no business carrying corpus text (AGENTS.md §13).
     const closed = openFixture()
     closed.close()
-    const result = measureCase(closed, { id: "fixture-closed", quote: VERSE, anchorFolded: normalizeForMatch(VERSE) })
+    const result = measureCase(closed, { id: "fixture-closed", expectedVerdict: "rejected", collection: "tirmidhi", quote: VERSE, anchorFolded: normalizeForMatch(VERSE) })
     expect(isErr(result)).toBe(true)
     if (isOk(result)) return
     expect(result.error).not.toContain(VERSE)
@@ -210,7 +221,7 @@ describe("an unmeasurable case is reported, not thrown", () => {
   test("no measurement is returned alongside the reason, so a caller cannot read a figure out of a failed case", () => {
     const closed = openFixture()
     closed.close()
-    const result = measureCase(closed, { id: "fixture-closed", quote: VERSE, anchorFolded: normalizeForMatch(VERSE) })
+    const result = measureCase(closed, { id: "fixture-closed", expectedVerdict: "rejected", collection: "tirmidhi", quote: VERSE, anchorFolded: normalizeForMatch(VERSE) })
     expect(result).not.toHaveProperty("value")
     expect(result).not.toHaveProperty("hits")
     expect(result).not.toHaveProperty("ms")
@@ -358,15 +369,49 @@ describe("the figure of record is the slowest of five runs, chosen by the tool",
 })
 
 describe("casesFrom reduces the eval set to what the measurement needs", () => {
+  /** The minimum a `caseCountsByCollection` probe needs, so the assertion is about the grouping only. */
+  const probesOf = (cases: readonly CoverageCase[]): readonly PresenceProbe[] =>
+    cases.map((entry) => ({ collection: entry.collection, reached: [true, true, true], expected: entry.expectedVerdict }))
+
   test("an anchor absent from the set falls back to the anchor id rather than to an empty string", () => {
     const cases = casesFrom({
       cases: [
-        { id: "c1", quote: "q", anchorId: "bukhari:1" },
-        { id: "c2", quote: "q2", anchorId: "bukhari:2", anchorText: "text" },
+        { id: "c1", quote: "q", anchorId: "bukhari:1", citation: { collection: "bukhari", number: "1" } },
+        { id: "c2", quote: "q2", anchorId: "bukhari:2", anchorText: "text", citation: { collection: "bukhari", number: "2" } },
       ],
     } as unknown as Parameters<typeof casesFrom>[0])
     expect(cases[0]?.anchorFolded).toBe(normalizeForMatch("bukhari:1"))
     expect(cases[1]?.anchorFolded).toBe(normalizeForMatch("text"))
+  })
+
+  test("a case carries its CITATION's collection, because that is the book the figure is about", () => {
+    // The per-collection table attributes each case to `citation.collection`, not to the anchor's. A
+    // fixture that omits the field would have this read `undefined` and group every case under one key,
+    // which is a table of one row and a coverage claim about a collection nobody measured.
+    const cases = casesFrom({
+      cases: [
+        { id: "c1", quote: "q", anchorId: "abudawud:1", citation: { collection: "abudawud", number: "1" } },
+        { id: "c2", quote: "q", anchorId: "quran:2", citation: { collection: "quran", number: "2" } },
+      ],
+    } as unknown as Parameters<typeof casesFrom>[0])
+    expect([...caseCountsByCollection(probesOf(cases))]).toEqual([
+      ["abudawud", 1],
+      ["quran", 1],
+    ])
+  })
+
+  test("a case carries its adjudicated expectation, because the rejection figures are derived from it", () => {
+    // CR-3. The `rejected` column has no other source that is not a retyped constant, and `reached`
+    // cannot supply it: a fabrication whose anchor ranked first is still a fabrication. Read from the
+    // set rather than recomputed here, so a case class that stopped expecting `rejected` changes the
+    // published figures instead of being silently reclassified.
+    const cases = casesFrom({
+      cases: [
+        { id: "c1", quote: "q", expectedVerdict: "rejected", anchorId: "abudawud:1", citation: { collection: "abudawud", number: "1" } },
+        { id: "c2", quote: "q", expectedVerdict: "verified", anchorId: "abudawud:2", citation: { collection: "abudawud", number: "2" } },
+      ],
+    } as unknown as Parameters<typeof casesFrom>[0])
+    expect(verdictCountsByCollection(probesOf(cases)).get("abudawud")).toEqual({ rejected: 1, verified: 1 })
   })
 })
 
@@ -385,7 +430,8 @@ describe("the figures this harness records are in the shape the claim rule reads
     { id: "b", ms: 20, hits: { [MIN_SHARED_TRIGRAMS]: [false, true, true] }, gated: { [MIN_SHARED_RUN_CHARS]: { shown: 1, anchorRank: 0 } } },
   ]
   const identity = { snapshotHash: "c".repeat(64), recordCount: 27_234 }
-  const figures = suggestionFigures(measurements, { p50: 600.4, p95: 700.6, max: 900.2 }, identity)
+  const digest = `ds1:${"e".repeat(64)}`
+  const figures = suggestionFigures(measurements, { p50: 600.4, p95: 700.6, max: 900.2 }, identity, digest)
 
   test("every value is top-level, so nothing is nested out of the rule's reach", () => {
     for (const value of Object.values(figures)) {
@@ -393,10 +439,19 @@ describe("the figures this harness records are in the shape the claim rule reads
     }
   })
 
-  test("the only string is the corpus fingerprint, because a latency without a corpus is about nothing", () => {
+  test("the only strings are identities, and both are named rather than swept up with the figures", () => {
+    // Enumerated, not merely counted. A third string added to this artefact is a judgement a reader
+    // cannot make from the file, and the list here is what forces the decision to be written down.
     const strings = Object.entries(figures).filter((entry): entry is [string, string] => typeof entry[1] === "string")
-    expect(strings.map((entry) => entry[0])).toEqual(["suggestionCorpusFingerprint"])
+    expect(strings.map((entry) => entry[0])).toEqual(["suggestionCorpusFingerprint", BASELINE_IDENTITY_KEY])
     expect(figures.suggestionCorpusFingerprint).toBe(identity.snapshotHash)
+  })
+
+  test("the eval set's identity is recorded, because a recall rate is a ratio and this is its denominator", () => {
+    expect(figures[BASELINE_IDENTITY_KEY]).toBe(digest)
+    // The key is the one `recallRegression` reads, so a rename here that missed the reader would make
+    // every future `--record` refuse for a reason naming a key the artefact no longer carries.
+    expect(BASELINE_IDENTITY_KEY).toBe("suggestionEvalSetDigest")
   })
 
   test("a latency is recorded as whole milliseconds, never as a fraction a reader would re-round", () => {
@@ -631,5 +686,311 @@ describe("every published figure travels with the conditions it was measured und
     // different string, so the omission cannot pass as agreement.
     const lines = conditionsLines({ ...conditions, machine: { ...conditions.machine, cpu: "unknown" } })
     expect(lines.join("\n")).toContain("cpu                unknown")
+  })
+})
+
+/**
+ * The four modes, tested as a pure function over argv.
+ *
+ * CR-2 and CR-4 are both about which invocation is allowed to reach the writer, and neither is a
+ * property a test can see by reading `main`. So the mode is a value with its own parser, and the parser
+ * is what these tests plant violations against — including the one that matters most: a default run that
+ * cannot move a floor, which is what makes pointing the acceptance step at a bare invocation harmless
+ * but useless (the acceptance step now passes `--check`).
+ */
+describe("the mode a run was asked for", () => {
+  test("no flag measures, which is the default a reader runs to see the numbers", () => {
+    expect(parseCoverageMode([])).toEqual(ok<CoverageMode>("measure"))
+  })
+
+  test("each mode is reachable by exactly its own flag, and only its own", () => {
+    // Driven off the declaration rather than a re-listed copy, so adding a mode without a flag here —
+    // or a flag no mode answers to — fails this test instead of shipping (AGENTS.md section 17).
+    for (const [mode, flag] of Object.entries(COVERAGE_MODE_FLAGS)) {
+      if (flag === "") continue
+      expect(parseCoverageMode([flag])).toEqual(ok(mode as CoverageMode))
+    }
+  })
+
+  test("a typo refuses rather than falling back to measure, so the acceptance step cannot pass on one", () => {
+    // The failure this closes: `--chek` ignored would print a table, exit 0, and be read as "every
+    // record still found". The gate's step would be green having verified nothing.
+    const verdict = parseCoverageMode(["--chek"])
+    expect(isErr(verdict)).toBe(true)
+    if (!isErr(verdict)) return
+    expect(verdict.error).toContain("--chek")
+    // The refusal names what does exist, so the reader does not have to know the mode vocabulary first.
+    expect(verdict.error).toContain("--check")
+    expect(verdict.error).toContain("--record")
+    expect(verdict.error).toContain("--rebaseline")
+  })
+
+  test("two modes at once refuse, because the combination reads as 'record, and it's fine'", () => {
+    const verdict = parseCoverageMode(["--record", "--rebaseline"])
+    expect(isErr(verdict)).toBe(true)
+    if (!isErr(verdict)) return
+    expect(verdict.error).toContain("two modes at once")
+  })
+
+  test("a positional argument refuses, because a case id is not an instruction to this harness", () => {
+    const verdict = parseCoverageMode(["--check", "quran"])
+    expect(isErr(verdict)).toBe(true)
+    if (!isErr(verdict)) return
+    expect(verdict.error).toContain("positional")
+  })
+
+  test("the four modes are written down once, so a new mode cannot be added without naming it here", () => {
+    expect(Object.keys(COVERAGE_MODE_FLAGS).sort()).toEqual(["check", "measure", "rebaseline", "record"])
+  })
+})
+
+/**
+ * `--rebaseline` is the only command that may move a floor down, so what it prints is part of the
+ * integrity of the artefact rather than a nicety.
+ *
+ * The defect it replaces is a refusal message that told the operator to add a number to
+ * `vs-search.json` by hand. That made the legitimate case — the eval set was legitimately regenerated,
+ * so the recorded floor describes a different denominator — indistinguishable from a real regression,
+ * and the only way through it was to write an unmeasured number into the file every document is checked
+ * against. `--rebaseline` re-measures instead, and this report is what keeps the movement visible.
+ */
+describe("rebaselining prints the movement it caused", () => {
+  const DIGEST = `ds1:${"e".repeat(64)}`
+  const AFTER: Readonly<Record<string, number | string>> = {
+    suggestionPresenceTop5: 36,
+    suggestionRecallGatedTop5: 30,
+  }
+
+  test("every floor it rewrote is reported as before -> after, so the commit carries the movement", () => {
+    const report = rebaselineReport({ suggestionPresenceTop5: 38, suggestionRecallGatedTop5: 38 }, AFTER, DIGEST).join("\n")
+    expect(report).toContain("suggestionPresenceTop5: 38 -> 36")
+    expect(report).toContain("suggestionRecallGatedTop5: 38 -> 30")
+  })
+
+  test("the report names the digest the new baseline is measured over", () => {
+    // The denominator the old floor described is gone, and the report is where that is stated.
+    const report = rebaselineReport({ suggestionEvalSetDigest: `ds1:${"a".repeat(64)}` }, AFTER, DIGEST).join("\n")
+    expect(report).toContain(`ds1:${"a".repeat(64)} -> ${DIGEST}`)
+  })
+
+  test("a floor that did not exist before reads as `none`, not as a zero it never was", () => {
+    // The half that matters when somebody reads this to decide whether the baseline was quietly
+    // replaced: "none" says a floor was created, where "0" would say one was already zero.
+    const report = rebaselineReport({}, AFTER, DIGEST).join("\n")
+    expect(report).toContain("suggestionPresenceTop5: none -> 36")
+    expect(report).not.toContain("suggestionPresenceTop5: 0 ->")
+  })
+
+  test("the report says the floor was NOT compared, because that is the whole cost of the mode", () => {
+    // A reader who sees a drop in the artefact and no record of a skipped comparison cannot tell a
+    // sanctioned rebaseline from a waved-through regression.
+    const report = rebaselineReport({}, AFTER, DIGEST).join("\n")
+    expect(report).toContain("NOT compared")
+    expect(report).toContain("including a drop")
+  })
+})
+
+/**
+ * ADR-17: the recall precondition on `--record`, tested as a pure function over two tables.
+ *
+ * The tempting way to test a gate like this is to run the harness against the real corpus twice with
+ * different floors and watch the second one refuse. That costs a minute per run, needs the corpus, and
+ * — the fatal part — would pass for the wrong reason often enough that a reader could not tell whether
+ * recall or the harness broke. So the decision is extracted, and the refusal is proven to depend on the
+ * recall numbers alone.
+ *
+ * Each test below plants one violation. A gate whose refusals cannot each be provoked is not a gate;
+ * it is a condition, and it fails the "a guard that cannot fail is not a guard" requirement in
+ * AGENTS.md section 14 for exactly the case where it matters most.
+ */
+describe("recall is a precondition on recording, because latency is the only figure an index buys", () => {
+  /** The identity every baseline in this block was measured over. */
+  const DIGEST = `ds1:${"e".repeat(64)}`
+
+  /** A baseline and a run that ties it, which is the only case that is allowed to proceed. */
+  const BASELINE: Readonly<Record<string, unknown>> = {
+    [BASELINE_IDENTITY_KEY]: DIGEST,
+    suggestionPresenceTop5: 38,
+    suggestionRecallGatedTop5: 38,
+  }
+  const TIED: Readonly<Record<string, number | string>> = {
+    suggestionPresenceTop5: 38,
+    suggestionRecallGatedTop5: 38,
+  }
+
+  test("a run that ties the recorded baseline is allowed to record", () => {
+    // The pass path, stated first: a gate proven only to refuse is indistinguishable from a broken one,
+    // and the person who broke it would be told they had implemented a precondition.
+    expect(recallRegression(BASELINE, TIED, DIGEST)).toEqual(ok("recall holds"))
+  })
+
+  test("a run that IMPROVES recall is allowed to record", () => {
+    // Asymmetric on purpose. A floor is a floor, not a target to be defended: refusing an improvement
+    // would make the gate a brake on a fix, and the engineer would then work around it.
+    const improved = { ...TIED, suggestionPresenceTop5: 40, suggestionRecallGatedTop5: 40 }
+    expect(recallRegression(BASELINE, improved, DIGEST)).toEqual(ok("recall holds"))
+  })
+
+  test("losing one top-5 presence refuses, and the refusal names both numbers", () => {
+    // The planted violation. 38 -> 37 is a single record that no longer appears in the first five, and
+    // it is the whole failure mode ADR-08's FTS spike demonstrated: faster, and quietly returning
+    // nothing for a quote it used to answer.
+    const lost = { ...TIED, suggestionPresenceTop5: 37 }
+    const verdict = recallRegression(BASELINE, lost, DIGEST)
+    expect(isErr(verdict)).toBe(true)
+    if (!isErr(verdict)) return
+    expect(verdict.error).toContain("suggestionPresenceTop5")
+    expect(verdict.error).toContain("37")
+    expect(verdict.error).toContain("38")
+    // The reason must name the rule that decided it, or a reader is left to guess whether the refusal
+    // was a performance budget or an integrity one.
+    expect(verdict.error).toContain("ADR-17")
+  })
+
+  test("losing gated recall refuses even when presence is unchanged", () => {
+    // The second key is not redundant with the first, which is why both are compared. Presence is "a
+    // row was shown"; gated recall is "the row shown was the anchor". A ranking that drifts so the
+    // right record is displayed in the wrong position keeps every presence number while losing the
+    // record a judge is actually looking for.
+    const lost = { ...TIED, suggestionRecallGatedTop5: 30 }
+    const verdict = recallRegression(BASELINE, lost, DIGEST)
+    expect(isErr(verdict)).toBe(true)
+    if (!isErr(verdict)) return
+    expect(verdict.error).toContain("suggestionRecallGatedTop5")
+  })
+
+  test("no tolerance band is applied to recall, however small the loss", () => {
+    // `LATENCY_BAND_MULTIPLIER` is 1.5x, and it would happily wave through 38 -> 37. Applying it here
+    // would be the defect: wall clock belongs to the machine, and recall belongs to the code. One record
+    // is the whole unit of judgement in this product, so one record lost is a regression.
+    const oneLost = recallRegression({ ...BASELINE, suggestionPresenceTop5: 1 }, { ...TIED, suggestionPresenceTop5: 1 }, DIGEST)
+    expect(oneLost).toEqual(ok("recall holds"))
+    const actuallyLost = recallRegression({ ...BASELINE, suggestionPresenceTop5: 1 }, { ...TIED, suggestionPresenceTop5: 0 }, DIGEST)
+    expect(isErr(actuallyLost)).toBe(true)
+  })
+
+  test("an artefact with no recall baseline refuses, because it cannot be compared against nothing", () => {
+    // The first `--record` after recall was added to the artefact, and the case that decides whether the
+    // gate is fail-closed. Reading a missing key as "no regression" would let the very change the gate
+    // exists to catch — the one that introduces an index — record its own baseline with nobody to check
+    // it against (AGENTS.md section 3).
+    //
+    // The identity key stays, deliberately. Spreading `undefined` over it is not "leaving it out" — it is
+    // still a present key holding `undefined`, which the reader's `typeof` check refuses — so the run
+    // would stop at the identity refusal and this test would quietly stop proving the thing it is named
+    // for. The floor is missing *independently* of the denominator here.
+    const verdict = recallRegression(
+      { [BASELINE_IDENTITY_KEY]: DIGEST },
+      TIED,
+      DIGEST,
+    )
+    expect(isErr(verdict)).toBe(true)
+    if (!isErr(verdict)) return
+    expect(verdict.error).toContain("suggestionPresenceTop5")
+    expect(verdict.error).toContain("not a measurement")
+    // Not a regression: nothing was compared, so reporting a loss would send the reader to fix a search
+    // that never failed anything.
+    expect(verdict.error).not.toContain("regressed")
+  })
+
+  test("a changed eval set refuses before any recall is compared", () => {
+    // The failure ADR-17 calls the dangerous one, and the reason identity is checked first rather than
+    // alongside: regenerating the case set moves the denominator, the aggregate can land on the same
+    // value, and the comparison reports a pass over two experiments. 40/40 against a 40-case set and
+    // 40/40 against a 41-case set are not the same measurement, and only the digest can tell them apart.
+    const verdict = recallRegression(BASELINE, TIED, `ds1:${"f".repeat(64)}`)
+    expect(isErr(verdict)).toBe(true)
+    if (!isErr(verdict)) return
+    expect(verdict.error).toContain("not the one this baseline was measured over")
+    expect(verdict.error).toContain("a different measurement")
+    // Both digests are named, because the person fixing this needs to know which file to edit and which
+    // set to regenerate — a refusal that says only "mismatch" sends them to git log.
+    expect(verdict.error).toContain(`ds1:${"e".repeat(64)}`)
+    expect(verdict.error).toContain(`ds1:${"f".repeat(64)}`)
+  })
+
+  test("a baseline with no identity refuses as an incomparable denominator, not as a regression", () => {
+    // Ordering, stated as its own test. An artefact predating `datasetDigest` has no denominator, and
+    // the refusal must name that fact rather than reporting a recall loss that never happened — a
+    // message blaming a regression would send the reader to fix the search when the artefact is what
+    // needs attention.
+    const verdict = recallRegression({ suggestionPresenceTop5: 40, suggestionRecallGatedTop5: 40 }, TIED, DIGEST)
+    expect(isErr(verdict)).toBe(true)
+    if (!isErr(verdict)) return
+    expect(verdict.error).toContain(BASELINE_IDENTITY_KEY)
+    expect(verdict.error).not.toContain("regressed")
+  })
+
+  test("a baseline key that is present but not a number refuses rather than coercing", () => {
+    // A string "38" would compare under `Number()` and quietly pass a corrupt artefact. The refusal has
+    // to name the artefact, because the artefact is what the person has to fix by hand.
+    const verdict = recallRegression({ ...BASELINE, suggestionPresenceTop5: "38" }, TIED, DIGEST)
+    expect(isErr(verdict)).toBe(true)
+    if (!isErr(verdict)) return
+    expect(verdict.error).toContain("data/benchmark/vs-search.json")
+  })
+
+  test("a run that computed no recall figure refuses to record latency over an unknown search", () => {
+    // Absent in the other direction. A harness that failed to measure recall produced a latency figure
+    // that says nothing about whether the search still finds the record, and recording it would publish
+    // that figure as evidence of a working path.
+    const verdict = recallRegression(BASELINE, { suggestionLatencyP95Ms: 753 }, DIGEST)
+    expect(isErr(verdict)).toBe(true)
+    if (!isErr(verdict)) return
+    expect(verdict.error).toContain("suggestionPresenceTop5")
+  })
+
+  test("both baseline keys are read, so neither can be dropped from the artefact unnoticed", () => {
+    // The set is written down once. A test that re-listed the keys here would be a second source of
+    // truth, and the failure it would miss is the artefact quietly losing one (AGENTS.md section 17).
+    expect(RECALL_BASELINE_KEYS).toEqual(["suggestionPresenceTop5", "suggestionRecallGatedTop5"])
+    for (const key of RECALL_BASELINE_KEYS) {
+      const without = { ...BASELINE }
+      delete without[key]
+      expect(isErr(recallRegression(without, TIED, DIGEST))).toBe(true)
+    }
+  })
+
+  test("the committed artefact carries a baseline, so the gate is satisfiable by today's code", () => {
+    // The failure this exists to catch is the gate being *unsatisfiable*: a truncation of the artefact,
+    // or a key renamed without this being updated, would make every future `--record` refuse forever and
+    // the latency figures unrecordable. Nobody would notice, because refusing is the gate working. So the
+    // real file is read here, and the values it holds must satisfy a run that finds everything.
+    const read = readBaseline(join(import.meta.dir, "..", "..", ARTEFACT_PATH))
+    expect(isOk(read)).toBe(true)
+    if (!isOk(read)) return
+    const baseline: Record<string, number | string> = {}
+    for (const [key, value] of Object.entries(read.value)) {
+      if (typeof value === "number" || typeof value === "string") baseline[key] = value
+    }
+    for (const key of RECALL_BASELINE_KEYS) {
+      expect(typeof baseline[key]).toBe("number")
+    }
+    // Full recall is the shipped path's actual figure, which is why this gate can demand it. Asserted
+    // rather than assumed: if the search ever loses a record, this is the test that says so first, and
+    // it should fail here rather than at the next `--record` with no explanation.
+    expect(recallRegression(baseline, baseline, baseline[BASELINE_IDENTITY_KEY] as string)).toEqual(ok("recall holds"))
+  })
+
+  test("an artefact that is not a JSON object refuses, rather than reading as no regression", () => {
+    // The shape a hand-edit produces: a truncated file, or a stray `[` making the artefact an array.
+    // `readFigures` in the gate walks the top level for numbers, so an array would silently contribute
+    // nothing and every latency comparison would read as "not stated" — green, and meaningless.
+    const dir = mkdtempSync(join(tmpdir(), "mizan-baseline-"))
+    try {
+      const path = join(dir, "vs-search.json")
+      writeFileSync(path, "[1, 2, 3]")
+      const verdict = readBaseline(path)
+      expect(isErr(verdict)).toBe(true)
+      if (!isErr(verdict)) return
+      expect(verdict.error).toContain("not a JSON object")
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("a missing artefact refuses, because there is no baseline to compare against", () => {
+    const verdict = readBaseline(join(tmpdir(), "mizan-does-not-exist", "vs-search.json"))
+    expect(isErr(verdict)).toBe(true)
   })
 })

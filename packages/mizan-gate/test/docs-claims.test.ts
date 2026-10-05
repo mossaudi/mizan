@@ -11,6 +11,8 @@ import {
   checkRegistryClaims,
   checkSnapshotArithmetic,
   checkedPaths,
+  coverageCaseKey,
+  COVERAGE_KEYS,
   formatDocsFailure,
   formatDocsSuccess,
   runDocsClaimChecks,
@@ -19,6 +21,7 @@ import {
   type SourceFile,
 } from "../src/index.ts"
 import { LATENCY_KEYS } from "../src/docs-value-latency.ts"
+import { digestOf, isOk } from "@mizan/core"
 
 /**
  * Tests for D-1, the documentation-claims check.
@@ -334,13 +337,18 @@ describe("R5 — the quarantine table must equal the attested snapshot", () => {
  * decodes the artefact through the schema `@mizan/core` declares, so a fixture that did not
  * satisfy it would be testing nothing. `anchorCount` is the count the rule judges documents
  * against, so the builder takes it explicitly rather than deriving it.
+ *
+ * `schemaVersion` 3 makes `datasetDigest` and `coverageRows` required, so this fixture carries both
+ * or every R6 test below would be measuring a decode failure. The digest is computed rather than
+ * pasted: a fixture asserting an identity that is not its own is the self-certifying shape R6 and
+ * ADR-15's coverage rule both exist to reject.
  */
 const artefact = (
   cases: readonly { readonly id: string; readonly anchorId: string; readonly quote: string }[],
   anchorCount = new Set(cases.map((entry) => entry.anchorId)).size,
-): string =>
-  JSON.stringify({
-    schemaVersion: 1,
+): string => {
+  const set: Record<string, unknown> = {
+    schemaVersion: 3,
     set: "fixture",
     title: "fixture",
     purpose: "fixture",
@@ -356,6 +364,7 @@ const artefact = (
       why: "c",
       whoDecides: "the team lead",
     },
+    coverageRows: [{ collection: "abudawud", caseCount: cases.length, anchorCount }],
     digitFacts: {},
     classCounts: {},
     verdictCounts: {},
@@ -375,7 +384,11 @@ const artefact = (
       anchorId: entry.anchorId,
       divergence: null,
     })),
-  })
+  }
+  const digest = digestOf(set)
+  if (!isOk(digest)) throw new Error(`fixture digest could not be computed: ${digest.error.detail}`)
+  return JSON.stringify({ ...set, datasetDigest: digest.value })
+}
 
 describe("R6 — the eval sets' breadth must be described as the artefacts are", () => {
   /**
@@ -925,12 +938,35 @@ describe("runDocsClaimChecks — the runner, end to end", () => {
     const RECORDED_P50 = 600
     const RECORDED_P95 = 700
     const RECORDED_MAX = 1_100
+
+    /**
+     * The per-collection case counts a recorded artefact carries, and the total derived from them.
+     *
+     * Present because the real `vs-search.json` carries them and `checkPresenceCoverageRecorded` asks the
+     * artefact whether it can name the collection a figure is over; a fixture omitting them would model a
+     * repository that no longer exists and would fail for a reason unrelated to what each test is about.
+     *
+     * The total is computed rather than typed, because a self-inconsistent fixture is the exact shape this
+     * repository's rules exist to catch, and a test fixture that commits it would be arguing against itself.
+     */
+    const COVERAGE_FIXTURE_CASES: Readonly<Record<string, number>> = {
+      abudawud: 7,
+      ibnmajah: 7,
+      malik: 7,
+      nasai: 7,
+      quran: 6,
+      tirmidhi: 6,
+    }
+    const COVERAGE_FIXTURE_TOTAL = Object.values(COVERAGE_FIXTURE_CASES).reduce((sum, cases) => sum + cases, 0)
     const artefact = JSON.stringify({
       [LATENCY_KEYS.p50]: RECORDED_P50,
       [LATENCY_KEYS.p95]: RECORDED_P95,
       [LATENCY_KEYS.max]: RECORDED_MAX,
       [LATENCY_KEYS.band]: 1.5,
       [LATENCY_KEYS.fingerprint]: FINGERPRINT,
+      [COVERAGE_KEYS.totalCases]: COVERAGE_FIXTURE_TOTAL,
+      [COVERAGE_KEYS.collections]: Object.keys(COVERAGE_FIXTURE_CASES).join(","),
+      ...Object.fromEntries(Object.entries(COVERAGE_FIXTURE_CASES).map(([collection, cases]) => [coverageCaseKey(collection), cases])),
     })
 
     /** Every finding this sweep raised for `path`, so a test never has to reason about the others. */

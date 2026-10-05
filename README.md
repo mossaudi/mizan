@@ -222,7 +222,7 @@ against it.
 Three properties make the sets harder to fool than they look:
 
 - **Breadth, stated exactly.** The 200 golden cases draw on 56 records, not 200 texts, and
-  the 40 red-team cases draw on 30 records. Neither set is a sample of independent texts, and the
+  the 40 red-team cases draw on 38 records. Neither set is a sample of independent texts, and the
   golden set quotes some of its records more than once on purpose: the three normalization classes
   quote the *same* spans three ways — exact, undiacriticized, tatweel-spaced — so a fold too weak to
   strip combining marks is caught on a text the exact class already verified, not only on text

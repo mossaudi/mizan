@@ -1,12 +1,44 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "set": "redteam",
   "title": "Red-team set: fabrications that must never verify",
-  "purpose": "Every case is a fabrication of a real corpus span. A single `verified` here is a false positive on invented religious text, which is the failure this repository exists to prevent, so the gate is exactly zero rather than the golden set's accuracy bar.",
+  "purpose": "Every case is a fabrication of a real corpus span. A single `verified` here is a false positive on invented religious text, which is the failure this repository exists to prevent, so the gate is exactly zero rather than the golden set's accuracy bar. Drawn round-robin across every served collection (ADR-15), so no collection is exempt from being falsified.",
   "generatedBy": "scripts/build-eval-set.ts",
   "regenerateWith": "bun run build:eval",
-  "determinism": "Same snapshot in, byte-identical files out. Every selection is ordered (records by id, collections by name, classes by the table order in plan.ts) and no clock, locale or randomness is consulted.",
+  "determinism": "Same snapshot in, byte-identical files out. Every selection is ordered (records by id, collections by name, cases drawn round-robin across collections per ADR-15) and no clock, locale or randomness is consulted. datasetDigest is the ds1 digest of this document with the datasetDigest key removed, so any reader can recompute it.",
   "expectationSource": "Hand-adjudicated in scripts/eval/plan.ts from the documented behaviour of the fold table. Never observed from @mizan/verify: a set whose expectations were recorded from the code under test is a regression test of the code against itself.",
+  "coverageRows": [
+    {
+      "collection": "abudawud",
+      "caseCount": 15,
+      "anchorCount": 14
+    },
+    {
+      "collection": "ibnmajah",
+      "caseCount": 13,
+      "anchorCount": 13
+    },
+    {
+      "collection": "malik",
+      "caseCount": 5,
+      "anchorCount": 4
+    },
+    {
+      "collection": "nasai",
+      "caseCount": 3,
+      "anchorCount": 3
+    },
+    {
+      "collection": "quran",
+      "caseCount": 2,
+      "anchorCount": 2
+    },
+    {
+      "collection": "tirmidhi",
+      "caseCount": 2,
+      "anchorCount": 2
+    }
+  ],
   "digitFacts": {
     "asciiDigitOccurrences": 19,
     "recordsContainingDigits": 4,
@@ -24,7 +56,7 @@
   "verdictCounts": {
     "rejected": 40
   },
-  "anchorCount": 30,
+  "anchorCount": 38,
   "licenceNotice": "Quoted spans are real source text, reproduced verbatim under each collection's own licence and attribution, as recorded per anchor. Fabricated spans (classes one_word_changed, two_word_changed, letter_transposed, digit_substituted, word_inserted, injection_appended) and elided spans are synthetic test data. They are not hadith, they assert nothing, and no case may be cited as a source. Qur'an text is under no-derivatives terms and is reproduced without modification.",
   "anchors": [
     {
@@ -71,36 +103,6 @@
       "sourceUrl": "https://sunnah.com/abudawud:100",
       "textHash": "ab98a825d1844e1b9335340cdc2f1b0e43a04d98baf57e3b8e866547ae79b61b",
       "textDisplay": "حَدَّثَنَا الْحَسَنُ بْنُ عَلِيٍّ، حَدَّثَنَا أَبُو الْوَلِيدِ، وَسَهْلُ بْنُ حَمَّادٍ، قَالاَ حَدَّثَنَا عَبْدُ الْعَزِيزِ بْنُ عَبْدِ اللَّهِ بْنِ أَبِي سَلَمَةَ، عَنْ عَمْرِو بْنِ يَحْيَى، عَنْ أَبِيهِ، عَنْ عَبْدِ اللَّهِ بْنِ زَيْدٍ، قَالَ جَاءَنَا رَسُولُ اللَّهِ صلى الله عليه وسلم فَأَخْرَجْنَا لَهُ مَاءً فِي تَوْرٍ مِنْ صُفْرٍ فَتَوَضَّأَ ‏.‏"
-    },
-    {
-      "id": "abudawud:1000",
-      "collection": "abudawud",
-      "number": "1000",
-      "grade": "Sahih / Sahih / Sahih / Sahih",
-      "gradeApplicable": true,
-      "gradeSource": "quranlab/hadith",
-      "gradeBasis": "row",
-      "attribution": "Hadith text and grades: QuranLab (quranlab/hadith on Hugging Face), Arabic matn public domain per the dataset card",
-      "license": "Dataset card: license \"other\", license_name \"mixed-per-row-pd-arabic-and-reference\"",
-      "licenseUrl": "https://huggingface.co/datasets/quranlab/hadith",
-      "sourceUrl": "https://sunnah.com/abudawud:1000",
-      "textHash": "d74680465373182aa5cee19c16eaeac0bcb9a75ad03005b6cabc5f7d59a1e85b",
-      "textDisplay": "حَدَّثَنَا عَبْدُ اللَّهِ بْنُ مُحَمَّدٍ النُّفَيْلِيُّ، حَدَّثَنَا زُهَيْرٌ، حَدَّثَنَا الأَعْمَشُ، عَنِ الْمُسَيَّبِ بْنِ رَافِعٍ، عَنْ تَمِيمٍ الطَّائِيِّ، عَنْ جَابِرِ بْنِ سَمُرَةَ، قَالَ دَخَلَ عَلَيْنَا رَسُولُ اللَّهِ صلى الله عليه وسلم وَالنَّاسُ رَافِعُو أَيْدِيهِمْ - قَالَ زُهَيْرٌ أُرَاهُ قَالَ - فِي الصَّلاَةِ فَقَالَ ‏ \"‏ مَا لِي أَرَاكُمْ رَافِعِي أَيْدِيكُمْ كَأَنَّهَا أَذْنَابُ خَيْلٍ شُمْسٍ اسْكُنُوا فِي الصَّلاَةِ ‏\"‏ ‏.‏"
-    },
-    {
-      "id": "abudawud:1001",
-      "collection": "abudawud",
-      "number": "1001",
-      "grade": "Daif / Daif / Daif / Daif",
-      "gradeApplicable": true,
-      "gradeSource": "quranlab/hadith",
-      "gradeBasis": "row",
-      "attribution": "Hadith text and grades: QuranLab (quranlab/hadith on Hugging Face), Arabic matn public domain per the dataset card",
-      "license": "Dataset card: license \"other\", license_name \"mixed-per-row-pd-arabic-and-reference\"",
-      "licenseUrl": "https://huggingface.co/datasets/quranlab/hadith",
-      "sourceUrl": "https://sunnah.com/abudawud:1001",
-      "textHash": "ecd46c068ee74f9d053ed7dd58254209afaac179da79c3c4e138843676ff8075",
-      "textDisplay": "حَدَّثَنَا مُحَمَّدُ بْنُ عُثْمَانَ أَبُو الْجَمَاهِرِ، حَدَّثَنَا سَعِيدُ بْنُ بَشِيرٍ، عَنْ قَتَادَةَ، عَنِ الْحَسَنِ، عَنْ سَمُرَةَ، قَالَ أَمَرَنَا النَّبِيُّ صلى الله عليه وسلم أَنْ نَرُدَّ عَلَى الإِمَامِ وَأَنْ نَتَحَابَّ وَأَنْ يُسَلِّمَ بَعْضُنَا عَلَى بَعْضٍ ‏.‏"
     },
     {
       "id": "abudawud:1003",
@@ -463,6 +465,51 @@
       "textDisplay": "حَدَّثَنَا عَمَّارُ بْنُ طَالُوتَ، حَدَّثَنَا عَبْدُ الْمَلِكِ بْنُ عَبْدِ الْعَزِيزِ الْمَاجِشُونُ، حَدَّثَنَا مَالِكُ بْنُ أَنَسٍ، عَنْ عَبْدِ اللَّهِ بْنِ أَبِي بَكْرِ بْنِ مُحَمَّدِ بْنِ عَمْرِو بْنِ حَزْمٍ، عَنْ أَبِيهِ، عَنْ عَمْرِو بْنِ سُلَيْمٍ الزُّرَقِيِّ، عَنْ أَبِي حُمَيْدٍ السَّاعِدِيِّ، أَنَّهُمْ قَالُوا يَا رَسُولَ اللَّهِ أُمِرْنَا بِالصَّلاَةِ عَلَيْكَ فَكَيْفَ نُصَلِّي عَلَيْكَ فَقَالَ ‏ \"‏ قُولُوا اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَأَزْوَاجِهِ وَذُرِّيَّتِهِ، كَمَا صَلَّيْتَ عَلَى إِبْرَاهِيمَ، وَبَارِكْ عَلَى مُحَمَّدٍ وَأَزْوَاجِهِ وَذُرِّيَّتِهِ، كَمَا بَارَكْتَ عَلَى آلِ إِبْرَاهِيمَ فِي الْعَالَمِينَ، إِنَّكَ حَمِيدٌ مَجِيدٌ ‏\"‏ ‏.‏"
     },
     {
+      "id": "malik:1",
+      "collection": "malik",
+      "number": "1",
+      "grade": "Sahih",
+      "gradeApplicable": true,
+      "gradeSource": "quranlab/hadith",
+      "gradeBasis": "row",
+      "attribution": "Hadith text and grades: QuranLab (quranlab/hadith on Hugging Face), Arabic matn public domain per the dataset card",
+      "license": "Dataset card: license \"other\", license_name \"mixed-per-row-pd-arabic-and-reference\"",
+      "licenseUrl": "https://huggingface.co/datasets/quranlab/hadith",
+      "sourceUrl": "https://sunnah.com/malik:1",
+      "textHash": "567c395e6f5d671eb227425dd7fb48e624650936c7c8c68ef12b7b3de906b1fd",
+      "textDisplay": "قَالَ حَدَّثَنِي يَحْيَى بْنُ يَحْيَى اللَّيْثِيُّ، عَنْ مَالِكِ بْنِ أَنَسٍ، عَنِ ابْنِ شِهَابٍ، أَنَّ عُمَرَ بْنَ عَبْدِ الْعَزِيزِ، أَخَّرَ الصَّلاَةَ يَوْمًا فَدَخَلَ عَلَيْهِ عُرْوَةُ بْنُ الزُّبَيْرِ فَأَخْبَرَهُ أَنَّ الْمُغِيرَةَ بْنَ شُعْبَةَ أَخَّرَ الصَّلاَةَ يَوْمًا وَهُوَ بِالْكُوفَةِ فَدَخَلَ عَلَيْهِ أَبُو مَسْعُودٍ الأَنْصَارِيُّ فَقَالَ مَا هَذَا يَا مُغِيرَةُ أَلَيْسَ قَدْ عَلِمْتَ أَنَّ جِبْرِيلَ نَزَلَ فَصَلَّى فَصَلَّى رَسُولُ اللَّهِ صلى الله عليه وسلم ثُمَّ صَلَّى فَصَلَّى رَسُولُ اللَّهِ صلى الله عليه وسلم ثُمَّ صَلَّى فَصَلَّى رَسُولُ اللَّهِ صلى الله عليه وسلم ثُمَّ صَلَّى فَصَلَّى رَسُولُ اللَّهِ صلى الله عليه وسلم ثُمَّ صَلَّى فَصَلَّى رَسُولُ اللَّهِ صلى الله عليه وسلم ثُمَّ قَالَ ‏ \"‏ بِهَذَا أُمِرْتُ ‏\"‏ ‏.‏ فَقَالَ عُمَرُ بْنُ عَبْدِ الْعَزِيزِ اعْلَمْ مَا تُحَدِّثُ بِهِ يَا عُرْوَةُ أَوَ إِنَّ جِبْرِيلَ هُوَ الَّذِي أَقَامَ لِرَسُولِ اللَّهِ صلى الله عليه وسلم وَقْتَ الصَّلاَةِ قَالَ عُرْوَةُ كَذَلِكَ كَانَ بَشِيرُ بْنُ أَبِي مَسْعُودٍ الأَنْصَارِيُّ يُحَدِّثُ عَنْ أَبِيهِ ‏.‏"
+    },
+    {
+      "id": "malik:10",
+      "collection": "malik",
+      "number": "10",
+      "grade": "Sahih",
+      "gradeApplicable": true,
+      "gradeSource": "quranlab/hadith",
+      "gradeBasis": "row",
+      "attribution": "Hadith text and grades: QuranLab (quranlab/hadith on Hugging Face), Arabic matn public domain per the dataset card",
+      "license": "Dataset card: license \"other\", license_name \"mixed-per-row-pd-arabic-and-reference\"",
+      "licenseUrl": "https://huggingface.co/datasets/quranlab/hadith",
+      "sourceUrl": "https://sunnah.com/malik:10",
+      "textHash": "1733ff297f8b8f632d11dad29c376916b977cd1852ddbd73701b6406d46e0475",
+      "textDisplay": "وَحَدَّثَنِي عَنْ مَالِكٍ، عَنْ إِسْحَاقَ بْنِ عَبْدِ اللَّهِ بْنِ أَبِي طَلْحَةَ، عَنْ أَنَسِ بْنِ مَالِكٍ، أَنَّهُ قَالَ كُنَّا نُصَلِّي الْعَصْرَ ثُمَّ يَخْرُجُ الإِنْسَانُ إِلَى بَنِي عَمْرِو بْنِ عَوْفٍ فَيَجِدُهُمْ يُصَلُّونَ الْعَصْرَ ‏.‏"
+    },
+    {
+      "id": "malik:100",
+      "collection": "malik",
+      "number": "100",
+      "grade": "Mauquf Sahih",
+      "gradeApplicable": true,
+      "gradeSource": "quranlab/hadith",
+      "gradeBasis": "row",
+      "attribution": "Hadith text and grades: QuranLab (quranlab/hadith on Hugging Face), Arabic matn public domain per the dataset card",
+      "license": "Dataset card: license \"other\", license_name \"mixed-per-row-pd-arabic-and-reference\"",
+      "licenseUrl": "https://huggingface.co/datasets/quranlab/hadith",
+      "sourceUrl": "https://sunnah.com/malik:100",
+      "textHash": "6e7d54835582abd440cef3ef389649e496ad0dc284e291c04801213c3dd3cf61",
+      "textDisplay": "وَحَدَّثَنِي عَنْ مَالِكٍ، عَنْ نَافِعٍ، أَنَّ عَبْدَ اللَّهِ بْنَ عُمَرَ، كَانَ إِذَا اغْتَسَلَ مِنَ الْجَنَابَةِ بَدَأَ فَأَفْرَغَ عَلَى يَدِهِ الْيُمْنَى فَغَسَلَهَا ثُمَّ غَسَلَ فَرْجَهُ ثُمَّ مَضْمَضَ وَاسْتَنْثَرَ ثُمَّ غَسَلَ وَجْهَهُ وَنَضَحَ فِي عَيْنَيْهِ ثُمَّ غَسَلَ يَدَهُ الْيُمْنَى ثُمَّ الْيُسْرَى ثُمَّ غَسَلَ رَأْسَهُ ثُمَّ اغْتَسَلَ وَأَفَاضَ عَلَيْهِ الْمَاءَ ‏.‏"
+    },
+    {
       "id": "malik:1290",
       "collection": "malik",
       "number": "1290",
@@ -476,6 +523,111 @@
       "sourceUrl": "https://sunnah.com/malik:1290",
       "textHash": "d80544d115e1f064950fcbb8f8165494e7452dacfd3589f131bcfb1a9d25a973",
       "textDisplay": "حَدَّثَنِي يَحْيَى، عَنْ مَالِكٍ، عَنِ الثِّقَةِ، عِنْدَهُ عَنْ عَمْرِو بْنِ شُعَيْبٍ، عَنْ أَبِيهِ، عَنْ جَدِّهِ، أَنَّ رَسُولَ اللَّهِ صلى الله عليه وسلم نَهَى عَنْ بَيْعِ الْعُرْبَانِ ‏.‏ قَالَ مَالِكٌ: وَذلِكَ فِيمَا نُرَى - وَاللهُ أَعْلَمُ - أَنْ يَشْتَرِيَ الرَّجُلُ الْعَبْدَ، أَوِ الْوَلِيدَةَ. أَوْ يَتَكَارَى الدَّابَّةَ. ثُمَّ يَقُولُ لِلَّذِي اشْتَرَى مِنْهُ، أَوْ تَكَارَى مِنْهُ: أُعْطِيكَ دِينَاراً، أَوْ دِرْهَماً، أَوْ أَكْثَرَ مِنْ ذلِكَ، أَوْ أَقَلَّ. عَلَى أَنِّي إِنْ أَخَذْتُ السِّلْعَةَ، أَوْ رَكِبْتُ مَا تَكَارَيْتُ مِنْكَ، فَالَّذِي أَعْطَيْتُكَ هُوَ مِنْ ثَمَنِ السِّلْعَةِ. أَوْ مِنْ كِرَاءِ الدَّابَّةِ، وَإِنْ تَرَكْتُ ابْتِيَاعَ السِّلْعَةِ، أَوْ كِرَاءَ الدَّابَّةِ، فَمَا أَعْطَيْتُكَ لَكَ بَاطِلٌ بِغَيْرِ شَيْءٍ. قَالَ مَالِكٌ: وَالْأَمْرُ عِنْدَنَا، أَنَّهُ لاَ بَأْسَ بِأَنْ يَبْتَاعَ الْعَبْدَ التَّاجِرَ الْفَصِيحَ، بِالْأَعْبُدِ مِنَ الْحَبَشَةِ، أَوْ مِنْ جِنْسٍ مِنَ الْأَجْنَاسِ، لَيْسُوا مِثْلَهُ فِي الْفَصَاحَةِ، وَلاَ فِي التِّجَارَةِ، وَالنَّفَاذِ، وَالْمَعْرِفَةِ. لاَ بَأْسَ بِهذَا، أَنْ يَشْتَرِيَ مِنْهُ الْعَبْدَ بِالْعَبْدَيْنِ، أَوْ بِالْأَعْبُدِ إِلَى أَجَلٍ مَعْلُومٍ. إِذَا اخْتَلَفَ، فَبَانَ اخْتِلاَفُهُ .فَإِنْ أَشْبَهَ بَعْضُ ذلِكَ بَعْضاً، حَتَّى يَتَقَارَبَ، فَلاَ تَأْخُذَنْ مِنْهُ اثْنَيْنِ بِوَاحِدٍ، إِلَى أَجَلٍ. وَإِنِ اخْتَلَفَتْ أَجْنَاسُهُمْ. قَالَ مَالِكٌ: وَلاَ بَأْسَ بِأَنْ تَبِيعَ مَا اشْتَرَيْتَ مِنْ ذلِكَ، قَبْلَ أَنْ تَسْتَوْفِيَهُ. إِذَا انْتَقَدْتَ ثَمَنَهُ مِنْ غَيْرِ صَاحِبِهِ الَّذِي اشْتَرَيْتَهُ مِنْهُ. قَالَ مَالِكٌ: لاَ يَنْبَغِي أَنْ يُسْتَثْنَى جَنِينٌ فِي بَطْنِ أُمِّهِ، إِذَا بِيعَتْ. لِأَنَّ ذلِكَ غَرَرٌ. لاَ يُدْرَى أَذَكَرٌ هُوَ أَمْ (1) أُنْثَى أو حَسَنٌ (2) أَوْ قَبِيحٌ، أَوْ نَاقِصٌ، أَوْ تَامٌّ، أَوْ حَيٌّ أَوْ مَيِّتٌ؟. وَذلِكَ يَضَعُ مِنْ ثَمَنِهَا. قَالَ مَالِكٌ، فِي الرَّجُلِ يَبْتَاعُ الْعَبْدَ، أَوِ الْوَلِيدَةَ، بِمِائَةِ دِينَارٍ إِلَى أَجَلٍ. ثُمَّ يَنْدَمُ الْبَائِعُ. فَيَسْأَلُ الْمُبْتَاعَ أَنْ يُقِيلَهُ بِعَشَرَةِ دَنَانِيرَ، يَدْفَعُهَا إِلَيْهِ نَقْداً. أَوْ إِلَى أَجَلٍ. وَيَمْحُو عَنْهُ الْمِائَةَ دِينَارٍ الَّتِي لَهُ. قَالَ مَالِكٌ: لاَ بَأْسَ بِذلِكَ. وَإِنْ نَدِمَ الْمُبْتَاعُ، فَسَأَلَ الْبَائِعَ أَنْ يُقِيلَهُ فِي الْجَارِيَةِ، أَوِ الْعَبْدِ، وَيَزِيدَهُ عَشَرَةَ دَنَانِيرَ نَقْداً، أَوْ إِلَى أَجَلٍ أَبْعَدَ مِنَ الْأَجَلِ الَّذِي اشْتَرَى إِلَيْهِ الْعَبْدَ، أَوِ الْوَلِيدَةَ. فَإِنَّ ذلِكَ لاَ يَنْبَغِي. وَإِنَّمَا كَرِهَ ذلِكَ؛ لِأَنَّ الْبَائِعَ كَأَنَّهُ بَاعَ مِنْهُ مِائَةَ دِينَارٍ لَهُ، إِلَى سَنَةٍ قَبْلَ أَنْ تَحِلَّ، بِجَارِيَةٍ، وَبِعَشَرَةِ دَنَانِيرَ نَقْداً. أَوْ إِلَى أَجَلٍ أَبْعَدَ مِنَ السَّنَةِ. فَدَخَلَ فِي ذلِكَ بَيْعُ الذَّهَبِ بِالذَّهَبِ إِلَى أَجَلٍ. قَالَ مَالِكٌ، فِي الرَّجُلِ يَبِيعُ مِنَ الرَّجُلِ الْجَارِيَةَ بِمِائَةِ دِينَارٍ إِلَى أَجَلٍ، ثُمَّ يَشْتَرِيهَا بِأَكْثَرَ مِنْ ذلِكَ الثَّمَنِ الَّذِي بَاعَهَا بِهِ إِلَى أَبْعَدَ مِنْ ذلِكَ الْأَجَلِ، الَّذِي بَاعَهَا إِلَيْهِ: إِنَّ ذلِكَ لاَ يَصْلُحُ. وَتَفْسِيرُ مَا كَرِهَ مِنْ ذلِكَ، أَنْ يَبِيعَ الرَّجُلُ الْجَارِيَةَ إِلَى أَجَلٍ. ثُمَّ يَبْتَاعُهَا إِلَى أَجَلٍ أَبْعَدَ مِنْهُ. يَبِيعُهَا بِثَلاَثِينَ دِينَاراً إِلَى شَهْرٍ، ثُمَّ يَبْتَاعُهَا بِسِتِّينَ دِينَاراً، إِلَى سَنَةٍ، أَوْ إِلَى نِصْفِ سَنَةٍ. فَصَارَ، إِنْ رَجَعَتْ إِلَيْهِ سِلْعَتُهُ بِعَيْنِهَا، وَأَعْطَاهُ صَاحِبُهُ ثَلاَثِينَ دِينَاراً، إِلَى شَهْرٍ؛ بِسِتِّينَ دِينَاراً، إِلَى سَنَةٍ، أَوْ إِلَى نِصْفِ سَنَةٍ. فَهذَا لاَ يَنْبَغِي"
+    },
+    {
+      "id": "nasai:1",
+      "collection": "nasai",
+      "number": "1",
+      "grade": "Sahih / Sahih / Sahih Muslim",
+      "gradeApplicable": true,
+      "gradeSource": "quranlab/hadith",
+      "gradeBasis": "row",
+      "attribution": "Hadith text and grades: QuranLab (quranlab/hadith on Hugging Face), Arabic matn public domain per the dataset card",
+      "license": "Dataset card: license \"other\", license_name \"mixed-per-row-pd-arabic-and-reference\"",
+      "licenseUrl": "https://huggingface.co/datasets/quranlab/hadith",
+      "sourceUrl": "https://sunnah.com/nasai:1",
+      "textHash": "6cba575c928b861c6371a200e450e11c4fd035b19f2bd0b816b8ea5832c99ff1",
+      "textDisplay": "أَخْبَرَنَا قُتَيْبَةُ بْنُ سَعِيدٍ، قَالَ حَدَّثَنَا سُفْيَانُ، عَنِ الزُّهْرِيِّ، عَنْ أَبِي سَلَمَةَ، عَنْ أَبِي هُرَيْرَةَ، أَنَّ النَّبِيَّ صلى الله عليه وسلم قَالَ ‏ \"‏ إِذَا اسْتَيْقَظَ أَحَدُكُمْ مِنْ نَوْمِهِ فَلاَ يَغْمِسْ يَدَهُ فِي وَضُوئِهِ حَتَّى يَغْسِلَهَا ثَلاَثًا فَإِنَّ أَحَدَكُمْ لاَ يَدْرِي أَيْنَ بَاتَتْ يَدُهُ ‏\"‏ ‏.‏"
+    },
+    {
+      "id": "nasai:10",
+      "collection": "nasai",
+      "number": "10",
+      "grade": "Sahih / Sahih / Hasan",
+      "gradeApplicable": true,
+      "gradeSource": "quranlab/hadith",
+      "gradeBasis": "row",
+      "attribution": "Hadith text and grades: QuranLab (quranlab/hadith on Hugging Face), Arabic matn public domain per the dataset card",
+      "license": "Dataset card: license \"other\", license_name \"mixed-per-row-pd-arabic-and-reference\"",
+      "licenseUrl": "https://huggingface.co/datasets/quranlab/hadith",
+      "sourceUrl": "https://sunnah.com/nasai:10",
+      "textHash": "2a7b3bc2f3d733ddd40e7cdf550cd47108529b4a7c6981402c3f6ed04ac52a61",
+      "textDisplay": "أَخْبَرَنَا مُحَمَّدُ بْنُ عَبْدِ الأَعْلَى، قَالَ حَدَّثَنَا الْمُعْتَمِرُ، قَالَ سَمِعْتُ مَعْمَرًا، عَنِ الزُّهْرِيِّ، عَنْ سَعِيدِ بْنِ الْمُسَيَّبِ، عَنْ أَبِي هُرَيْرَةَ، قَالَ قَالَ رَسُولُ اللَّهِ صلى الله عليه وسلم ‏ \"‏ خَمْسٌ مِنَ الْفِطْرَةِ قَصُّ الشَّارِبِ وَنَتْفُ الإِبْطِ وَتَقْلِيمُ الأَظْفَارِ وَالاِسْتِحْدَادُ وَالْخِتَانُ ‏\"‏ ‏.‏"
+    },
+    {
+      "id": "nasai:100",
+      "collection": "nasai",
+      "number": "100",
+      "grade": "Sahih Isnaad / Sahih Isnaad / Hasan",
+      "gradeApplicable": true,
+      "gradeSource": "quranlab/hadith",
+      "gradeBasis": "row",
+      "attribution": "Hadith text and grades: QuranLab (quranlab/hadith on Hugging Face), Arabic matn public domain per the dataset card",
+      "license": "Dataset card: license \"other\", license_name \"mixed-per-row-pd-arabic-and-reference\"",
+      "licenseUrl": "https://huggingface.co/datasets/quranlab/hadith",
+      "sourceUrl": "https://sunnah.com/nasai:100",
+      "textHash": "b0c6486e41afc5fc6ad19f6f508677d58119533542a7f70c083eada769650a62",
+      "textDisplay": "أَخْبَرَنَا الْحُسَيْنُ بْنُ حُرَيْثٍ، قَالَ حَدَّثَنَا الْفَضْلُ بْنُ مُوسَى، عَنْ جُعَيْدِ بْنِ عَبْدِ الرَّحْمَنِ، قَالَ أَخْبَرَنِي عَبْدُ الْمَلِكِ بْنُ مَرْوَانَ بْنِ الْحَارِثِ بْنِ أَبِي ذُبَابٍ، قَالَ أَخْبَرَنِي أَبُو عَبْدِ اللَّهِ، سَالِمٌ سَبَلاَنُ قَالَ وَكَانَتْ عَائِشَةُ تَسْتَعْجِبُ بِأَمَانَتِهِ وَتَسْتَأْجِرُهُ فَأَرَتْنِي كَيْفَ كَانَ رَسُولُ اللَّهِ صلى الله عليه وسلم يَتَوَضَّأُ فَتَمَضْمَضَتْ وَاسْتَنْثَرَتْ ثَلاَثًا وَغَسَلَتْ وَجْهَهَا ثَلاَثًا ثُمَّ غَسَلَتْ يَدَهَا الْيُمْنَى ثَلاَثًا وَالْيُسْرَى ثَلاَثًا وَوَضَعَتْ يَدَهَا فِي مُقَدَّمِ رَأْسِهَا ثُمَّ مَسَحَتْ رَأْسَهَا مَسْحَةً وَاحِدَةً إِلَى مُؤَخَّرِهِ ثُمَّ أَمَرَّتْ يَدَيْهَا بِأُذُنَيْهَا ثُمَّ مَرَّتْ عَلَى الْخَدَّيْنِ قَالَ سَالِمٌ كُنْتُ آتِيهَا مُكَاتَبًا مَا تَخْتَفِي مِنِّي فَتَجْلِسُ بَيْنَ يَدَىَّ وَتَتَحَدَّثُ مَعِي حَتَّى جِئْتُهَا ذَاتَ يَوْمٍ فَقُلْتُ ادْعِي لِي بِالْبَرَكَةِ يَا أُمَّ الْمُؤْمِنِينَ ‏.‏ قَالَتْ وَمَا ذَاكَ قُلْتُ أَعْتَقَنِي اللَّهُ ‏.‏ قَالَتْ بَارَكَ اللَّهُ لَكَ ‏.‏ وَأَرْخَتِ الْحِجَابَ دُونِي فَلَمْ أَرَهَا بَعْدَ ذَلِكَ الْيَوْمِ ‏.‏"
+    },
+    {
+      "id": "quran:10",
+      "collection": "quran",
+      "number": "10",
+      "grade": null,
+      "gradeApplicable": false,
+      "gradeSource": "tanzil/quran-uthmani",
+      "gradeBasis": "none",
+      "attribution": "Qur'an text: Tanzil (tanzil.net), distributed unmodified under the Tanzil terms of use",
+      "license": "Tanzil Terms of Use — free for non-commercial redistribution provided it is distributed unmodified and marked as Tanzil",
+      "licenseUrl": "https://tanzil.net/res/terms-of-use",
+      "sourceUrl": "https://tanzil.net/pub/download/index.php?quranType=uthmani&outType=txt&agree=true",
+      "textHash": "aef1994a31784ca13a984836fbecbe761618f8307f13336afc68c2764df758a2",
+      "textDisplay": "ٱلَّذِينَ يُؤْمِنُونَ بِٱلْغَيْبِ وَيُقِيمُونَ ٱلصَّلَوٰةَ وَمِمَّا رَزَقْنَٰهُمْ يُنفِقُونَ"
+    },
+    {
+      "id": "quran:100",
+      "collection": "quran",
+      "number": "100",
+      "grade": null,
+      "gradeApplicable": false,
+      "gradeSource": "tanzil/quran-uthmani",
+      "gradeBasis": "none",
+      "attribution": "Qur'an text: Tanzil (tanzil.net), distributed unmodified under the Tanzil terms of use",
+      "license": "Tanzil Terms of Use — free for non-commercial redistribution provided it is distributed unmodified and marked as Tanzil",
+      "licenseUrl": "https://tanzil.net/res/terms-of-use",
+      "sourceUrl": "https://tanzil.net/pub/download/index.php?quranType=uthmani&outType=txt&agree=true",
+      "textHash": "e04ce8b9cedf93c1f588a05d4ef713f8bf577a36d083badeb3a824a04c332d3d",
+      "textDisplay": "وَإِذْ أَخَذْنَا مِيثَٰقَكُمْ وَرَفَعْنَا فَوْقَكُمُ ٱلطُّورَ خُذُوا۟ مَآ ءَاتَيْنَٰكُم بِقُوَّةٍ وَٱسْمَعُوا۟ قَالُوا۟ سَمِعْنَا وَعَصَيْنَا وَأُشْرِبُوا۟ فِى قُلُوبِهِمُ ٱلْعِجْلَ بِكُفْرِهِمْ قُلْ بِئْسَمَا يَأْمُرُكُم بِهِۦٓ إِيمَٰنُكُمْ إِن كُنتُم مُّؤْمِنِينَ"
+    },
+    {
+      "id": "tirmidhi:1",
+      "collection": "tirmidhi",
+      "number": "1",
+      "grade": "Sahih / Sahih / Sahih - Bukhari And Muslim",
+      "gradeApplicable": true,
+      "gradeSource": "quranlab/hadith",
+      "gradeBasis": "row",
+      "attribution": "Hadith text and grades: QuranLab (quranlab/hadith on Hugging Face), Arabic matn public domain per the dataset card",
+      "license": "Dataset card: license \"other\", license_name \"mixed-per-row-pd-arabic-and-reference\"",
+      "licenseUrl": "https://huggingface.co/datasets/quranlab/hadith",
+      "sourceUrl": "https://sunnah.com/tirmidhi:1",
+      "textHash": "f7f703b842fe8dd4d84341abf04210784968fc5501d1a3b7faf9985cb9759b96",
+      "textDisplay": "حَدَّثَنَا قُتَيْبَةُ بْنُ سَعِيدٍ، حَدَّثَنَا أَبُو عَوَانَةَ، عَنْ سِمَاكِ بْنِ حَرْبٍ، ح وَحَدَّثَنَا هَنَّادٌ، حَدَّثَنَا وَكِيعٌ، عَنْ إِسْرَائِيلَ، عَنْ سِمَاكٍ، عَنْ مُصْعَبِ بْنِ سَعْدٍ، عَنِ ابْنِ عُمَرَ، عَنِ النَّبِيِّ صلى الله عليه وسلم قَالَ ‏\"‏ لاَ تُقْبَلُ صَلاَةٌ بِغَيْرِ طُهُورٍ وَلاَ صَدَقَةٌ مِنْ غُلُولٍ ‏\"‏ ‏.‏ قَالَ هَنَّادٌ فِي حَدِيثِهِ ‏\"‏ إِلاَّ بِطُهُورٍ ‏\"‏ ‏.‏ قَالَ أَبُو عِيسَى هَذَا الْحَدِيثُ أَصَحُّ شَيْءٍ فِي هَذَا الْبَابِ وَأَحْسَنُ ‏.‏ وَفِي الْبَابِ عَنْ أَبِي الْمَلِيحِ عَنْ أَبِيهِ وَأَبِي هُرَيْرَةَ وَأَنَسٍ ‏.‏ وَأَبُو الْمَلِيحِ بْنُ أُسَامَةَ اسْمُهُ عَامِرٌ وَيُقَالُ زَيْدُ بْنُ أُسَامَةَ بْنِ عُمَيْرٍ الْهُذَلِيُّ ‏.‏"
+    },
+    {
+      "id": "tirmidhi:10",
+      "collection": "tirmidhi",
+      "number": "10",
+      "grade": "Daif Isnaad / Daif Isnaad / Daif / Daif",
+      "gradeApplicable": true,
+      "gradeSource": "quranlab/hadith",
+      "gradeBasis": "row",
+      "attribution": "Hadith text and grades: QuranLab (quranlab/hadith on Hugging Face), Arabic matn public domain per the dataset card",
+      "license": "Dataset card: license \"other\", license_name \"mixed-per-row-pd-arabic-and-reference\"",
+      "licenseUrl": "https://huggingface.co/datasets/quranlab/hadith",
+      "sourceUrl": "https://sunnah.com/tirmidhi:10",
+      "textHash": "bc4f4764418eebc337dfb715763560d792714340c8fb60f89ca4492f1bfd4512",
+      "textDisplay": "وَقَدْ رَوَى هَذَا الْحَدِيثَ ابْنُ لَهِيعَةَ، عَنْ أَبِي الزُّبَيْرِ، عَنْ جَابِرٍ، عَنْ أَبِي قَتَادَةَ، أَنَّهُ رَأَى النَّبِيَّ صلى الله عليه وسلم يَبُولُ مُسْتَقْبِلَ الْقِبْلَةِ ‏.‏ حَدَّثَنَا بِذَلِكَ قُتَيْبَةُ حَدَّثَنَا ابْنُ لَهِيعَةَ ‏.‏ وَحَدِيثُ جَابِرٍ عَنِ النَّبِيِّ صلى الله عليه وسلم أَصَحُّ مِنْ حَدِيثِ ابْنِ لَهِيعَةَ ‏.‏ وَابْنُ لَهِيعَةَ ضَعِيفٌ عِنْدَ أَهْلِ الْحَدِيثِ ضَعَّفَهُ يَحْيَى بْنُ سَعِيدٍ الْقَطَّانُ وَغَيْرُهُ مِنْ قِبَلِ حِفْظِهِ ‏.‏"
     }
   ],
   "cases": [
@@ -1050,114 +1202,6 @@
       "id": "redteam-022",
       "classId": "letter_transposed",
       "mutation": "letter_transposed",
-      "note": "Two adjacent letters swapped in abudawud:10. One edit from the source under a Damerau metric; a different string under containment.",
-      "quote": "قَلاَ نَهَى رَسُولُ اللَّهِ صلى الله عليه وسلم أَنْ نَسْتَقْبِلَ الْقِبْلَتَيْنِ بِبَوْلٍ",
-      "citation": {
-        "collection": "abudawud",
-        "number": "10",
-        "grade": null,
-        "raw": "abudawud:10"
-      },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "Swapping two adjacent letters reorders the string. An edit-distance metric would call that one edit; containment calls it a different string.",
-      "anchorId": "abudawud:10",
-      "anchorText": "نَهَى رَسُولُ اللَّهِ صلى الله عليه وسلم أَنْ",
-      "adjudication": {
-        "caseId": "redteam-022",
-        "anchor": "abudawud:10",
-        "adjudicatedVerdict": "rejected",
-        "adjudicatedReason": "quote_absent_at_cited_id",
-        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
-        "decidedBy": "mizan team lead (architecture review)",
-        "decidedOn": "2026-09-28"
-      }
-    },
-    {
-      "id": "redteam-023",
-      "classId": "letter_transposed",
-      "mutation": "letter_transposed",
-      "note": "Two adjacent letters swapped in abudawud:100. One edit from the source under a Damerau metric; a different string under containment.",
-      "quote": "قَلاَ جَاءَنَا رَسُولُ اللَّهِ صلى الله عليه وسلم فَأَخْرَجْنَا لَهُ مَاءً فِي",
-      "citation": {
-        "collection": "abudawud",
-        "number": "100",
-        "grade": null,
-        "raw": "abudawud:100"
-      },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "Swapping two adjacent letters reorders the string. An edit-distance metric would call that one edit; containment calls it a different string.",
-      "anchorId": "abudawud:100",
-      "anchorText": "جَاءَنَا رَسُولُ اللَّهِ صلى الله عليه وسلم فَأَخْرَجْنَا",
-      "adjudication": {
-        "caseId": "redteam-023",
-        "anchor": "abudawud:100",
-        "adjudicatedVerdict": "rejected",
-        "adjudicatedReason": "quote_absent_at_cited_id",
-        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
-        "decidedBy": "mizan team lead (architecture review)",
-        "decidedOn": "2026-09-28"
-      }
-    },
-    {
-      "id": "redteam-024",
-      "classId": "letter_transposed",
-      "mutation": "letter_transposed",
-      "note": "Two adjacent letters swapped in abudawud:1000. One edit from the source under a Damerau metric; a different string under containment.",
-      "quote": "قَلاَ دَخَلَ عَلَيْنَا رَسُولُ اللَّهِ صلى الله عليه وسلم وَالنَّاسُ رَافِعُو أَيْدِيهِمْ",
-      "citation": {
-        "collection": "abudawud",
-        "number": "1000",
-        "grade": null,
-        "raw": "abudawud:1000"
-      },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "Swapping two adjacent letters reorders the string. An edit-distance metric would call that one edit; containment calls it a different string.",
-      "anchorId": "abudawud:1000",
-      "anchorText": "دَخَلَ عَلَيْنَا رَسُولُ اللَّهِ صلى الله عليه وسلم",
-      "adjudication": {
-        "caseId": "redteam-024",
-        "anchor": "abudawud:1000",
-        "adjudicatedVerdict": "rejected",
-        "adjudicatedReason": "quote_absent_at_cited_id",
-        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
-        "decidedBy": "mizan team lead (architecture review)",
-        "decidedOn": "2026-09-28"
-      }
-    },
-    {
-      "id": "redteam-025",
-      "classId": "letter_transposed",
-      "mutation": "letter_transposed",
-      "note": "Two adjacent letters swapped in abudawud:1001. One edit from the source under a Damerau metric; a different string under containment.",
-      "quote": "قَلاَ أَمَرَنَا النَّبِيُّ صلى الله عليه وسلم أَنْ نَرُدَّ عَلَى الإِمَامِ وَأَنْ",
-      "citation": {
-        "collection": "abudawud",
-        "number": "1001",
-        "grade": null,
-        "raw": "abudawud:1001"
-      },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "Swapping two adjacent letters reorders the string. An edit-distance metric would call that one edit; containment calls it a different string.",
-      "anchorId": "abudawud:1001",
-      "anchorText": "أَمَرَنَا النَّبِيُّ صلى الله عليه وسلم أَنْ نَرُدَّ",
-      "adjudication": {
-        "caseId": "redteam-025",
-        "anchor": "abudawud:1001",
-        "adjudicatedVerdict": "rejected",
-        "adjudicatedReason": "quote_absent_at_cited_id",
-        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
-        "decidedBy": "mizan team lead (architecture review)",
-        "decidedOn": "2026-09-28"
-      }
-    },
-    {
-      "id": "redteam-026",
-      "classId": "letter_transposed",
-      "mutation": "letter_transposed",
       "note": "Two adjacent letters swapped in ibnmajah:1. One edit from the source under a Damerau metric; a different string under containment.",
       "quote": "حَدَّثَنَا شَرِكيٌ عَنِ الأَعْمَشِ عَنْ أَبِي صَالِحٍ عَنْ أَبِي هُرَيْرَةَ",
       "citation": {
@@ -1172,7 +1216,7 @@
       "anchorId": "ibnmajah:1",
       "anchorText": "عَنِ الأَعْمَشِ عَنْ أَبِي صَالِحٍ عَنْ أَبِي هُرَيْرَةَ",
       "adjudication": {
-        "caseId": "redteam-026",
+        "caseId": "redteam-022",
         "anchor": "ibnmajah:1",
         "adjudicatedVerdict": "rejected",
         "adjudicatedReason": "quote_absent_at_cited_id",
@@ -1182,7 +1226,142 @@
       }
     },
     {
+      "id": "redteam-023",
+      "classId": "letter_transposed",
+      "mutation": "letter_transposed",
+      "note": "Two adjacent letters swapped in malik:1. One edit from the source under a Damerau metric; a different string under containment.",
+      "quote": "أَخَّرَ لاصَّلاَةَ يَوْمًا فَدَخَلَ عَلَيْهِ عُرْوَةُ بْنُ الزُّبَيْرِ فَأَخْبَرَهُ أَنَّ الْمُغِيرَةَ بْنَ",
+      "citation": {
+        "collection": "malik",
+        "number": "1",
+        "grade": null,
+        "raw": "malik:1"
+      },
+      "expectedVerdict": "rejected",
+      "expectedReason": "quote_absent_at_cited_id",
+      "expectedRationale": "Swapping two adjacent letters reorders the string. An edit-distance metric would call that one edit; containment calls it a different string.",
+      "anchorId": "malik:1",
+      "anchorText": "يَوْمًا فَدَخَلَ عَلَيْهِ عُرْوَةُ بْنُ الزُّبَيْرِ فَأَخْبَرَهُ أَنَّ",
+      "adjudication": {
+        "caseId": "redteam-023",
+        "anchor": "malik:1",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
+    },
+    {
+      "id": "redteam-024",
+      "classId": "letter_transposed",
+      "mutation": "letter_transposed",
+      "note": "Two adjacent letters swapped in nasai:1. One edit from the source under a Damerau metric; a different string under containment.",
+      "quote": "إِذَا ساْتَيْقَظَ أَحَدُكُمْ مِنْ نَوْمِهِ فَلاَ يَغْمِسْ يَدَهُ فِي وَضُوئِهِ حَتَّى يَغْسِلَهَا",
+      "citation": {
+        "collection": "nasai",
+        "number": "1",
+        "grade": null,
+        "raw": "nasai:1"
+      },
+      "expectedVerdict": "rejected",
+      "expectedReason": "quote_absent_at_cited_id",
+      "expectedRationale": "Swapping two adjacent letters reorders the string. An edit-distance metric would call that one edit; containment calls it a different string.",
+      "anchorId": "nasai:1",
+      "anchorText": "أَحَدُكُمْ مِنْ نَوْمِهِ فَلاَ يَغْمِسْ يَدَهُ فِي وَضُوئِهِ",
+      "adjudication": {
+        "caseId": "redteam-024",
+        "anchor": "nasai:1",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
+    },
+    {
+      "id": "redteam-025",
+      "classId": "letter_transposed",
+      "mutation": "letter_transposed",
+      "note": "Two adjacent letters swapped in quran:10. One edit from the source under a Damerau metric; a different string under containment.",
+      "quote": "ٱلَّذِنيَ يُؤْمِنُونَ بِٱلْغَيْبِ وَيُقِيمُونَ ٱلصَّلَوٰةَ وَمِمَّا رَزَقْنَٰهُمْ يُنفِقُونَ",
+      "citation": {
+        "collection": "quran",
+        "number": "10",
+        "grade": null,
+        "raw": "quran:10"
+      },
+      "expectedVerdict": "rejected",
+      "expectedReason": "quote_absent_at_cited_id",
+      "expectedRationale": "Swapping two adjacent letters reorders the string. An edit-distance metric would call that one edit; containment calls it a different string.",
+      "anchorId": "quran:10",
+      "anchorText": "يُؤْمِنُونَ بِٱلْغَيْبِ وَيُقِيمُونَ ٱلصَّلَوٰةَ وَمِمَّا رَزَقْنَٰهُمْ يُنفِقُونَ",
+      "adjudication": {
+        "caseId": "redteam-025",
+        "anchor": "quran:10",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
+    },
+    {
+      "id": "redteam-026",
+      "classId": "letter_transposed",
+      "mutation": "letter_transposed",
+      "note": "Two adjacent letters swapped in tirmidhi:1. One edit from the source under a Damerau metric; a different string under containment.",
+      "quote": "وَأَبُو لاْمَلِيحِ بْنُ أُسَامَةَ اسْمُهُ عَامِرٌ وَيُقَالُ زَيْدُ بْنُ أُسَامَةَ بْنِ عُمَيْرٍ",
+      "citation": {
+        "collection": "tirmidhi",
+        "number": "1",
+        "grade": null,
+        "raw": "tirmidhi:1"
+      },
+      "expectedVerdict": "rejected",
+      "expectedReason": "quote_absent_at_cited_id",
+      "expectedRationale": "Swapping two adjacent letters reorders the string. An edit-distance metric would call that one edit; containment calls it a different string.",
+      "anchorId": "tirmidhi:1",
+      "anchorText": "بْنُ أُسَامَةَ اسْمُهُ عَامِرٌ وَيُقَالُ زَيْدُ بْنُ أُسَامَةَ",
+      "adjudication": {
+        "caseId": "redteam-026",
+        "anchor": "tirmidhi:1",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
+    },
+    {
       "id": "redteam-027",
+      "classId": "letter_transposed",
+      "mutation": "letter_transposed",
+      "note": "Two adjacent letters swapped in abudawud:10. One edit from the source under a Damerau metric; a different string under containment.",
+      "quote": "قَلاَ نَهَى رَسُولُ اللَّهِ صلى الله عليه وسلم أَنْ نَسْتَقْبِلَ الْقِبْلَتَيْنِ بِبَوْلٍ",
+      "citation": {
+        "collection": "abudawud",
+        "number": "10",
+        "grade": null,
+        "raw": "abudawud:10"
+      },
+      "expectedVerdict": "rejected",
+      "expectedReason": "quote_absent_at_cited_id",
+      "expectedRationale": "Swapping two adjacent letters reorders the string. An edit-distance metric would call that one edit; containment calls it a different string.",
+      "anchorId": "abudawud:10",
+      "anchorText": "نَهَى رَسُولُ اللَّهِ صلى الله عليه وسلم أَنْ",
+      "adjudication": {
+        "caseId": "redteam-027",
+        "anchor": "abudawud:10",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
+    },
+    {
+      "id": "redteam-028",
       "classId": "letter_transposed",
       "mutation": "letter_transposed",
       "note": "Two adjacent letters swapped in ibnmajah:10. One edit from the source under a Damerau metric; a different string under containment.",
@@ -1199,35 +1378,8 @@
       "anchorId": "ibnmajah:10",
       "anchorText": "يَزَالُ طَائِفَةٌ مِنْ أُمَّتِي عَلَى الْحَقِّ مَنْصُورِينَ لاَ",
       "adjudication": {
-        "caseId": "redteam-027",
-        "anchor": "ibnmajah:10",
-        "adjudicatedVerdict": "rejected",
-        "adjudicatedReason": "quote_absent_at_cited_id",
-        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
-        "decidedBy": "mizan team lead (architecture review)",
-        "decidedOn": "2026-09-28"
-      }
-    },
-    {
-      "id": "redteam-028",
-      "classId": "letter_transposed",
-      "mutation": "letter_transposed",
-      "note": "Two adjacent letters swapped in ibnmajah:100. One edit from the source under a Damerau metric; a different string under containment.",
-      "quote": "أَبُو بَكْرٍ وَعُمَرُ سَيِّدَا كُهُلوِ أَهْلِ الْجَنَّةِ مِنَ الأَوَّلِينَ وَالآخِرِينَ إِلاَّ النَّبِيِّينَ",
-      "citation": {
-        "collection": "ibnmajah",
-        "number": "100",
-        "grade": null,
-        "raw": "ibnmajah:100"
-      },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "Swapping two adjacent letters reorders the string. An edit-distance metric would call that one edit; containment calls it a different string.",
-      "anchorId": "ibnmajah:100",
-      "anchorText": "أَهْلِ الْجَنَّةِ مِنَ الأَوَّلِينَ وَالآخِرِينَ إِلاَّ النَّبِيِّينَ",
-      "adjudication": {
         "caseId": "redteam-028",
-        "anchor": "ibnmajah:100",
+        "anchor": "ibnmajah:10",
         "adjudicatedVerdict": "rejected",
         "adjudicatedReason": "quote_absent_at_cited_id",
         "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
@@ -1251,7 +1403,7 @@
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "Stage 3 folds the two DIGIT FORMS together but never changes a digit's value, so 3 is not 4.",
       "anchorId": "abudawud:281",
-      "anchorText": "مَوْلَى بَنِي هَاشِمٍ وَطَلْقُ بْنُ حَبِيبٍ عَنِ ابْنِ",
+      "anchorText": "مَوْلَى بَنِي هَاشِمٍ وَطَلْقُ بْنُ حَبِيبٍ عَنْ ابْنِ",
       "adjudication": {
         "caseId": "redteam-029",
         "anchor": "abudawud:281",
@@ -1347,22 +1499,22 @@
       "id": "redteam-033",
       "classId": "word_inserted",
       "mutation": "word_inserted",
-      "note": "One extra word inserted into a span of abudawud:1, lengthening it past the source.",
-      "quote": "أَنَّ وَ النَّبِيَّ صلى الله عليه وسلم كَانَ إِذَا ذَهَبَ الْمَذْهَبَ",
+      "note": "One extra word inserted into a span of malik:10, lengthening it past the source.",
+      "quote": "أَنَّهُ وَ قَالَ كُنَّا نُصَلِّي الْعَصْرَ ثُمَّ يَخْرُجُ الإِنْسَانُ إِلَى بَنِي عَمْرِو بْنِ",
       "citation": {
-        "collection": "abudawud",
-        "number": "1",
+        "collection": "malik",
+        "number": "10",
         "grade": null,
-        "raw": "abudawud:1"
+        "raw": "malik:10"
       },
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "An inserted word lengthens the span, and containment is exact and contiguous.",
-      "anchorId": "abudawud:1",
-      "anchorText": "النَّبِيَّ صلى الله عليه وسلم كَانَ إِذَا ذَهَبَ",
+      "anchorId": "malik:10",
+      "anchorText": "قَالَ كُنَّا نُصَلِّي الْعَصْرَ ثُمَّ يَخْرُجُ الإِنْسَانُ إِلَى",
       "adjudication": {
         "caseId": "redteam-033",
-        "anchor": "abudawud:1",
+        "anchor": "malik:10",
         "adjudicatedVerdict": "rejected",
         "adjudicatedReason": "quote_absent_at_cited_id",
         "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
@@ -1374,22 +1526,22 @@
       "id": "redteam-034",
       "classId": "word_inserted",
       "mutation": "word_inserted",
-      "note": "One extra word inserted into a span of abudawud:10, lengthening it past the source.",
-      "quote": "قَالَ وَ نَهَى رَسُولُ اللَّهِ صلى الله عليه وسلم أَنْ نَسْتَقْبِلَ الْقِبْلَتَيْنِ بِبَوْلٍ",
+      "note": "One extra word inserted into a span of nasai:10, lengthening it past the source.",
+      "quote": "خَمْسٌ وَ مِنَ الْفِطْرَةِ قَصُّ الشَّارِبِ وَنَتْفُ الإِبْطِ وَتَقْلِيمُ الأَظْفَارِ وَالاِسْتِحْدَادُ",
       "citation": {
-        "collection": "abudawud",
+        "collection": "nasai",
         "number": "10",
         "grade": null,
-        "raw": "abudawud:10"
+        "raw": "nasai:10"
       },
       "expectedVerdict": "rejected",
       "expectedReason": "quote_absent_at_cited_id",
       "expectedRationale": "An inserted word lengthens the span, and containment is exact and contiguous.",
-      "anchorId": "abudawud:10",
-      "anchorText": "نَهَى رَسُولُ اللَّهِ صلى الله عليه وسلم أَنْ",
+      "anchorId": "nasai:10",
+      "anchorText": "مِنَ الْفِطْرَةِ قَصُّ الشَّارِبِ وَنَتْفُ الإِبْطِ وَتَقْلِيمُ الأَظْفَارِ",
       "adjudication": {
         "caseId": "redteam-034",
-        "anchor": "abudawud:10",
+        "anchor": "nasai:10",
         "adjudicatedVerdict": "rejected",
         "adjudicatedReason": "quote_absent_at_cited_id",
         "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
@@ -1399,6 +1551,60 @@
     },
     {
       "id": "redteam-035",
+      "classId": "word_inserted",
+      "mutation": "word_inserted",
+      "note": "One extra word inserted into a span of quran:100, lengthening it past the source.",
+      "quote": "وَإِذْ وَ أَخَذْنَا مِيثَٰقَكُمْ وَرَفَعْنَا فَوْقَكُمُ ٱلطُّورَ خُذُوا۟ مَآ ءَاتَيْنَٰكُم بِقُوَّةٍ وَٱسْمَعُوا۟ قَالُوا۟",
+      "citation": {
+        "collection": "quran",
+        "number": "100",
+        "grade": null,
+        "raw": "quran:100"
+      },
+      "expectedVerdict": "rejected",
+      "expectedReason": "quote_absent_at_cited_id",
+      "expectedRationale": "An inserted word lengthens the span, and containment is exact and contiguous.",
+      "anchorId": "quran:100",
+      "anchorText": "أَخَذْنَا مِيثَٰقَكُمْ وَرَفَعْنَا فَوْقَكُمُ ٱلطُّورَ خُذُوا۟ مَآ ءَاتَيْنَٰكُم",
+      "adjudication": {
+        "caseId": "redteam-035",
+        "anchor": "quran:100",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
+    },
+    {
+      "id": "redteam-036",
+      "classId": "word_inserted",
+      "mutation": "word_inserted",
+      "note": "One extra word inserted into a span of tirmidhi:10, lengthening it past the source.",
+      "quote": "وَحَدِيثُ وَ جَابِرٍ عَنِ النَّبِيِّ صلى الله عليه وسلم أَصَحُّ مِنْ حَدِيثِ ابْنِ",
+      "citation": {
+        "collection": "tirmidhi",
+        "number": "10",
+        "grade": null,
+        "raw": "tirmidhi:10"
+      },
+      "expectedVerdict": "rejected",
+      "expectedReason": "quote_absent_at_cited_id",
+      "expectedRationale": "An inserted word lengthens the span, and containment is exact and contiguous.",
+      "anchorId": "tirmidhi:10",
+      "anchorText": "جَابِرٍ عَنِ النَّبِيِّ صلى الله عليه وسلم أَصَحُّ",
+      "adjudication": {
+        "caseId": "redteam-036",
+        "anchor": "tirmidhi:10",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
+    },
+    {
+      "id": "redteam-037",
       "classId": "word_inserted",
       "mutation": "word_inserted",
       "note": "One extra word inserted into a span of abudawud:100, lengthening it past the source.",
@@ -1415,7 +1621,7 @@
       "anchorId": "abudawud:100",
       "anchorText": "جَاءَنَا رَسُولُ اللَّهِ صلى الله عليه وسلم فَأَخْرَجْنَا",
       "adjudication": {
-        "caseId": "redteam-035",
+        "caseId": "redteam-037",
         "anchor": "abudawud:100",
         "adjudicatedVerdict": "rejected",
         "adjudicatedReason": "quote_absent_at_cited_id",
@@ -1425,115 +1631,7 @@
       }
     },
     {
-      "id": "redteam-036",
-      "classId": "word_inserted",
-      "mutation": "word_inserted",
-      "note": "One extra word inserted into a span of abudawud:1000, lengthening it past the source.",
-      "quote": "قَالَ وَ دَخَلَ عَلَيْنَا رَسُولُ اللَّهِ صلى الله عليه وسلم وَالنَّاسُ رَافِعُو أَيْدِيهِمْ",
-      "citation": {
-        "collection": "abudawud",
-        "number": "1000",
-        "grade": null,
-        "raw": "abudawud:1000"
-      },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An inserted word lengthens the span, and containment is exact and contiguous.",
-      "anchorId": "abudawud:1000",
-      "anchorText": "دَخَلَ عَلَيْنَا رَسُولُ اللَّهِ صلى الله عليه وسلم",
-      "adjudication": {
-        "caseId": "redteam-036",
-        "anchor": "abudawud:1000",
-        "adjudicatedVerdict": "rejected",
-        "adjudicatedReason": "quote_absent_at_cited_id",
-        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
-        "decidedBy": "mizan team lead (architecture review)",
-        "decidedOn": "2026-09-28"
-      }
-    },
-    {
-      "id": "redteam-037",
-      "classId": "word_inserted",
-      "mutation": "word_inserted",
-      "note": "One extra word inserted into a span of abudawud:1001, lengthening it past the source.",
-      "quote": "قَالَ وَ أَمَرَنَا النَّبِيُّ صلى الله عليه وسلم أَنْ نَرُدَّ عَلَى الإِمَامِ وَأَنْ",
-      "citation": {
-        "collection": "abudawud",
-        "number": "1001",
-        "grade": null,
-        "raw": "abudawud:1001"
-      },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An inserted word lengthens the span, and containment is exact and contiguous.",
-      "anchorId": "abudawud:1001",
-      "anchorText": "أَمَرَنَا النَّبِيُّ صلى الله عليه وسلم أَنْ نَرُدَّ",
-      "adjudication": {
-        "caseId": "redteam-037",
-        "anchor": "abudawud:1001",
-        "adjudicatedVerdict": "rejected",
-        "adjudicatedReason": "quote_absent_at_cited_id",
-        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
-        "decidedBy": "mizan team lead (architecture review)",
-        "decidedOn": "2026-09-28"
-      }
-    },
-    {
       "id": "redteam-038",
-      "classId": "word_inserted",
-      "mutation": "word_inserted",
-      "note": "One extra word inserted into a span of ibnmajah:1, lengthening it past the source.",
-      "quote": "حَدَّثَنَا وَ شَرِيكٌ عَنِ الأَعْمَشِ عَنْ أَبِي صَالِحٍ عَنْ أَبِي هُرَيْرَةَ",
-      "citation": {
-        "collection": "ibnmajah",
-        "number": "1",
-        "grade": null,
-        "raw": "ibnmajah:1"
-      },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An inserted word lengthens the span, and containment is exact and contiguous.",
-      "anchorId": "ibnmajah:1",
-      "anchorText": "شَرِيكٌ عَنِ الأَعْمَشِ عَنْ أَبِي صَالِحٍ عَنْ أَبِي",
-      "adjudication": {
-        "caseId": "redteam-038",
-        "anchor": "ibnmajah:1",
-        "adjudicatedVerdict": "rejected",
-        "adjudicatedReason": "quote_absent_at_cited_id",
-        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
-        "decidedBy": "mizan team lead (architecture review)",
-        "decidedOn": "2026-09-28"
-      }
-    },
-    {
-      "id": "redteam-039",
-      "classId": "word_inserted",
-      "mutation": "word_inserted",
-      "note": "One extra word inserted into a span of ibnmajah:10, lengthening it past the source.",
-      "quote": "لاَ وَ يَزَالُ طَائِفَةٌ مِنْ أُمَّتِي عَلَى الْحَقِّ مَنْصُورِينَ لاَ يَضُرُّهُمْ مَنْ خَالَفَهُمْ",
-      "citation": {
-        "collection": "ibnmajah",
-        "number": "10",
-        "grade": null,
-        "raw": "ibnmajah:10"
-      },
-      "expectedVerdict": "rejected",
-      "expectedReason": "quote_absent_at_cited_id",
-      "expectedRationale": "An inserted word lengthens the span, and containment is exact and contiguous.",
-      "anchorId": "ibnmajah:10",
-      "anchorText": "يَزَالُ طَائِفَةٌ مِنْ أُمَّتِي عَلَى الْحَقِّ مَنْصُورِينَ لاَ",
-      "adjudication": {
-        "caseId": "redteam-039",
-        "anchor": "ibnmajah:10",
-        "adjudicatedVerdict": "rejected",
-        "adjudicatedReason": "quote_absent_at_cited_id",
-        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
-        "decidedBy": "mizan team lead (architecture review)",
-        "decidedOn": "2026-09-28"
-      }
-    },
-    {
-      "id": "redteam-040",
       "classId": "word_inserted",
       "mutation": "word_inserted",
       "note": "One extra word inserted into a span of ibnmajah:100, lengthening it past the source.",
@@ -1550,7 +1648,7 @@
       "anchorId": "ibnmajah:100",
       "anchorText": "وَ بَكْرٍ وَعُمَرُ سَيِّدَا كُهُولِ أَهْلِ الْجَنَّةِ مِنَ",
       "adjudication": {
-        "caseId": "redteam-040",
+        "caseId": "redteam-038",
         "anchor": "ibnmajah:100",
         "adjudicatedVerdict": "rejected",
         "adjudicatedReason": "quote_absent_at_cited_id",
@@ -1558,6 +1656,61 @@
         "decidedBy": "mizan team lead (architecture review)",
         "decidedOn": "2026-09-28"
       }
+    },
+    {
+      "id": "redteam-039",
+      "classId": "word_inserted",
+      "mutation": "word_inserted",
+      "note": "One extra word inserted into a span of malik:100, lengthening it past the source.",
+      "quote": "كَانَ وَ إِذَا اغْتَسَلَ مِنَ الْجَنَابَةِ بَدَأَ فَأَفْرَغَ عَلَى يَدِهِ الْيُمْنَى فَغَسَلَهَا ثُمَّ",
+      "citation": {
+        "collection": "malik",
+        "number": "100",
+        "grade": null,
+        "raw": "malik:100"
+      },
+      "expectedVerdict": "rejected",
+      "expectedReason": "quote_absent_at_cited_id",
+      "expectedRationale": "An inserted word lengthens the span, and containment is exact and contiguous.",
+      "anchorId": "malik:100",
+      "anchorText": "إِذَا اغْتَسَلَ مِنَ الْجَنَابَةِ بَدَأَ فَأَفْرَغَ عَلَى يَدِهِ",
+      "adjudication": {
+        "caseId": "redteam-039",
+        "anchor": "malik:100",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
+    },
+    {
+      "id": "redteam-040",
+      "classId": "word_inserted",
+      "mutation": "word_inserted",
+      "note": "One extra word inserted into a span of nasai:100, lengthening it past the source.",
+      "quote": "سَالِمٌ وَ سَبَلاَنُ قَالَ وَكَانَتْ عَائِشَةُ تَسْتَعْجِبُ بِأَمَانَتِهِ وَتَسْتَأْجِرُهُ فَأَرَتْنِي كَيْفَ كَانَ رَسُولُ",
+      "citation": {
+        "collection": "nasai",
+        "number": "100",
+        "grade": null,
+        "raw": "nasai:100"
+      },
+      "expectedVerdict": "rejected",
+      "expectedReason": "quote_absent_at_cited_id",
+      "expectedRationale": "An inserted word lengthens the span, and containment is exact and contiguous.",
+      "anchorId": "nasai:100",
+      "anchorText": "سَبَلاَنُ قَالَ وَكَانَتْ عَائِشَةُ تَسْتَعْجِبُ بِأَمَانَتِهِ وَتَسْتَأْجِرُهُ فَأَرَتْنِي",
+      "adjudication": {
+        "caseId": "redteam-040",
+        "anchor": "nasai:100",
+        "adjudicatedVerdict": "rejected",
+        "adjudicatedReason": "quote_absent_at_cited_id",
+        "rationale": "A human read this quote against its cited source and found the claim asserts something the source does not say: this is a fabricated span, not a re-rendering of one, so there is no faithful paraphrase to abstain about and `rejected` / `quote_absent_at_cited_id` is the correct answer — which is also the answer today's procedure gives. A close fabrication is not thereby a paraphrase. Note that most of these spans are largely real, so an anchor drawn from one will locate and MIZ-106's arm will report `unverifiable`; that movement is a property of the locator, is published as `redTeamMovement.rejectedToUnverifiable`, and does not make these claims faithful. A bad locator can only ever yield `unverifiable` or `rejected`, never `verified`.",
+        "decidedBy": "mizan team lead (architecture review)",
+        "decidedOn": "2026-09-28"
+      }
     }
-  ]
+  ],
+  "datasetDigest": "ds1:c9b35dd9ae7200e1b0152cfcb8afb80205e4500f5b40008c2e77d03ce5cc88e5"
 }

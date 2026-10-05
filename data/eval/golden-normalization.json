@@ -1,12 +1,49 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "set": "golden",
   "title": "Golden normalization and verification set",
   "purpose": "200 cases over 13 classes: four renderings of a correct quotation that must all verify, then the ways a text stops being a quotation, then the two citation shapes that make a verdict impossible rather than wrong. Run against the real resolver and the real verifier; nothing is mocked.",
   "generatedBy": "scripts/build-eval-set.ts",
   "regenerateWith": "bun run build:eval",
-  "determinism": "Same snapshot in, byte-identical files out. Every selection is ordered (records by id, collections by name, classes by the table order in plan.ts) and no clock, locale or randomness is consulted.",
+  "determinism": "Same snapshot in, byte-identical files out. Every selection is ordered (records by id, collections by name, cases drawn round-robin across collections per ADR-15) and no clock, locale or randomness is consulted. datasetDigest is the ds1 digest of this document with the datasetDigest key removed, so any reader can recompute it.",
   "expectationSource": "Hand-adjudicated in scripts/eval/plan.ts from the documented behaviour of the fold table. Never observed from @mizan/verify: a set whose expectations were recorded from the code under test is a regression test of the code against itself.",
+  "coverageRows": [
+    {
+      "collection": "",
+      "caseCount": 20,
+      "anchorCount": 5
+    },
+    {
+      "collection": "abudawud",
+      "caseCount": 63,
+      "anchorCount": 31
+    },
+    {
+      "collection": "ibnmajah",
+      "caseCount": 31,
+      "anchorCount": 5
+    },
+    {
+      "collection": "malik",
+      "caseCount": 25,
+      "anchorCount": 5
+    },
+    {
+      "collection": "nasai",
+      "caseCount": 25,
+      "anchorCount": 5
+    },
+    {
+      "collection": "quran",
+      "caseCount": 20,
+      "anchorCount": 5
+    },
+    {
+      "collection": "tirmidhi",
+      "caseCount": 16,
+      "anchorCount": 5
+    }
+  ],
   "digitFacts": {
     "asciiDigitOccurrences": 19,
     "recordsContainingDigits": 4,
@@ -4535,5 +4572,6 @@
       "expectedRationale": "The number exists in more than one collection and the answer named none, so resolving it would be a guess. Guessing here is how a correct answer gets falsely accused of misquoting.",
       "anchorId": "malik:1"
     }
-  ]
+  ],
+  "datasetDigest": "ds1:0c16dda25dce552e46c74a9f93fba1f1c509ee1a35b92b51678b29dde93439cb"
 }

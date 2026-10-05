@@ -11,6 +11,7 @@ import {
 import { checkGateCountClaim, GATE_CLAIM_EXCLUDES, GATE_CLAIM_EXTENSIONS } from "./docs-gates.ts"
 import { checkSnapshotArithmetic } from "./docs-snapshot.ts"
 import { checkEvalBreadth } from "./docs-artifacts.ts"
+import { checkCollectionCoverage, checkCoverageTableRows, checkPresenceCollectionNamed, checkPresenceCoverageRecorded, COVERAGE_SET } from "./docs-coverage.ts"
 import { checkLiveProviderClaim } from "./docs-egress.ts"
 import { checkAnswerQualityClaim, checkBenchmarkClaimUnbacked, statementBacking, type StatedBenchmark } from "./docs-value.ts"
 import { checkExternalClaimUnbacked, externalClaimFigures, EXTERNAL_CLAIMS_PATH } from "./docs-external.ts"
@@ -27,8 +28,8 @@ import { byPath, collectSourceFilesSync, productionFiles, underPrefix, type Sour
 
 /**
  * D-1's runner: the IO half, so the rules in `docs-claims.ts`, `docs-gates.ts`,
- * `docs-snapshot.ts`, `docs-artifacts.ts`, `docs-egress.ts`, `docs-value.ts`, `docs-adr.ts`,
- * `docs-corpus.ts`, `docs-generated.ts` and `docs-runbook.ts` stay pure and testable.
+ * `docs-snapshot.ts`, `docs-artifacts.ts`, `docs-coverage.ts`, `docs-egress.ts`, `docs-value.ts`,
+ * `docs-adr.ts`, `docs-corpus.ts`, `docs-generated.ts` and `docs-runbook.ts` stay pure and testable.
  *
  * Split the same way `g4-gitleaks.ts` is: the decision is a function of contents, the reading is
  * a function of the filesystem, and only this file knows where the repository is.
@@ -267,7 +268,21 @@ const readJson = (root: string, relative: string): unknown => {
  * line is drawn at *claiming* — an attestation that exists is a claim about the corpus, and one that
  * cannot answer R18's question has failed to keep it.
  */
-type ServedCollections = { readonly served: ReadonlySet<string>; readonly usable: boolean }
+type ServedCollections = {
+  readonly served: ReadonlySet<string>
+  readonly usable: boolean
+  /**
+   * Collection -> served record count, for the table rule's `served records` column.
+   *
+   * Kept as the numbers and not just the names because R21d checks a published *corpus size* beside the
+   * measurement figures: `docs/value-proof.md` states 5,272 abudawud records next to 15 adjudicated
+   * cases, and the second number is measured by us while the first is a property of the snapshot. A set
+   * of names cannot compare either, which is why this is a map and not the `served` set. Empty when the
+   * attestation is absent or unusable, and `checkCoverageTableRows` treats an empty map as "the served
+   * set could not be enumerated" and skips only the stale-row distinction.
+   */
+  readonly counts: ReadonlyMap<string, number>
+}
 
 const servedCollections = (root: string): ServedCollections => {
   // `readJson` cannot tell an absent file from an unreadable one: both arrive as `null`. The
@@ -275,16 +290,24 @@ const servedCollections = (root: string): ServedCollections => {
   // claims no corpus, and an unreadable one is a claim that failed to be made — so the presence of the
   // file is asked separately rather than inferred from the parse.
   const text = readIfPresent(root, ATTESTATION)
-  if (text === null) return { served: new Set(), usable: true }
+  if (text === null) return { served: new Set(), usable: true, counts: new Map() }
   const attestation = readJson(root, ATTESTATION)
-  if (typeof attestation !== "object" || attestation === null) return { served: new Set(), usable: false }
+  if (typeof attestation !== "object" || attestation === null) return { served: new Set(), usable: false, counts: new Map() }
   const counts = (attestation as { readonly collectionCounts?: unknown }).collectionCounts
-  if (typeof counts !== "object" || counts === null) return { served: new Set(), usable: false }
-  const served = new Set(Object.keys(counts as Record<string, unknown>).filter((key) => /^[a-z][a-z0-9_]*$/.test(key)))
+  if (typeof counts !== "object" || counts === null) return { served: new Set(), usable: false, counts: new Map() }
+  const fields = counts as Readonly<Record<string, unknown>>
+  const served = new Set(Object.keys(fields).filter((key) => /^[a-z][a-z0-9_]*$/.test(key)))
   // A counts object that yields no usable key is the same defect as a missing field: a record of a
   // corpus naming no collection cannot renounce anything, so R18 would silently police nothing.
-  if (served.size === 0) return { served, usable: false }
-  return { served, usable: true }
+  if (served.size === 0) return { served, usable: false, counts: new Map() }
+  // A count that is not a finite number cannot be compared against, so it is dropped from `counts` and
+  // kept in `served`: the collection demonstrably exists, which is all `served` claims, and the rule that
+  // needs its size will skip a column it has no number for rather than invent one.
+  const measured = new Map<string, number>()
+  for (const [collection, value] of Object.entries(fields)) {
+    if (typeof value === "number" && Number.isFinite(value)) measured.set(collection, value)
+  }
+  return { served, usable: true, counts: measured }
 }
 
 /**
@@ -347,6 +370,11 @@ export const runDocsClaimChecks = (root: string): DocsCheckResult => {
   const benchmark: StatedBenchmark = { path: BENCHMARK_ARTEFACT, text: readIfPresent(root, BENCHMARK_ARTEFACT) }
   if (benchmark.text !== null) recorded(BENCHMARK_ARTEFACT, "evidence")
 
+  // The audited documents' texts, gathered for R21b's artefact half below. Kept as one list rather than a
+  // boolean flag because the rule needs to *name* the documents whose figures cannot be attributed, and a
+  // flag would leave it inventing that list from the set of all audited documents.
+  const auditedTexts: { document: string; text: string }[] = []
+
   // R17's registry. Read whole — it is a few kilobytes — and passed to the documents below, which
   // are the only place a figure can be attributed to it. `null` when absent, which the rule reports
   // against any document that still tries to attribute something.
@@ -367,6 +395,17 @@ export const runDocsClaimChecks = (root: string): DocsCheckResult => {
   const scripts = scriptsIn(root)
   const sources = productSources(root)
 
+  /**
+   * The served set and its per-collection sizes, read before the document sweep.
+   *
+   * Hoisted above the sweep for R21d: the table rule compares a document's `served records` column
+   * against the attestation, and it is one artefact read for two rules rather than a second read of the
+   * same file. Every comment below about *why* the attestation is read this way still applies; only the
+   * position changed. `const` because a later reassignment would let the two rules see two corpora in
+   * one run (AGENTS.md section 6).
+   */
+  const served = servedCollections(root)
+
   for (const document of AUDITED_DOCUMENTS) {
     const text = readIfPresent(root, document)
     if (text === null) {
@@ -378,6 +417,7 @@ export const runDocsClaimChecks = (root: string): DocsCheckResult => {
       continue
     }
     recorded(document, "document")
+    auditedTexts.push({ document, text })
     claims.push(...checkBacktickedPaths(text, document, inRepository))
 
     if (scripts !== null) claims.push(...checkDocumentedScripts(text, document, scripts))
@@ -392,8 +432,26 @@ export const runDocsClaimChecks = (root: string): DocsCheckResult => {
     // else — see `docs-value-latency.ts` for why this is an extension and not a copy.
     claims.push(...checkLatencyFigureUnbacked(text, document, benchmark, externalFigures.map((entry) => entry.figure)))
     claims.push(...checkLatencyCorpusNamed(text, document, benchmark))
+    // R21b, on the same artefact and for the same reason as R18 above: this asks WHICH SET a presence
+    // figure is over, which no figure comparison can answer. A document stating no presence figure is
+    // not this rule's business — it reports nothing rather than manufacturing a finding, because a rule
+    // that fires on every document trains its readers to ignore it.
+    claims.push(...checkPresenceCollectionNamed(text, document, benchmark))
+    // R21d, the table half of the same question. It runs on the *audited* documents only, because a
+    // coverage table is a disclosure artefact and a per-collection row appearing in an unrelated fixture
+    // is not a claim about this repository's measurements. Kept after R21b's sentence rule so a table
+    // whose figures are fine and whose prose is not reports the prose defect alone: two findings for one
+    // drifting number is what makes a reader stop reading the second.
+    claims.push(...checkCoverageTableRows(text, document, benchmark, served.counts))
     if (document === DEMO_RUNBOOK) claims.push(...checkRunbookOrder(text, document))
   }
+
+  // R21b's artefact half, asked once and AFTER the sweep rather than once per document inside it: a
+  // `vs-search.json` that records no coverage is one defect in one file, and reporting it against ten
+  // documents would name the wrong culprit ten times and bury the line that names the right one. It runs
+  // here because it needs the documents, and it stays silent when none of them states a presence figure —
+  // demanding attribution for a claim nobody made is the same defect as inventing one.
+  claims.push(...checkPresenceCoverageRecorded({ path: BENCHMARK_ARTEFACT, text: benchmark.text }, auditedTexts))
 
   const registry = readIfPresent(root, REGISTRY)
   const disclosure = readIfPresent(root, "DISCLOSURE.md")
@@ -412,7 +470,7 @@ export const runDocsClaimChecks = (root: string): DocsCheckResult => {
     if (disclosure !== null) claims.push(...checkSnapshotArithmetic(disclosure, attestation, "DISCLOSURE.md"))
   }
 
-  // R8 runs over the whole tree rather than `AUDITED_DOCUMENTS`, because the files that went stale
+// R8 runs over the whole tree rather than `AUDITED_DOCUMENTS`, because the files that went stale
   // are mostly not judge-facing documents: they are a CI step name, a `package.json` description
   // and this package's own CLI help. `GATE_IDS` is the truth, so the check cannot be satisfied by
   // a document choosing not to mention the count.
@@ -439,7 +497,15 @@ export const runDocsClaimChecks = (root: string): DocsCheckResult => {
   // claim about what this repository's procedure returns, which is made in the same documents and in
   // no fixture. A rule that ran over the `.ts` sweep instead would be reading test fixtures that
   // quote `rejected` and `unverifiable` by the hundred.
-  const served = servedCollections(root)
+  //
+  // ADR-15. The rule that reads the attestation for the *served set* rather than for a published
+  // count, so it takes the same `usable` flag as R18 - the pair that distinguishes "no corpus is
+  // claimed" from "a corpus is claimed and cannot be enumerated". It runs here, beside R18 rather
+  // than inside the snapshot block above, because it answers a different question about the same
+  // artefact: not "does this document quote the right number" but "was every served collection ever
+  // asked to be falsified".
+  const redTeamText = readIfPresent(root, REDTEAM_EVAL)
+  claims.push(...checkCollectionCoverage(served.served, served.usable, redTeamText, COVERAGE_SET))
   if (!served.usable) {
     claims.push(
       claim(

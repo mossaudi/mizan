@@ -24,6 +24,7 @@ export type {
   VerifyError,
 } from "./errors.ts"
 export { CHAIN_SEPARATOR, GENESIS_PREV_HASH, chainHash, isSha256Hex, sha256Hex, shortHash } from "./hash.ts"
+export { DATASET_DIGEST_VERSION, digestOf, identityMismatch, isDatasetDigest } from "./hash/dataset-identity.ts"
 export { canonicalJson } from "./json.ts"
 export { elapsedMs, isExpired, nowIso, startDeadline, withDeadline, withDeadlineResult, type Deadline } from "./time.ts"
 
@@ -37,9 +38,10 @@ export { ANCHOR_PROTOCOL_VERSION, AnchorAdjudication, AnchorAdjudicationSet, Anc
 export { Answer, Citation, Claim, emptyClaim, normalizeQuote } from "./schema/claim.ts"
 export { BaselineDeclaration, BenchmarkOutcome, BenchmarkResult, BENCHMARK_SCHEMA_VERSION, HONEST_BASELINE, PRE_REGISTERED_HYPOTHESIS, METHOD_NOT_PUBLISHED, PEER_REGISTER_VERSION, PeerFigure, PeerMethod, PeerRegister, peerStatesAFigure } from "./schema/benchmark.ts"
 export { COVERAGE_SCHEMA_VERSION, CollectionCoverage, CoverageTotals, QuarantineCoverage, SourceCoverage } from "./schema/coverage.ts"
-export { Correction, CorrectionSpan, LocatedCorrection, NearbyRecord, Relevance, RelevanceState, SUGGESTION_DISCLAIMER, SUGGESTION_MEASUREMENT_SCOPE, Suggestion, SuggestionCandidates, SuggestionNoCandidates, SuggestionScope, SuggestionUnavailable, UnverifiableCorrection, type SuggestionState } from "./schema/display.ts"
+export { Correction, CorrectionSpan, LocatedCorrection, NearbyRecord, Relevance, RelevanceState, SUGGESTION_DISCLAIMER, SUGGESTION_MEASURED_COLLECTIONS, SUGGESTION_MEASUREMENT_SCOPE, SUGGESTION_THIN_COLLECTIONS, Suggestion, SuggestionCandidates, SuggestionNoCandidates, SuggestionScope, SuggestionUnavailable, UnverifiableCorrection, type SuggestionState } from "./schema/display.ts"
 export { DEMO_ANCHOR_SET_VERSION, DEMO_QUESTION_SET_VERSION, DemoAnchor, DemoAnchorSet, DemoExpectation, DemoQuestion, DemoQuestionSet } from "./schema/demo.ts"
-export { DivergenceResolution, EvalAnchor, EvalCase, EvalSet, KnownDivergence } from "./schema/eval.ts"
+export { CollectionCoverageRow, DivergenceResolution, EvalAnchor, EvalCase, EvalSet, KnownDivergence } from "./schema/eval.ts"
+export { DegradationCondition, conditionOf, decodeCondition, describeCondition } from "./schema/degradation.ts"
 export { ResolvedCitation, unresolved } from "./schema/resolved.ts"
 export { SSR_SCHEMA_VERSION, SsrResult } from "./schema/ssr.ts"
 export { CorpusRecord, CorpusRecordMeta, GradeBasis, QURAN_COLLECTION, toRecordMeta } from "./schema/record.ts"
