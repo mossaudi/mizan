@@ -244,6 +244,39 @@ describe("the measurement coverage is disclosed, and is not confused with the se
     expect(text).toContain(SUGGESTION_MEASUREMENT_SCOPE)
   })
 
+  test("no state may print a count of records searched, because that number is a recall claim", () => {
+    // The negative assertion `lets-efficient-continue-v2.md` E7.4 asks for, and it is a negative one on
+    // purpose: the positive tests above all pin strings that must appear, and a string nobody forbids is
+    // a string nobody has to keep. "Searched N records" is the wording that reads as a measure of how hard
+    // we looked — which is the number that flatters a retriever most, and the one this block must never be
+    // quoted as. The product says "X returned of Y records scanned" instead, and this fails the moment
+    // either half of that sentence is dropped for the shorter, flattering one.
+    const nothing: readonly Claim[] = [
+      { id: "c1", text: "prose", quote: normalizeQuote("نص لا يوجد في هذه المجموعة إطلاقا أبدا"), citations: [citation("bukhari", "1")] },
+    ]
+    const broken = new Database(":memory:")
+    broken.exec("CREATE TABLE records (id TEXT, collection TEXT, textMatch TEXT)")
+    broken.exec("INSERT INTO records (id, collection, textMatch) VALUES ('bad:1', 'x', NULL)")
+    const states = [
+      textFor([claimOf(FABRICATED)]),
+      screen(nothing, suggestionsFor(db, nothing, verify(nothing).claims)),
+      renderReport({
+        prose: "answer",
+        report: verify([claimOf(FABRICATED)]),
+        claims: [claimOf(FABRICATED)],
+        sources: new Map(),
+        relevance: null,
+        suggestions: [suggestionFor(broken, FABRICATED, null)],
+        transcript: "live",
+        model: "test",
+        sourceCount: 0,
+        snapshotHash: SNAPSHOT_HASH,
+      }),
+    ]
+    for (const state of states) expect(state).not.toContain("records searched")
+    broken.close()
+  })
+
   test("a state where no floor was applied makes no measurement claim", () => {
     // `unavailable` means the corpus could not be searched. A coverage disclosure there would describe
     // a measurement that never happened, which is the same over-claiming as an invented count.

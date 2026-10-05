@@ -42,10 +42,32 @@ Under a `REJECTED` badge there is one more block, and it is the only thing this 
 badge that the badge does not already say:
 
 ```
-nearest suggestions (non-authoritative) — not a verification result
-  searched 27,234 records in this snapshot
-  1. abudawud:1003  بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+nearest suggestions (non-authoritative) — not a verification result for knowledge-fading-1: 1 returned of 2 records scanned, within abudawud
+         the shared-character floor was measured on hadith cases only — quran and tirmidhi are unmeasured
+1. abudawud 4255 — https://sunnah.com/abudawud:4255
+         حَدَّثَنَا أَحْمَدُ بْنُ صَالِحٍ، حَدَّثَنَا عَنْبَسَةُ، حَدَّثَنِي يُونُسُ، عَنِ ابْنِ شِهَابٍ، قَالَ حَدَّثَنِي حُمَيْدُ بْنُ عَبْدِ الرَّحْمَنِ، أَنَّ أَبَا هُرَيْرَةَ، قَالَ قَالَ رَسُولُ اللَّهِ صلى الله عليه وسلم ‏"‏ يَتَقَارَبُ الزَّمَانُ وَيَنْقُصُ الْعِلْمُ وَتَظْهَرُ الْفِتَنُ وَيُلْقَى الشُّحُّ وَيَكْثُرُ الْهَرْجُ ‏"‏ ‏.‏ قِيلَ يَا رَسُولَ اللَّهِ أَيَّةُ هُوَ قَالَ ‏"‏ الْقَتْلُ الْقَتْلُ ‏"‏ ‏.‏
+        shared: 35 of 60 folded characters — display only, never a verdict
+        grade: Sahih / Sahih / Sahih Muslim (157 After 2672) (dataset's own grade; quranlab/hadith/row, not ours)
 ```
+
+That is the real output of `bun run demo`, whose two-record corpus is built from
+`data/eval/demo-anchors.json` rather than from the 81 MB snapshot, which is why the count is `2` and
+not `27,234`. On the full corpus the same block reads `1 returned of 27234 records scanned, within
+<the cited collection>`. Four things in it are deliberate:
+
+- **Returned of scanned, never "searched".** A count of records *searched* reads as a measure of how
+  hard we looked, and it is the number that flatters a retriever most. `1 returned of 27234` says
+  what the reader actually got and what it cost, in that order, and it cannot be quoted as a recall
+  claim.
+- **The scope is on the block.** `within abudawud` says which collections the rows came from. When the
+  cited collection has nothing close, the list widens to the whole snapshot and the line says so —
+  a whole-corpus list wearing a scoped list's clothes is worse than no list.
+- **The measurement disclosure.** The shared-character floor below was measured on hadith cases only,
+  so the block says which parts of the corpus the number describes and which parts are unmeasured.
+  A floor with no stated measurement scope is a floor nobody can argue with.
+- **Integers, never a percentage.** `shared: 35 of 60 folded characters` is two numbers a reader can
+  check. A similarity percentage would be a verdict in disguise, which is the one thing this block is
+  not allowed to be.
 
 A `REJECTED` badge tells a reader that the quote is wrong. It does not tell them what the model *meant*,
 and the answer to that question is already in the corpus. Those lines are the nearest records by exact

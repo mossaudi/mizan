@@ -1,48 +1,60 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Database } from "bun:sqlite"
-import { normalizeForMatch, isErr, isOk, unwrapOrThrow } from "@mizan/core"
+import { err, normalizeForMatch, isErr, isOk, ok, unwrapOrThrow } from "@mizan/core"
 import { buildSnapshot, openSnapshot, toCorpusRecord } from "@mizan/corpus"
 import { MIN_SHARED_TRIGRAMS } from "@mizan/suggest"
 import { MIN_SHARED_RUN_CHARS } from "@mizan/verify"
 import {
+  CUTOFFS,
+  FLOORS,
   HARNESS_COMMAND,
   LATENCY_BAND_MULTIPLIER,
   RUN_FLOORS,
+  attempt,
   casesFrom,
   conditionsLines,
   coverageAt,
   floorRecallCost,
+  incompleteFloors,
   isHit,
   measureCase,
   precisionAt,
+  recordFigures,
   scanCost,
   slowestOf,
+  suggestionFigures,
   RECORD_RUNS,
   type CaseMeasurement,
+  type Displayed,
   type MeasurementConditions,
 } from "./suggest-coverage.ts"
 
 /**
- * The coverage harness's own arithmetic, over a corpus small enough to be obvious.
+ * The harness's own arithmetic, over a corpus small enough to be obvious.
  *
  * The harness's `main()` reads the committed corpus, takes about a minute, and asserts nothing on
  * its own — a measurement you cannot fail is not a guard. So the FIGURES it computes are tested
  * here against a fixture where the right answer is known by construction, and `main()` is left to
  * be run by a person who wants the number.
  *
- * Three properties are pinned here, and each one is a way the number could have lied:
+ * Four properties are pinned here, and each one is a way the number could have lied:
  *   1. a hit is FOLDED TEXT, not a record id — the corpus stores the same verse twice, so an
  *      id-based test would report a miss where the reader gets the right answer;
  *   2. a cut-off is a PREFIX of one ranking, so top-1 ⊆ top-3 ⊆ top-5 and a ranker that reordered
  *      between cut-offs would be caught;
  *   3. `coverageAt` counts a MISS as a miss and never as a skip, which is what stops a missing
- *      measurement from quietly improving the reported rate.
+ *      measurement from quietly improving the reported rate;
+ *   4. a measurement that cannot be completed refuses to publish, rather than publishing a table
+ *      with a hole in it that both readers above would have read as a real measurement.
  */
 
 const VERSE = "الله لا إله إلا هو الحي القيوم"
+
+/** A `Displayed` with the shape the completeness check cares about: present, whatever its numbers. */
+const DISPLAYED: Displayed = { shown: 0, anchorRank: 0 }
 
 const openFixture = (): Database => {
   const fixtureDir = mkdtempSync(join(tmpdir(), "mizan-suggest-coverage-"))
@@ -355,6 +367,196 @@ describe("casesFrom reduces the eval set to what the measurement needs", () => {
     } as unknown as Parameters<typeof casesFrom>[0])
     expect(cases[0]?.anchorFolded).toBe(normalizeForMatch("bukhari:1"))
     expect(cases[1]?.anchorFolded).toBe(normalizeForMatch("text"))
+  })
+})
+
+/**
+ * The recorded artefact is the claim sweep's only evidence, so its shape is a contract, not a detail.
+ *
+ * `readFigures` in `@mizan/gate` walks the top level of the parsed JSON and keeps the numeric entries.
+ * A figure nested one level down is not wrong, it is invisible — the rule would read an artefact that
+ * parsed and find nothing to compare, and would be green forever. These tests are what stop the shape
+ * being "tidied" into a nested object by a future change, which is the refactor the architecture note
+ * warns about by name.
+ */
+describe("the figures this harness records are in the shape the claim rule reads", () => {
+  const measurements: readonly CaseMeasurement[] = [
+    { id: "a", ms: 10, hits: { [MIN_SHARED_TRIGRAMS]: [true, true, true] }, gated: { [MIN_SHARED_RUN_CHARS]: { shown: 3, anchorRank: 1 } } },
+    { id: "b", ms: 20, hits: { [MIN_SHARED_TRIGRAMS]: [false, true, true] }, gated: { [MIN_SHARED_RUN_CHARS]: { shown: 1, anchorRank: 0 } } },
+  ]
+  const identity = { snapshotHash: "c".repeat(64), recordCount: 27_234 }
+  const figures = suggestionFigures(measurements, { p50: 600.4, p95: 700.6, max: 900.2 }, identity)
+
+  test("every value is top-level, so nothing is nested out of the rule's reach", () => {
+    for (const value of Object.values(figures)) {
+      expect(typeof value === "number" || typeof value === "string").toBe(true)
+    }
+  })
+
+  test("the only string is the corpus fingerprint, because a latency without a corpus is about nothing", () => {
+    const strings = Object.entries(figures).filter((entry): entry is [string, string] => typeof entry[1] === "string")
+    expect(strings.map((entry) => entry[0])).toEqual(["suggestionCorpusFingerprint"])
+    expect(figures.suggestionCorpusFingerprint).toBe(identity.snapshotHash)
+  })
+
+  test("a latency is recorded as whole milliseconds, never as a fraction a reader would re-round", () => {
+    expect(figures.suggestionLatencyP50Ms).toBe(600)
+    expect(figures.suggestionLatencyP95Ms).toBe(701)
+    expect(figures.suggestionLatencyMaxMs).toBe(900)
+  })
+
+  test("a cut-off column is named by the cut-off it measures, never by its position in the list", () => {
+    // `CUTOFFS` is [1, 3, 5]. An earlier iteration keyed these by array index and published
+    // `suggestionPresenceTop2` describing top-3 — a plausible-looking wrong number in the one file a
+    // document is checked against. Keyed by value, the key and the column cannot come apart.
+    expect(figures).toHaveProperty("suggestionPresenceTop1")
+    expect(figures).toHaveProperty("suggestionPresenceTop3")
+    expect(figures).toHaveProperty("suggestionPresenceTop5")
+    expect(figures).not.toHaveProperty("suggestionPresenceTop2")
+    expect(figures).not.toHaveProperty("suggestionPresenceTop0")
+    expect(figures.suggestionPresenceTop1).toBe(1)
+    expect(figures.suggestionPresenceTop5).toBe(2)
+  })
+
+  test("every rank the reader can see publishes a numerator and the denominator it is a fraction of", () => {
+    for (const rank of [1, 2, 3, 4, 5]) {
+      expect(figures).toHaveProperty(`suggestionPrecisionRank${rank}Hits`)
+      expect(figures).toHaveProperty(`suggestionPrecisionRank${rank}Denominator`)
+    }
+    // rank 1: both cases displayed a row there, and one of them was the anchor. rank 2: one case
+    // displayed a row, and it was not the anchor — the second column is the point.
+    expect(figures.suggestionPrecisionRank1Hits).toBe(1)
+    expect(figures.suggestionPrecisionRank1Denominator).toBe(2)
+    expect(figures.suggestionPrecisionRank2Denominator).toBe(1)
+    expect(figures.suggestionPrecisionRank2Hits).toBe(0)
+  })
+
+  test("the floor's recall cost is recorded, so a later run cannot quietly tighten it", () => {
+    expect(figures.suggestionRecallShippedTop5).toBe(2)
+    expect(figures.suggestionRecallGatedTop5).toBe(1)
+    expect(figures.suggestionFloorRunChars).toBe(MIN_SHARED_RUN_CHARS)
+    expect(figures.suggestionLatencyBandMultiplier).toBe(LATENCY_BAND_MULTIPLIER)
+  })
+})
+
+/**
+ * `--record` writes to a file, so writing is a step that can fail — and it fails as a value.
+ *
+ * Every other precondition in this harness already arrived as a `Result`, which is what let `main`
+ * print a reason and exit 3 having published nothing. The write was the one left throwing, so a
+ * malformed artefact exited 1 with a stack trace on the line after the reader was told the figure had
+ * been recorded (AGENTS.md §2).
+ */
+describe("a measurement refuses rather than escaping as an exception", () => {
+  // The corpus layer already converts its own failures, so the scan's boundary was real but not the
+  // whole function: `sharedRunOf`, `rankNeighboursAtFloor`, the `.map` over rows and the lookups below
+  // were all unguarded, and an exception from any of them left as an uncaught error — a stack trace and
+  // exit code 1, the same number an ordinary bug produces. These pin the boundary that closes that.
+  test("a thrown Error becomes a Result failure carrying its own message", () => {
+    const thrown = attempt<number>(() => {
+      throw new Error("a corpus row this harness has not met")
+    })
+    expect(isErr(thrown)).toBe(true)
+    if (!isErr(thrown)) return
+    expect(thrown.error).toBe("a corpus row this harness has not met")
+  })
+
+  test("a thrown non-Error is still named, rather than becoming 'undefined'", () => {
+    // A `catch` that assumed `instanceof Error` would print "undefined" here and the harness report
+    // would carry a refusal that names nothing at all.
+    const thrown = attempt<number>(() => {
+      throw "the stream ended early" as unknown
+    })
+    expect(isErr(thrown)).toBe(true)
+    if (!isErr(thrown)) return
+    expect(thrown.error).toBe("the stream ended early")
+  })
+
+  test("an expected refusal passes through unchanged, so the boundary never relabels it", () => {
+    // The reason this is not a blanket `catch` that wraps everything in one message: a corpus fault and
+    // a bug in this file exit with the same code, and only the message separates them. A boundary that
+    // rewrote both into one shape would destroy the one distinction a reader has.
+    expect(attempt(() => err("scan failed: ...")).error).toBe("scan failed: ...")
+    expect(isOk(attempt(() => ok(41)))).toBe(true)
+  })
+
+  test("the tables are checked for completeness before a measurement is published", () => {
+    // `coverageAt` counts a missing entry as a MISS and `precisionAt` reads a missing floor as zero
+    // shown — both total, both deliberate, and both of which turn an incomplete table into a coverage
+    // number that is quietly too low. The readers cannot be the ones to notice, so the producer is.
+    const full = Object.fromEntries(FLOORS.map((floor) => [floor, CUTOFFS.map(() => false)]))
+    const gated = Object.fromEntries(RUN_FLOORS.map((floor) => [floor, DISPLAYED]))
+    expect(incompleteFloors(full, gated)).toBeNull()
+
+    const oneShort = { ...full, [FLOORS[2]]: CUTOFFS.slice(0, 2) }
+    expect(incompleteFloors(oneShort, gated)).toContain(`${FLOORS[2]}`)
+  })
+
+  test("a display floor with no entry refuses too, and names how many are missing", () => {
+    // The other table, and the one whose failure would be invisible: an absent `gated` entry is read as
+    // zero rows shown, which shortens the denominator and quietly improves the precision it is a
+    // fraction of.
+    const full = Object.fromEntries(FLOORS.map((floor) => [floor, CUTOFFS.map(() => false)]))
+    const { [RUN_FLOORS[0]]: _dropped, ...gated } = Object.fromEntries(RUN_FLOORS.map((floor) => [floor, DISPLAYED]))
+    expect(incompleteFloors(full, gated)).toContain(`1 of ${RUN_FLOORS.length} display floors`)
+  })
+})
+
+describe("recording refuses rather than throwing, and says which file stopped it", () => {
+  const dir = mkdtempSync(join(tmpdir(), "mizan-suggest-record-"))
+  afterAll(() => {
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+    } catch {
+      // the OS reclaims a temp directory; a leftover file is a far smaller problem than a flaky test
+    }
+  })
+
+  const at = (name: string, body: string): string => {
+    const path = join(dir, name)
+    writeFileSync(path, body, "utf8")
+    return path
+  }
+
+  const figures = { suggestionLatencyP95Ms: 700, suggestionCorpusFingerprint: "d".repeat(64) }
+
+  test("an artefact that is not a JSON object is refused, naming the file", () => {
+    const path = at("array.json", "[1, 2, 3]\n")
+    const result = recordFigures(path, figures)
+    expect(isErr(result)).toBe(true)
+    if (isOk(result)) return
+    expect(result.error).toContain(path)
+    expect(result.error).toContain("not a JSON object")
+  })
+
+  test("a truncated body is refused, naming the file and saying it is not JSON", () => {
+    const path = at("truncated.json", "{ \"suggestionLatencyP95Ms\": 700,\n")
+    const result = recordFigures(path, figures)
+    expect(isErr(result)).toBe(true)
+    if (isOk(result)) return
+    expect(result.error).toContain(path)
+    expect(result.error).toContain("not valid JSON")
+  })
+
+  test("an absent file is refused rather than created, because an empty artefact would back nothing", () => {
+    const result = recordFigures(join(dir, "no-such-dir", "vs-search.json"), figures)
+    expect(isErr(result)).toBe(true)
+    if (isOk(result)) return
+    expect(result.error).toContain("could not be read")
+  })
+
+  test("the whole suggestion namespace is replaced, so a key this run dropped cannot survive", () => {
+    // The orphan this exists to prevent: an earlier `--record` published `suggestionPresenceTop2`, and a
+    // merge made that wrong number permanent, unowned and invisible.
+    const path = at("vs-search.json", `${JSON.stringify({ systemDetectionRate: 0.918, suggestionPresenceTop2: 38 }, null, 2)}\n`)
+    const written = recordFigures(path, figures)
+    expect(isOk(written)).toBe(true)
+    const recorded = JSON.parse(readFileSync(path, "utf8")) as Readonly<Record<string, unknown>>
+    expect(recorded.suggestionPresenceTop2).toBeUndefined()
+    expect(recorded.suggestionLatencyP95Ms).toBe(700)
+    // And the keys this harness does not own survive untouched, so a latency recording cannot silently
+    // rewrite the pre-registered retrieval hypothesis the file also carries.
+    expect(recorded.systemDetectionRate).toBe(0.918)
   })
 })
 

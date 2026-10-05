@@ -252,6 +252,38 @@ const describeCorpusError = (error: CorpusError): string => {
   return error._tag
 }
 
+/** How a thrown IO or JSON error is named, once, so no message invents its own wording. */
+const describeCause = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause))
+
+/**
+ * Runs a `Result`-returning computation and turns anything thrown inside it into a `Result` failure.
+ *
+ * ## Why this exists rather than six try/catch blocks
+ *
+ * Every fallible step in this file returns `Result` already, and the pattern for converting one is
+ * always the same two lines: catch, name the cause, return `err`. Written out six times it is six
+ * chances to forget the case id, and the one that forgot it produced a message with no measurement in
+ * it — which in a harness report is indistinguishable from a repository fault.
+ *
+ * ## Why the boundary is honest about what it caught
+ *
+ * `describeCause` returns the thrown value's own message, so an unexpected failure is reported as an
+ * unexpected failure and not dressed up as one of the expected ones. A caller can still tell the two
+ * apart: expected refusals carry a path or a rule id, and this one carries whatever the runtime said.
+ * That distinction matters more than it looks — a corpus fault and a bug in this file have the same
+ * exit code, and only the message tells them apart after the fact.
+ *
+ * The name is `attempt` rather than `attemptEither` because a second type parameter for a function with
+ * exactly one caller would be a capability nothing uses.
+ */
+export const attempt = <T>(compute: () => Result<T, string>): Result<T, string> => {
+  try {
+    return compute()
+  } catch (cause) {
+    return err(describeCause(cause))
+  }
+}
+
 /**
  * Scan once, time the product's own path, and report what was shown at every floor.
  *
@@ -286,41 +318,85 @@ const describeCorpusError = (error: CorpusError): string => {
  *
  * The error is a `string` rather than a tagged union because it is a harness diagnostic, not a
  * contract: nothing branches on its shape, and a tag would invent a taxonomy with one member.
+ *
+ * ## Why the whole body is inside the try
+ *
+ * Only the scan was inside a boundary, and only because it already returned a `Result`. Everything
+ * after it — `sharedRunOf`, `rankNeighboursAtFloor`, the `.map` over rows, the lookups into `hits` and
+ * `gated` — could throw on a corpus row this harness has not met, and an exception thrown here leaves
+ * through `main`'s loop as an uncaught error: a stack trace and exit code 1, indistinguishable from an
+ * ordinary bug. That is the exact confusion the scan conversion above was made to remove, left in place
+ * for every step after it. So the conversion is finished here rather than half-applied, and the test
+ * suite plants a collaborator that throws to prove the boundary is real rather than decorative.
+ *
+ * ## Why completeness is checked before returning `ok`
+ *
+ * `hits[floor]` and `gated[runFloor]` are filled by the two loops directly above, so they are complete
+ * by construction — today. That is a property of this function's body, and a later edit that adds a
+ * floor, filters one, or returns early would break it silently: `coverageAt` counts a missing entry as a
+ * *miss* (deliberately, and correctly — a case that was not measured is not a hit), so an incomplete
+ * table would publish a coverage number that is quietly too low, and `precisionAt` would publish a
+ * denominator that is quietly too small. A figure that flatters the harness by accident is the one
+ * thing this repository is not allowed to ship, so the invariant is asserted rather than assumed, and
+ * its failure is a refusal to publish.
  */
 export const measureCase = (db: Database, testCase: CoverageCase): Result<CaseMeasurement, string> => {
   const startedAt = performance.now()
-  const scanned = scanSuggestionCandidates(db, testCase.quote, SCAN_FLOOR)
-  if (!isOk(scanned)) return err(`scan failed: ${describeCorpusError(scanned.error)}`)
-  const source = scanned.value
+  return attempt(() => {
+    const scanned = scanSuggestionCandidates(db, testCase.quote, SCAN_FLOOR)
+    if (!isOk(scanned)) return err(`scan failed: ${describeCorpusError(scanned.error)}`)
+    const source = scanned.value
 
-  // The scan's own fold is handed back rather than folding a second time. `foldQuote` is idempotent,
-  // so either spelling gives the same ranking — passing the folded value simply keeps the "fold once per
-  // quote" contract in `candidates.ts` true rather than aspirational.
-  const rankedAt = (floor: number): readonly RankedNeighbour[] =>
-    rankNeighboursAtFloor({ quote: source.quoteFolded, rows: source.rows, floor, topK: MAX_TOP_K })
+    // The scan's own fold is handed back rather than folding a second time. `foldQuote` is idempotent,
+    // so either spelling gives the same ranking — passing the folded value simply keeps the "fold once per
+    // quote" contract in `candidates.ts` true rather than aspirational.
+    const rankedAt = (floor: number): readonly RankedNeighbour[] =>
+      rankNeighboursAtFloor({ quote: source.quoteFolded, rows: source.rows, floor, topK: MAX_TOP_K })
 
-  const productRows = rankedAt(MIN_SHARED_TRIGRAMS)
-  const measured: Measured[] = productRows.map((row) => ({
-    row,
-    run: sharedRunOf(testCase.quote, row.textMatch),
-  }))
-  // The display filter runs inside the clock, because a user waits for it too. Its result is what
-  // `displayedAt` recomputes for each swept floor below off the SAME measurements — the sweep compares
-  // rows against a floor, so it never pays for a second pass over the ranked list or the corpus.
-  const shipped = displayedAt(measured, testCase.anchorFolded, MIN_SHARED_RUN_CHARS)
-  const ms = performance.now() - startedAt
+    const productRows = rankedAt(MIN_SHARED_TRIGRAMS)
+    const measured: Measured[] = productRows.map((row) => ({
+      row,
+      run: sharedRunOf(testCase.quote, row.textMatch),
+    }))
+    // The display filter runs inside the clock, because a user waits for it too. Its result is what
+    // `displayedAt` recomputes for each swept floor below off the SAME measurements — the sweep compares
+    // rows against a floor, so it never pays for a second pass over the ranked list or the corpus.
+    const shipped = displayedAt(measured, testCase.anchorFolded, MIN_SHARED_RUN_CHARS)
+    const ms = performance.now() - startedAt
 
-  const hits: Record<number, boolean[]> = {}
-  for (const floor of FLOORS) {
-    const ranked = rankedAt(floor)
-    hits[floor] = CUTOFFS.map((cutoff) => isHit(testCase.anchorFolded, ranked.slice(0, cutoff)))
-  }
+    const hits: Record<number, boolean[]> = {}
+    for (const floor of FLOORS) {
+      const ranked = rankedAt(floor)
+      hits[floor] = CUTOFFS.map((cutoff) => isHit(testCase.anchorFolded, ranked.slice(0, cutoff)))
+    }
 
-  const gated: Record<number, Displayed> = { [MIN_SHARED_RUN_CHARS]: shipped }
-  for (const runFloor of RUN_FLOORS) {
-    gated[runFloor] = runFloor === MIN_SHARED_RUN_CHARS ? shipped : displayedAt(measured, testCase.anchorFolded, runFloor)
-  }
-  return ok({ id: testCase.id, ms, hits, gated })
+    const gated: Record<number, Displayed> = { [MIN_SHARED_RUN_CHARS]: shipped }
+    for (const runFloor of RUN_FLOORS) {
+      gated[runFloor] = runFloor === MIN_SHARED_RUN_CHARS ? shipped : displayedAt(measured, testCase.anchorFolded, runFloor)
+    }
+    const incomplete = incompleteFloors(hits, gated)
+    if (incomplete !== null) return err(`${testCase.id}: ${incomplete}`)
+    return ok({ id: testCase.id, ms, hits, gated })
+  })
+}
+
+/**
+ * The floor whose table is short, or `null` when every one is full.
+ *
+ * ## Why this is worth a check at all
+ *
+ * See the note on `measureCase`. `coverageAt` counts a missing `hits` entry as a miss and `precisionAt`
+ * reads `gated[floor]` with a fallback of zero, so both are total functions over a table that is complete
+ * only by accident. Both were written that way on purpose — a case that was not measured is not a hit,
+ * and an unmeasured rank is not a display — which is exactly why the *producer* has to be the place that
+ * refuses: the readers cannot, by design, be the ones who notice.
+ */
+export const incompleteFloors = (hits: Readonly<Record<number, boolean[]>>, gated: Readonly<Record<number, Displayed>>): string | null => {
+  const short = FLOORS.filter((floor) => hits[floor]?.length !== CUTOFFS.length)
+  if (short.length > 0) return `${short.length} of ${FLOORS.length} ranker floors recorded no full cut-off table: ${short.join(", ")}`
+  const ungated = RUN_FLOORS.filter((runFloor) => gated[runFloor] === undefined)
+  if (ungated.length > 0) return `${ungated.length} of ${RUN_FLOORS.length} display floors recorded nothing at all: ${ungated.join(", ")}`
+  return null
 }
 
 /** `hits/cases` for one floor and one cut-off index. A missing entry counts as a miss, not as a skip. */
@@ -514,24 +590,98 @@ export const ARTEFACT_PATH = "data/benchmark/vs-search.json"
  *
  * Attestation has already passed before this is reachable: the caller computes no figures at all
  * until it does, and a figure describing a corpus nobody vouched for has no business being recorded.
+ *
+ * ## Why the path is a parameter and why this returns a `Result`
+ *
+ * The path is passed in so the rule is testable against a file the test owns, instead of against the
+ * committed artefact. The `Result` is the same discipline as the scan's: an artefact that is not a
+ * JSON object is not a place this harness may write, and a `throw` would exit 1 with a stack trace
+ * between the latency table and the record line — the one place a reader is told a figure was
+ * published (AGENTS.md §2).
  */
-export const recordFigures = (figures: Readonly<Record<string, number | string>>): string => {
-  const parsed: unknown = JSON.parse(readFileSync(ARTEFACT_PATH, "utf8"))
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new Error(`${ARTEFACT_PATH} is not a JSON object, so there is nothing safe to write into`)
+export const recordFigures = (artefactPath: string, figures: Readonly<Record<string, number | string>>): Result<string, string> => {
+  const read = readTextFile(artefactPath)
+  if (!isOk(read)) return err(read.error)
+  const parsed = parseJsonObject(read.value, artefactPath)
+  if (!isOk(parsed)) return err(parsed.error)
+  const owned = Object.entries(parsed.value).filter(([key]) => !key.startsWith("suggestion"))
+  try {
+    writeFileSync(artefactPath, `${JSON.stringify({ ...Object.fromEntries(owned), ...figures }, null, 2)}\n`, "utf8")
+  } catch (cause) {
+    return err(`${artefactPath} could not be written: ${describeCause(cause)}`)
   }
-  const owned = Object.entries(parsed).filter(([key]) => !key.startsWith("suggestion"))
-  writeFileSync(ARTEFACT_PATH, `${JSON.stringify({ ...Object.fromEntries(owned), ...figures }, null, 2)}\n`, "utf8")
-  return ARTEFACT_PATH
+  return ok(artefactPath)
+}
+
+/**
+ * A committed file's text, or the reason it could not be read.
+ *
+ * The reason every read in this harness goes through here rather than through `readFileSync` directly:
+ * a file that cannot be read is a figure that cannot be published, so it has to arrive as a value
+ * `main` can print and refuse on. A `throw` from `readFileSync` would be an uncaught exception instead
+ * — exit code 1, a stack trace, and no statement of which measurement was refused (AGENTS.md §2).
+ */
+const readTextFile = (path: string): Result<string, string> => {
+  try {
+    return ok(readFileSync(path, "utf8"))
+  } catch (cause) {
+    return err(`${path} could not be read: ${describeCause(cause)}`)
+  }
+}
+
+/** Parsed as an object, or refused. An array or a bare scalar carries no key to replace. */
+const parseJsonObject = (text: string, path: string): Result<Readonly<Record<string, unknown>>, string> => {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text) as unknown
+  } catch (cause) {
+    return err(`${path} is not valid JSON: ${describeCause(cause)}`)
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return err(`${path} is not a JSON object, so there is nothing here to read as one`)
+  }
+  return ok(parsed as Readonly<Record<string, unknown>>)
+}
+
+/**
+ * The corpus, opened read-only, or the reason it could not be opened.
+ *
+ * A `Database` constructor over a truncated or non-SQLite file throws. That is the exact environment
+ * the story calls unmeasurable, and it is also the one where a stack trace would be the only thing a
+ * reader saw — so the refusal is a value carrying the reason, and `main` prints it and exits 3 having
+ * published nothing.
+ */
+const openCorpus = (): Result<Database, string> => {
+  try {
+    return ok(new Database(CORPUS_PATH, { readonly: true }))
+  } catch (cause) {
+    return err(`${CORPUS_PATH} could not be opened: ${describeCause(cause)}`)
+  }
 }
 
 const readCommittedAttestation = (): Result<string, AttestationProblem> => {
   if (!existsSync(ATTESTATION_PATH)) return err(attestationUnreadable(`${ATTESTATION_PATH} does not exist`))
-  try {
-    return ok(readFileSync(ATTESTATION_PATH, "utf8"))
-  } catch (cause) {
-    return err(attestationUnreadable(`${ATTESTATION_PATH} could not be read: ${cause instanceof Error ? cause.message : String(cause)}`))
-  }
+  const read = readTextFile(ATTESTATION_PATH)
+  if (!isOk(read)) return err(attestationUnreadable(read.error))
+  return ok(read.value)
+}
+
+/**
+ * The adversarial set, decoded, or the reason it could not be.
+ *
+ * Both halves are here rather than in `main` because both can fail on a committed file — a truncated
+ * JSON body and a well-formed body with a case missing `quote` are different defects with the same
+ * consequence, and both must leave the run with no figure printed rather than with a stack trace
+ * between two tables.
+ */
+const readEvalSet = (): Result<EvalSet, string> => {
+  const read = readTextFile(SET_PATH)
+  if (!isOk(read)) return err(read.error)
+  const parsed = parseJsonObject(read.value, SET_PATH)
+  if (!isOk(parsed)) return err(parsed.error)
+  const decoded = decodeOrFail(decodeSync(EvalSet), parsed.value, SET_PATH)
+  if (!isOk(decoded)) return err(`${SET_PATH} did not decode: ${describeDecodeFailure(decoded.error)}`)
+  return ok(decoded.value)
 }
 
 /** The corpus's own fingerprint, or a zero hash the caller will refuse to measure against. */
@@ -641,6 +791,20 @@ const renderSweep = (measurements: readonly CaseMeasurement[]): string => {
   return lines.join("\n")
 }
 
+/**
+ * The refusal every unmeasurable precondition takes: one `FAIL` line naming the reason, the line that
+ * says no figure was computed, and the exit code that means "the measurement is untrusted".
+ *
+ * One function so the three cannot come apart — the message that names the reason and the exit code
+ * that says what it means are the same promise, and a branch that printed a reason and returned 0
+ * would be a green run describing nothing.
+ */
+const refuse = (reason: string): number => {
+  console.error(`FAIL ${reason}`)
+  console.error("No figures were computed.")
+  return EXIT_UNTRUSTED
+}
+
 const main = (): number => {
   if (!existsSync(CORPUS_PATH)) {
     console.error(`FAIL ${CORPUS_PATH} is missing, so there is no corpus to measure against. Run \`bun run ingest\` first.`)
@@ -652,21 +816,20 @@ const main = (): number => {
   }
 
   const record = process.argv.slice(2).includes("--record")
-  const db = new Database(CORPUS_PATH, { readonly: true })
+  // Opened through the `Result` rather than constructed here: a corpus file that is present and is not
+  // a database is a precondition this harness can state, and a constructor throw would answer it with
+  // a stack trace and exit code 1.
+  const opened = openCorpus()
+  if (!isOk(opened)) return refuse(opened.error)
+  const db = opened.value
   try {
     const identity = readIdentity(db)
     const onDisk = `snapshotHash=${identity.snapshotHash} recordCount=${identity.recordCount}`
     if (identity.snapshotHash.length === 0 || !Number.isInteger(identity.recordCount)) {
-      console.error(`FAIL ${CORPUS_PATH} records no usable identity: ${onDisk}.`)
-      console.error("No figures were computed.")
-      return EXIT_UNTRUSTED
+      return refuse(`${CORPUS_PATH} records no usable identity: ${onDisk}.`)
     }
     const committed = readCommittedAttestation()
-    if (!isOk(committed)) {
-      console.error(`FAIL ${describeAttestationProblem(committed.error)}`)
-      console.error("No figures were computed.")
-      return EXIT_UNTRUSTED
-    }
+    if (!isOk(committed)) return refuse(describeAttestationProblem(committed.error))
     const attested = attestSnapshot(committed.value, identity)
     if (isErr(attested)) {
       console.error(`FAIL ${describeAttestationProblem(attested.error)}`)
@@ -676,14 +839,10 @@ const main = (): number => {
       return EXIT_UNTRUSTED
     }
 
-    const decoded = decodeOrFail(decodeSync(EvalSet), JSON.parse(readFileSync(SET_PATH, "utf8")) as unknown, SET_PATH)
-    if (!isOk(decoded)) {
-      console.error(`FAIL ${SET_PATH} did not decode: ${describeDecodeFailure(decoded.error)}`)
-      console.error("No figures were computed.")
-      return EXIT_UNTRUSTED
-    }
+    const set = readEvalSet()
+    if (!isOk(set)) return refuse(set.error)
 
-    const cases = casesFrom(decoded.value)
+    const cases = casesFrom(set.value)
 
     // `--record` runs the measurement RECORD_RUNS times and publishes the slowest, so the figure of
     // record is chosen by the tool rather than by whoever is reading the output. Measured spread on the
@@ -718,6 +877,8 @@ const main = (): number => {
       costs.push(scanCost(perRun))
     }
     if (reasons.size > 0) {
+      // Every reason, not the first: a run that could not measure five cases says so five times, because
+      // the fix is a corpus defect and the operator needs all of it at once.
       for (const reason of reasons) console.error(`FAIL ${reason}`)
       console.error("No figures were computed.")
       return EXIT_UNTRUSTED
@@ -759,8 +920,13 @@ const main = (): number => {
     if (!record) return 0
     // Recorded only after the end-of-run attestation re-read, so a corpus rewritten mid-run cannot
     // have its figures written into the artefact a document is checked against.
-    const written = recordFigures(suggestionFigures(measurements, cost, identity))
-    console.log(`\nrecorded flat suggestion figures into ${written} — the artefact \`check:docs\` judges a stated latency against`)
+    //
+    // A write that fails is reported and exits 3, not swallowed: the figures above were printed, and a
+    // reader who is told nothing would quote a number that no artefact carries and no rule can then
+    // check. The word "recorded" is only true when this line prints (AGENTS.md §16).
+    const written = recordFigures(ARTEFACT_PATH, suggestionFigures(measurements, cost, identity))
+    if (!isOk(written)) return refuse(written.error)
+    console.log(`\nrecorded flat suggestion figures into ${written.value} — the artefact \`check:docs\` judges a stated latency against`)
     return 0
   } finally {
     db.close()

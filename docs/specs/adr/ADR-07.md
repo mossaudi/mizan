@@ -16,9 +16,16 @@ list as evidence.
 ## Decision
 
 Suggestions are **display-only**. A `Suggestion` carries record ids, record texts, citation
-metadata, a grade as the dataset asserts it, and the count of records searched. It carries no score,
-no percentage, no confidence, no rank value, and no verdict of any kind, and no code path exists by
-which it could affect one.
+metadata, a grade as the dataset asserts it, and the count of records **scanned** alongside the count
+**returned** from them. It carries no score, no percentage, no confidence, no rank value, and no
+verdict of any kind, and no code path exists by which it could affect one.
+
+The second half of that pairing is not decoration. A count of records *searched* is the number that
+flatters a retrieval system most and is the one a reader is most likely to quote as a recall claim,
+so `considered` is printed only next to what the search actually produced: `1 returned of 27234
+records scanned`. Either number alone is misleading in the opposite direction — the scanned count
+invites a recall reading, the returned count invites a "found nothing" reading — and the block says
+which collections were in scope beside them.
 
 The judgement lives in `@mizan/suggest`, which is a **leaf package**: it may import only relative
 modules and `@mizan/core`. It has no database handle, no provider, no network, no clock, no

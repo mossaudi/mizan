@@ -11,6 +11,8 @@ import {
   checkRegistryClaims,
   checkSnapshotArithmetic,
   checkedPaths,
+  formatDocsFailure,
+  formatDocsSuccess,
   runDocsClaimChecks,
   type DocsCheckResult,
   type DocsClaim,
@@ -996,6 +998,46 @@ describe("runDocsClaimChecks — the runner, end to end", () => {
       expect(details(forFile(result, "docs/specs/adr/ADR-08.md"))).toBe("")
     })
 
+    test("the failure report a person reads names every element needed to fix the document", () => {
+      // The defect this closes is a *build* whose output cannot be acted on. A finding that names a
+      // stale number but not the rule, or not the number the artefact recorded, leaves the next person
+      // to guess which of the two latency documents drifted and against what.
+      //
+      // The report is asserted through `formatDocsFailure` — the function the script prints — rather
+      // than through a template transcribed here. The previous version of this test built the line
+      // itself, so the printer could print `[rule] file` and the test would still have passed: it was
+      // asserting against its own transcription, and a transcription cannot fail.
+      const stale = RECORDED_P95 * 4
+      const planted = withArtefact({ "docs/specs/adr/ADR-08.md": adr(`p95 ${stale} ms`, ` on snapshotHash=${SHORT}.`) })
+      const result = runDocsClaimChecks(planted)
+      expect(result.ok).toBe(false)
+      expect(formatDocsFailure(result)).toContain(
+        "  [latency-claim-unbacked] docs/specs/adr/ADR-08.md: states p95 2800ms; data/benchmark/vs-search.json recorded p95 700ms, and the published tolerance is 1.5x",
+      )
+    })
+
+    test("the whole failure report is printed, so nothing it raised is silently dropped", () => {
+      // The report is the tool's contract with the person who has to fix the repository, and both
+      // halves of it are load-bearing: the findings, and the instruction not to delete the claim.
+      // Asserted as a whole document rather than field by field because the two halves are the same
+      // promise — a header with no advice reads as "this is not fixable".
+      const stale = RECORDED_P95 * 4
+      const result = runDocsClaimChecks(
+        withArtefact({
+          "docs/specs/adr/ADR-08.md": adr(`p95 ${stale} ms`, ` on snapshotHash=${SHORT}.`),
+          "docs/degradation-matrix.md": matrix(`p95 ${stale} ms`, ` on snapshotHash=${SHORT}`),
+        }),
+      )
+      expect(result.ok).toBe(false)
+      const report = formatDocsFailure(result).join("\n")
+      expect(report).toContain("check:docs FAILED — 2 documented claim(s) disagree with the repository.")
+      expect(report).toContain("docs/specs/adr/ADR-08.md")
+      expect(report).toContain("docs/degradation-matrix.md")
+      expect(report).toContain("do not delete the claim, because the drift it records was real.")
+      // A finding printed into a build log carries integers and paths only, never corpus text.
+      expect(report).not.toMatch(/[\u0600-\u06FF]/)
+    })
+
     test("the corpus-identity rule is reached too, on a figure that agrees perfectly", () => {
       // The half that is easy to forget: a figure can match the artefact exactly and still describe a
       // corpus this repository no longer serves. The artefact carries the fingerprint, so deleting it from
@@ -1011,6 +1053,48 @@ describe("runDocsClaimChecks — the runner, end to end", () => {
       const result = runDocsClaimChecks(withArtefact({ "docs/degradation-matrix.md": matrix("a visible notice", "") }))
       expect(details(forFile(result, "docs/degradation-matrix.md"))).toBe("")
     })
+
+    test("a missing artefact fails the sweep rather than waving the figure through", () => {
+      // The fail-closed half, and the one that decides whether the rule is honest at all. A sweep that
+      // found no artefact and reported nothing would be a rule that is green precisely when it has
+      // nothing to compare against — the rule-scoped-away-from-the-file shape ADR-10 records, wearing
+      // a different hat. The finding names the artefact that would have told us the number is true.
+      const without: Record<string, string> = { ...clean, "docs/specs/adr/ADR-08.md": adr("p95 700 ms", ` on snapshotHash=${SHORT}.`) }
+      const result = runDocsClaimChecks(tree(without))
+      expect(result.ok).toBe(false)
+      const found = forFile(result, "docs/specs/adr/ADR-08.md")
+      // Both latency halves fail, because both preconditions are unmet: there is no number to compare against
+      // and no fingerprint for the document to name. Asserting only one would let the other half quietly
+      // stop firing. `missing-path` also fires here — the ADR quotes the artefact's path and it is gone —
+      // which is why the total is not pinned: the point is that latency fails closed, not the rule count.
+      expect(rules(found)).toContain("latency-claim-unbacked")
+      expect(rules(found)).toContain("latency-corpus-unnamed")
+      expect(details(found)).toContain("data/benchmark/vs-search.json is absent")
+    })
+
+    test("an artefact whose latency keys are nested reports the shape, not a silent pass", () => {
+      // The trap `docs-value-latency.ts` is built to avoid: `readFigures` only collects TOP-LEVEL
+      // numbers, so `latency: { p95: 700 }` would leave the rule comparing nothing and green forever.
+      // A missing key is reported as a finding, and this is the assertion that the report is real.
+      const nested = JSON.stringify({ latency: { p95: RECORDED_P95 }, [LATENCY_KEYS.fingerprint]: SHORT })
+      const result = runDocsClaimChecks(
+        tree({ ...clean, "data/benchmark/vs-search.json": nested, "docs/specs/adr/ADR-08.md": adr("p95 700 ms", ` on snapshotHash=${SHORT}.`) }),
+      )
+      expect(result.ok).toBe(false)
+      expect(details(forFile(result, "docs/specs/adr/ADR-08.md"))).toContain(LATENCY_KEYS.p95)
+    })
+  })
+
+  test("the passing report states three counts and a sweep scope, not one total", () => {
+    // The report is a claim about this tool's own coverage, so it is held to the same standard it
+    // holds documents to. One flat number over three tiers is the overstatement the tiering removed.
+    const result = runDocsClaimChecks(tree(clean))
+    const report = formatDocsSuccess(result).join("\n")
+    expect(report).toContain("audited documents")
+    expect(report).toContain("corpus surfaces")
+    expect(report).toContain("evidence artefacts read")
+    expect(report).toContain("files swept for gate-count and ADR citations")
+    expect(report).toContain("no claim disagrees with the repository.")
   })
 
   test("the report names each input once, and .env.example is audited", () => {

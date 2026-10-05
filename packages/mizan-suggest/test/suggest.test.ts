@@ -5,6 +5,7 @@ import {
   MAX_ROWS_RANKED,
   MAX_TOP_K,
   MIN_SHARED_TRIGRAMS,
+  TRIGRAM_CHARS,
   boundTopK,
   openSearch,
   rankNeighbours,
@@ -55,6 +56,10 @@ describe("opening a search", () => {
     // reader a 100% candidate on the strength of one two-letter word. There is no 3-gram, so there was
     // never a measurement to make.
     const search = openSearch("هو")
+    // Pinned first, because it is the precondition of every assertion below: the refusal is a claim
+    // about the FOLDED length of the quote, so a failure here has to be diagnosable without reading
+    // `suggest.ts` — either the window moved, or this literal stopped folding to two characters.
+    expect(search.quoteFolded.length).toBeLessThan(TRIGRAM_CHARS)
     expect(search.quoteTooShort).toBe(true)
     expect(search.overlapOf(VERSE).contained).toBe(false)
     expect(search.overlapOf(VERSE).shared).toBe(0)

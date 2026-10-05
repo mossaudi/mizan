@@ -25,6 +25,7 @@ export {
   type DocsRule,
 } from "./docs-claims.ts"
 export { checkedPaths, runDocsClaimChecks, AUDITED_DOCUMENTS, BENCHMARK_ARTEFACT, DEMO_RUNBOOK, GITIGNORE, REQUIRED_DOCUMENTS, ATTESTATION, ENV_EXAMPLE, GOLDEN_EVAL, PROVIDER_SOURCE, REDTEAM_EVAL, REGISTRY, VALUE_PROOF, type AuditTier, type CheckedFile, type DocsCheckResult } from "./docs-check.ts"
+export { formatDocsFailure, formatDocsSuccess, TIER_CAPTION } from "./docs-report.ts"
 export { checkAnswerQualityClaim, checkBenchmarkClaimUnbacked, isRate, ANSWER_QUALITY_PHRASES, QUANTITIES, benchmarkScope, figuresIn, groupFigure, renderingsOf, statementBacking, type ExternalFigure, type Quantity, type StatedBenchmark } from "./docs-value.ts"
 export { checkExternalClaimUnbacked, externalClaimFigures, EXTERNAL_CLAIMS_PATH, type FigurePromise } from "./docs-external.ts"
 export { checkExecutorLabelBlindness, EXECUTOR_PATH, LABEL_TOKENS } from "./docs-benchmark.ts"

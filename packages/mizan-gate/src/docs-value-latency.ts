@@ -72,21 +72,42 @@ export type LatencyArtefact = {
   readonly text: string | null
 }
 
-/** Top-level numeric fields, or `null` when the text is absent, unparseable, or carries no numbers. */
-const readLatencyFields = (text: string | null): Readonly<Record<string, number>> | null => {
-  if (text === null) return null
+/**
+ * The top-level numeric fields of the artefact, or why there are none.
+ *
+ * The three failure modes are kept apart because they need different fixes, and telling a maintainer
+ * the wrong one costs an afternoon. `absent` is a missing file; `unparseable` is invalid JSON;
+ * `no-top-level-numbers` is a file that reads perfectly and is shaped `latency: { p95: 754 }`, which
+ * is the trap this module's header describes. Reporting that last one as "could not be read" would
+ * send whoever nests a key looking for a parse error that does not exist.
+ */
+type LatencyFields =
+  | { readonly kind: "absent" | "unparseable" | "no-top-level-numbers" }
+  | { readonly kind: "fields"; readonly fields: Readonly<Record<string, number>> }
+
+/** Parse the artefact once into an object, or say why it is not one. */
+const readLatencyFields = (text: string | null): LatencyFields => {
+  if (text === null) return { kind: "absent" }
   let parsed: unknown
   try {
     parsed = JSON.parse(text) as unknown
   } catch {
-    return null
+    return { kind: "unparseable" }
   }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return { kind: "unparseable" }
   const fields: Record<string, number> = {}
   for (const [key, value] of Object.entries(parsed)) {
     if (typeof value === "number" && Number.isFinite(value)) fields[key] = value
   }
-  return Object.keys(fields).length === 0 ? null : fields
+  if (Object.keys(fields).length === 0) return { kind: "no-top-level-numbers" }
+  return { kind: "fields", fields }
+}
+
+/** The sentence that says why the artefact cannot answer, per failure mode. */
+const whyUnreadable = (artefact: LatencyArtefact, kind: LatencyFields["kind"]): string => {
+  if (kind === "absent") return `${artefact.path} is absent`
+  if (kind === "unparseable") return `${artefact.path} is not a JSON object`
+  return `${artefact.path} holds no top-level numbers — ${REQUIRED_LATENCY_KEYS.map((key) => `\`${key}\``).join(", ")} must be top level, not nested`
 }
 
 /** The top-level string field, or `null`. Kept apart because only the fingerprint is a string. */
@@ -183,10 +204,11 @@ export const checkLatencyFigureUnbacked = (
   if (stated.length === 0) return []
   const findings: DocsClaim[] = []
 
-  const fields = readLatencyFields(artefact.text)
-  if (fields === null) {
-    return [claim("latency-claim-unbacked", file, `states a latency figure but ${artefact.path} could not be read, so the number is unverified`)]
+  const read = readLatencyFields(artefact.text)
+  if (read.kind !== "fields") {
+    return [claim("latency-claim-unbacked", file, `states a latency figure but ${whyUnreadable(artefact, read.kind)}, so the number is unverified`)]
   }
+  const fields = read.fields
   for (const key of REQUIRED_LATENCY_KEYS) {
     if (fields[key] === undefined) {
       findings.push(claim("latency-claim-unbacked", file, `states a latency figure but ${artefact.path} has no top-level numeric \`${key}\`, so there is nothing to compare it against`))

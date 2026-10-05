@@ -1,0 +1,28 @@
+{
+  "office_fact_memory": [
+    {
+      "fact": "Industry standard for recall is BM25+dense+reranker; for verification mizan prefers dependency-free exact containment + display-only diagnostics (separates UX from authoritative verdict).",
+      "phase": "research",
+      "evidence": "Competitor scan (Arabic RAG QA) vs mizan constitution §9, §10.",
+      "confidence": 0.95
+    },
+    {
+      "fact": "quran-validator uses multi-tier including fuzzy >=0.85 with auto-correct; mizan enforces MatchStrength = {exact,percent:100}|{none} and keeps fuzzy strictly display-only per G-7/§10.",
+      "phase": "research",
+      "evidence": "quran-validator README + mizan gate rules.",
+      "confidence": 0.95
+    },
+    {
+      "fact": "ADR-08 rejected FTS5 trigram sidecar due to adversarial recall loss (3/10 cases failed) — any latency fix must preserve recall.",
+      "phase": "research",
+      "evidence": "docs/scaling-path + measurements.",
+      "confidence": 0.95
+    },
+    {
+      "fact": "Suggestion evaluation set is hadith-only (40 cases: abudawud 22, ibnmajah 16, malik 2); Quran (6236) and Tirmidhi unmeasured — corpus-wide suggestion figures must state this constraint.",
+      "phase": "research",
+      "evidence": "data/eval/redteam-fabricated.json; attestation corpus recordCount 27234.",
+      "confidence": 0.95
+    }
+  ]
+}
