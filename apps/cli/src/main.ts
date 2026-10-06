@@ -25,6 +25,7 @@ import { describeDemoQuestions, readDemoQuestionSet } from "./demo-questions.ts"
 import { resolveProvider, ENV_API_KEY, providerKeyConfigured, TRANSCRIPT_RELATIVE } from "./provider-config.ts"
 import { SYSTEM_INSTRUCTIONS, VERIFICATION_BUDGET_MS } from "./instructions.ts"
 import { EXIT_DEGRADED, EXIT_OK, EXIT_UNTRUSTED, EXIT_USAGE } from "./exit-codes.ts"
+import { describeCliState, type CliRefusal } from "./degradation.ts"
 
 /**
  * `bun run ask "…" — the end-to-end path, and the composition root.
@@ -113,16 +114,40 @@ const record = async (root: string, draft: RunTraceDraft): Promise<boolean> => {
  *     passes a comparison is worse than a crash.
  *
  * @returns the attested snapshot hash, which becomes `corpusSnapshotHash` on every trace.
+ *
+ * The failure carries the *state* as well as the sentence, because "the attestation file cannot be
+ * read" and "the attestation disagrees with the corpus" are different conditions with different
+ * remedies, and the shared vocabulary names them differently. A single `string` error made that
+ * distinction unrepresentable, which is how `attestation_unreadable` came to be a name the CLI could
+ * not produce.
  */
-const readAttestedSnapshot = async (root: string, db: Database): Promise<Result<string, string>> => {
-  const meta = readSnapshotMeta(db)
+const readAttestedSnapshot = async (root: string, db: Database): Promise<Result<string, CliRefusal>> => {
+  // Wrapped for the same reason `openSnapshot` is, one step later: `bun:sqlite` opens lazily, so a
+  // file that exists and is not a database throws on the FIRST QUERY, which is this line. Unwrapped,
+  // that escape left the function — a promise-returning one, inside a `finally` that closes the
+  // handle — and printed a stack trace for a condition the vocabulary now names.
+  let meta: Readonly<Record<string, string>>
+  try {
+    meta = readSnapshotMeta(db)
+  } catch (cause) {
+    return err({
+      condition: "corpus_unusable",
+      detail: `${CORPUS_RELATIVE} is present but is not a readable snapshot: ${cause instanceof Error ? cause.message : String(cause)}`,
+    })
+  }
   const snapshotHash = meta.snapshotHash
   if (snapshotHash === undefined) {
-    return err("this corpus records no snapshotHash, so there is nothing to attest. Rebuild it with `bun run ingest`.")
+    return err({
+      condition: "corpus_unusable",
+      detail: "this corpus records no snapshotHash, so there is nothing to attest.",
+    })
   }
   const recordCount = Number(meta.recordCount)
   if (!Number.isInteger(recordCount)) {
-    return err(`this corpus records a recordCount of ${JSON.stringify(meta.recordCount)}, which is not a count.`)
+    return err({
+      condition: "corpus_unusable",
+      detail: `this corpus records a recordCount of ${JSON.stringify(meta.recordCount)}, which is not a count.`,
+    })
   }
 
   const path = `${root}/${ATTESTATION_RELATIVE}`
@@ -133,11 +158,16 @@ const readAttestedSnapshot = async (root: string, db: Database): Promise<Result<
     // F4's sibling, same class: a missing attestation on the QUERY path is not a reason to
     // serve unauthenticated content. The old code would have printed a whole verified report here.
     const why = cause instanceof Error ? cause.message : "unknown error"
-    return err(`${ATTESTATION_RELATIVE} is missing or unreadable (${why}), so the corpus cannot be attested.`)
+    return err({
+      condition: "attestation_unreadable",
+      detail: `${ATTESTATION_RELATIVE} is missing or unreadable (${why}), so the corpus cannot be attested.`,
+    })
   }
 
   const attested = attestSnapshot(committed, { snapshotHash, recordCount })
-  if (isErr(attested)) return err(describeAttestationProblem(attested.error))
+  if (isErr(attested)) {
+    return err({ condition: "attestation_mismatch", detail: describeAttestationProblem(attested.error) })
+  }
   return ok(snapshotHash)
 }
 
@@ -325,21 +355,32 @@ const main = async (): Promise<number> => {
 
   const corpusPath = `${root}/${CORPUS_RELATIVE}`
   if (!existsSync(corpusPath)) {
-    // Not a degradation — a missing prerequisite, said plainly.
-    console.error(`no corpus at ${CORPUS_RELATIVE}. Run \`bun run ingest\` first.`)
+    // Not a degradation — a missing prerequisite, said plainly, in the shared vocabulary so the
+    // word a reader sees here is the word an MCP client gets for the same absence.
+    console.error(describeCliState("corpus_absent", `no corpus at ${CORPUS_RELATIVE}.`))
     return EXIT_USAGE
   }
 
-  const db = openSnapshot(corpusPath)
+  // `openSnapshot` can throw: `bun:sqlite` opens a file lazily, so a path that exists and is not a
+  // database opens without complaint and raises on the first query. Unwrapped, that escape printed a
+  // raw stack trace and exited on a code that means "a case failed" — and the corpus, which is
+  // present and broken, was never the subject. It is a present-but-unusable corpus, which is a
+  // different state from an absent one and gets its own name (AGENTS.md section 16).
+  let db: Database
+  try {
+    db = openSnapshot(corpusPath)
+  } catch (cause) {
+    console.error(describeCliState("corpus_unusable", `${CORPUS_RELATIVE} could not be opened: ${cause instanceof Error ? cause.message : String(cause)}`))
+    return EXIT_UNTRUSTED
+  }
+
   try {
     const attested = await readAttestedSnapshot(root, db)
     if (isErr(attested)) {
       // The AGENTS.md section 16 row: "attestation mismatch -> loud integrity error, no verdict".
       // Exit 3 rather than 2: nothing here is a usage problem the user can fix by retyping
       // their question, and nothing was recorded, so this is not a degraded run either.
-      console.error(`ask FAILED — ${attested.error}`)
-      console.error("  No answer was produced. A verdict computed against an unattested corpus is not a verdict.")
-      console.error(`  Rebuild the corpus with \`bun run ingest\`, or check that ${ATTESTATION_RELATIVE} matches it.`)
+      console.error(`ask FAILED — ${describeCliState(attested.error.condition, attested.error.detail)}`)
       return EXIT_UNTRUSTED
     }
     return await ask(root, db, question, attested.value, askedLanguage, suggest)

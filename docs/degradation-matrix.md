@@ -89,3 +89,26 @@ recorded — corpus identity, case count, quantile rule, cache state, runtime, p
 Each failure mode has a test that triggers it and asserts the correct surface. The
 tests are in `packages/mizan-core/test/degradation.test.ts`. The suggestion states above are tested in
 `apps/cli/test/suggestions.test.ts` against a real snapshot, a real verifier and the real renderer.
+
+### The two states a checkout without a corpus hits
+
+A clean clone never enters the pipeline, so two surfaces have a refusal with no run behind it, and the
+matrix needs words for them. `apps/cli/test/clean-clone.test.ts` and
+`packages/mizan-mcp/test/clean-clone.test.ts` trigger each state and assert that the CLI and the MCP
+server name it with the *same word* — the CLI prints `corpus_absent: …` and the MCP server prints
+`corpus_missing: … — corpus_absent: …`, so a client comparing the two surfaces reads one reason.
+
+| state | condition | why it is not the row above it |
+| --- | --- | --- |
+| `data/corpus.db` does not exist | `corpus_absent` | nothing was retrieved; `bun run ingest` is the fix |
+| it exists and is not a snapshot | `corpus_unusable` | the file is present and corrupt, so "absent" would send an operator looking for a clone that does not exist |
+| it exists, and `attestation.json` cannot be read | `attestation_unreadable` | nothing disagrees yet — there is no verdict to disagree |
+| it exists, and the attestation names another snapshot | `attestation_mismatch` | loud, and never a verdict computed against the wrong corpus |
+
+The MCP server starts and refuses every call: on a missing corpus it serves the session, answers
+`initialize` and `tools/list` normally, and answers each `tools/call` with `isError: true` and
+`reason: "corpus_absent"`, so a client can branch on the same word it would branch on from the CLI
+while never reading a verdict. Nothing is written to stdout that contains `verified` or `verdicts`, and
+the reason is also printed once on stderr at startup for an operator who is not an MCP client.
+`scripts/accept-customer.clean-clone.test.ts` is the same claim at the command level, and
+`bun run ci:clean-clone` runs it.

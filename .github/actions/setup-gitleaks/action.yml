@@ -1,0 +1,46 @@
+name: Install gitleaks
+description: >-
+  Put the pinned gitleaks binary on the runner's PATH, because G-4 spawns `gitleaks` as a
+  subprocess and fails closed when it is absent. Use this rather than the gitleaks ACTION: the
+  action uploads SARIF to GitHub's secret-scanning UI and installs no binary this gate can spawn.
+
+inputs:
+  version:
+    description: >-
+      The version to install. Asserted equal to GITLEAKS_VERSION in
+      packages/mizan-gate/src/gates/g4-gitleaks.ts by packages/mizan-gate/test/gates.test.ts, so a
+      developer and CI run the same scan.
+    required: false
+    default: "8.24.3"
+
+runs:
+  using: composite
+  steps:
+    - name: Install gitleaks (Linux)
+      if: runner.os == 'Linux'
+      shell: bash
+      env:
+        GITLEAKS_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        curl -sSfL -o "$RUNNER_TEMP/gitleaks.tar.gz" \
+          "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+        sudo tar -xz -C /usr/local/bin -f "$RUNNER_TEMP/gitleaks.tar.gz" gitleaks
+        gitleaks version
+
+    - name: Install gitleaks (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        GITLEAKS_VERSION: ${{ inputs.version }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $version = $env:GITLEAKS_VERSION
+        $zip = Join-Path $env:RUNNER_TEMP 'gitleaks.zip'
+        $bin = Join-Path $env:RUNNER_TEMP 'gitleaks'
+        Invoke-WebRequest -Uri "https://github.com/gitleaks/gitleaks/releases/download/v$version/gitleaks_${version}_windows_x64.zip" -OutFile $zip
+        Expand-Archive -Path $zip -DestinationPath $bin -Force
+        # PATH rather than a step-local path: the gate spawns `gitleaks` by name, so a binary that is
+        # merely present on disk is as absent as one that was never downloaded.
+        "$bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        gitleaks version

@@ -15,6 +15,8 @@
     "ci:typecheck": "bun run typecheck",
     "ci:test": "bun run scripts/ci.ts --only=test",
     "ci:gates": "bun run scripts/ci.ts --only=gates",
+    "ci:corpus": "bun test scripts/benchmark.corpus.test.ts",
+    "ci:clean-clone": "bun test scripts/accept-customer.clean-clone.test.ts",
     "test": "bun run scripts/root-test-refuses.ts",
     "ingest": "bun run scripts/ingest.ts",
     "ingest:check": "bun run scripts/ingest.ts --check",
@@ -30,6 +32,7 @@
     "verify:runs": "bun run scripts/verify-runs.ts",
     "verify:chain": "bun run scripts/verify-chain.ts",
     "check:docs": "bun run scripts/check-docs-claims.ts",
+    "acceptance:surface-state": "bun run scripts/acceptance/surface-state.ts",
     "accept:customer": "bun run scripts/accept-customer.ts",
     "benchmark": "bun run scripts/benchmark.ts",
     "mcp": "bun run packages/mizan-mcp/src/main.ts"

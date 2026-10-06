@@ -1,4 +1,4 @@
-import { HONEST_BASELINE, type BaselineDeclaration, type BenchmarkOutcome } from "@mizan/core"
+import { HONEST_BASELINE, err, ok, type BaselineDeclaration, type BenchmarkOutcome, type Result } from "@mizan/core"
 import { type BaselineOptions, type BaselineResult } from "./baseline.ts"
 import { type ComparisonFigures } from "./compare.ts"
 
@@ -112,7 +112,7 @@ export type Figures = {
 }
 
 /**
- * Combine the two arms into the figures, and fail if they disagree about the set.
+ * Combine the two arms into the figures, and refuse if they disagree about the set.
  *
  * The case counts must match. Two arms run over different numbers of cases would produce a delta
  * between two denominators, which is the arithmetic version of comparing two unrelated numbers — so
@@ -123,17 +123,33 @@ export type Figures = {
  * baseline and a delta of `0.0` — an artefact that reads as "mizan caught nothing" when the truth
  * is "nothing was run", and a report that prints a hypothesis verdict for it. Refusing is the only
  * honest surface: the command reports a failure and writes nothing (AGENTS.md §16).
+ *
+ * ## Why this returns a `Result` and does not throw
+ *
+ * It used to `throw new Error` on both refusals, and that was an AGENTS.md §2 violation in the one
+ * function in this directory that computes `delta` and `falseVerifiedCount` — the two figures a judge
+ * reads. The mismatch branch is *reachable on the shipped path*: `run.ts` scores the baseline arm
+ * from `arms.baseline` and builds the system figures from `comparisons`, and the two are built by
+ * separate functions over separate inputs, so a defect in either one surfaces as a stack trace out of
+ * `bun run benchmark:vs-search` rather than as the sentence explaining which denominators disagreed.
+ *
+ * A `Result` makes the caller handle it, which is what turned that into `return EXIT_UNTRUSTED` with
+ * a message. It also means the invariant is expressed once, in the type, instead of in a comment above
+ * a `throw` nobody has to handle.
  */
-export const figuresOf = (outcomes: readonly BenchmarkOutcome[], system: ComparisonFigures): Figures => {
+export const figuresOf = (
+  outcomes: readonly BenchmarkOutcome[],
+  system: ComparisonFigures,
+): Result<Figures, string> => {
   if (outcomes.length !== system.caseCount) {
-    throw new Error(`figures: the baseline scored ${outcomes.length} cases and the system arm measured ${system.caseCount}, so the delta would compare two denominators`)
+    return err(`figures: the baseline scored ${outcomes.length} cases and the system arm measured ${system.caseCount}, so the delta would compare two denominators`)
   }
   if (outcomes.length === 0) {
-    throw new Error("figures: the set scored zero cases, so every rate would be 0 over 0 and the delta would compare nothing")
+    return err("figures: the set scored zero cases, so every rate would be 0 over 0 and the delta would compare nothing")
   }
   const total = outcomes.length
   const baselineTop1HitRate = rate(outcomes.filter((entry) => entry.baselineTopHit).length, total)
-  return {
+  return ok({
     baselineTop1HitRate,
     systemDetectionRate: system.detectionRate,
     systemAgreementRate: system.agreementRate,
@@ -142,7 +158,7 @@ export const figuresOf = (outcomes: readonly BenchmarkOutcome[], system: Compari
     // Carried from the comparison, where "the verifier called a fabrication verified" is computed.
     falseVerifiedCount: system.falseVerifiedCount,
     caseCount: total,
-  }
+  })
 }
 
 /** What each defect buys the rigger, and the sentence the self-test can print about it. */

@@ -21,13 +21,19 @@ export type GitleaksResult = { readonly ok: boolean; readonly detail: string }
  * The step name is quoted exactly as it appears in `.github/workflows/ci.yml`, because this
  * message previously pointed at a step that did not exist: the `secrets` job used the
  * gitleaks ACTION, which installs nothing on the runner's PATH, and the `gate` job — the only
- * job that runs `bun run ci` and therefore the only job that runs this gate — had no gitleaks
+ * job that ran `bun run ci` and therefore the only job that ran this gate — had no gitleaks
  * at all. A developer who followed the old message found nothing. The action now runs in its
- * own named job (`secrets`) and the install step is named in the `gate` job.
+ * own named job (`secrets`), and the install step named here lives in `.github/actions/
+ * setup-gitleaks` and is used by every job that runs `bun run ci`.
+ *
+ * `test/gates.test.ts` asserts both halves of that claim: that the action's default version is this
+ * module's `GITLEAKS_VERSION`, and that every job running `bun run ci` uses the action. Without those
+ * two assertions this comment is exactly the kind of claim that was wrong once already.
  */
 export const GITLEAKS_MISSING_MESSAGE =
   "gitleaks is not installed, so G-4 did not run. Install it (see .github/workflows/ci.yml, " +
-  "'Install gitleaks (G-4 subprocess gate needs the binary, not the action)', which pins the version) " +
+  "'Install gitleaks (G-4 subprocess gate needs the binary, not the action)', which runs " +
+  ".github/actions/setup-gitleaks and pins the version) " +
   "and re-run. A gate that does not run is not a gate."
 
 /** The version CI installs, so a local developer reproduces the scan rather than approximating it. */

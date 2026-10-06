@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { stripCommentsOnly } from "@mizan/gate"
 import { ROOT } from "./committed-ledger.ts"
+import { boundedExit, SUBPROCESS_TIMEOUT_MS } from "./subprocess-budget.ts"
 
 /**
  * MIZ-104's security acceptance, in the only form that survives the next edit.
@@ -169,6 +170,10 @@ describe("the demo with a key in the environment", () => {
     // Spawned once and asserted three times. The demo rebuilds its corpus and replays both
     // questions on every run, and re-spawning it per assertion would triple the cost of the
     // slowest test in the package to learn nothing the first run did not say.
+    //
+    // The budget is on `boundedExit`, not on this hook. A `beforeAll` has no per-test timeout
+    // annotation to raise — the tests below inherit whatever the hook is still doing — so a hang
+    // here is the one hang a `test(..., 60_000)` cannot catch, and it is bounded at the spawn.
     const proc = Bun.spawn(["bun", "run", DEMO_ENTRY], {
       cwd: ROOT,
       stdout: "pipe",
@@ -176,9 +181,12 @@ describe("the demo with a key in the environment", () => {
       env: { ...process.env, MIZAN_LLM_API_KEY: CANARY, MIZAN_LLM_BASE_URL: "" },
     })
     const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()])
-    code = await proc.exited
-    output = `${stdout}${stderr}`
-  })
+    const captured = `${stdout}${stderr}`
+    code = await boundedExit(proc.exited, () => {
+      proc.kill()
+    }, "bun run apps/cli/src/demo.ts", () => captured)
+    output = captured
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test("it still completes, and prints both badges", () => {
     expect(code).toBe(0)

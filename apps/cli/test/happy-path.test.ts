@@ -9,6 +9,7 @@ import { openSnapshot, readSnapshotMeta, resolveCitations } from "@mizan/corpus"
 import { runSpine, transcriptProvider, type RetrievedContext } from "@mizan/agent"
 import { verifyAnswer } from "@mizan/verify"
 import { preserveCommittedLedger, spawnCli } from "./committed-ledger.ts"
+import { SUBPROCESS_TIMEOUT_MS } from "./subprocess-budget.ts"
 import {
   EXIT_ATTESTATION_MISMATCH,
   EXIT_CORPUS_MISS,
@@ -197,7 +198,7 @@ describe("the CLI's exit code tells a caller whether it got an answer", () => {
     // changes nothing — the fail-open shape wearing a helpful sentence (AGENTS.md §3).
     expect(output).not.toContain("unset MIZAN_LLM_API_KEY")
     expect(output).toContain("--list-questions")
-  }, 60_000)
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test.skipIf(!CORPUS_PRESENT)("a configured provider that fails offers the labelled replay, and does not take it", async () => {
     // The base URL is refused by the host allowlist before any socket is opened, so this exercises
@@ -215,7 +216,7 @@ describe("the CLI's exit code tells a caller whether it got an answer", () => {
     // An offer, not a substitution: nothing was answered, and no key material is on screen.
     expect(output).not.toContain("sk-canary")
     expect(output).not.toContain("VERIFIED")
-  }, 60_000)
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test.skipIf(!CORPUS_PRESENT)("the committed question exits zero with a computed verdict", async () => {
     const { code, output } = await run(QUESTION)
@@ -223,7 +224,7 @@ describe("the CLI's exit code tells a caller whether it got an answer", () => {
     expect(output).toContain("VERIFIED")
     // The replay label is the honesty guarantee, and it is on screen, not just in the trace.
     expect(output).toContain("PRECOMPUTED")
-  }, 60_000)
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test.skipIf(!CORPUS_PRESENT)("the report states which language the question was asked in", async () => {
     // US-13 made observable rather than asserted. Before this, `processQuestion` was exported from
@@ -233,7 +234,7 @@ describe("the CLI's exit code tells a caller whether it got an answer", () => {
     const { code, output } = await run(QUESTION)
     expect(code).toBe(0)
     expect(output).toContain("language     en (ltr, detected)")
-  }, 60_000)
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test.skipIf(!CORPUS_PRESENT)("a question that merely uses a SQL word is asked, not refused", async () => {
     // The boundary must not refuse a real question. The previous filter rejected `\bsystem\b` and
@@ -244,7 +245,7 @@ describe("the CLI's exit code tells a caller whether it got an answer", () => {
     const { code, output } = await run("Explain the system of prayer in Islam.")
     expect(output).not.toContain("ask REFUSED")
     expect(code).not.toBe(EXIT_USAGE)
-  }, 60_000)
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test.skipIf(!CORPUS_PRESENT)("a payload-shaped question is refused at the boundary, before anything runs", async () => {
     // Refusal at the boundary is the cheap, unambiguous place: nothing is opened, no provider is
@@ -260,7 +261,7 @@ describe("the CLI's exit code tells a caller whether it got an answer", () => {
     expect(output).not.toContain("VERIFIED")
     expect(output).not.toContain("UNVERIFIABLE")
     expect(output).not.toContain("model unavailable")
-  }, 60_000)
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test.skipIf(!CORPUS_PRESENT)("a question in an undetectable script is refused, and says so", async () => {
     // The other boundary refusal, and a different fact from the one above: mizan cannot read this,
@@ -269,7 +270,7 @@ describe("the CLI's exit code tells a caller whether it got an answer", () => {
     expect(code).toBe(EXIT_USAGE)
     expect(output).toContain("ask REFUSED")
     expect(output).toContain("could not detect")
-  }, 60_000)
+  }, SUBPROCESS_TIMEOUT_MS)
 
   /**
    * The trace records what actually happened, not a plausible-looking summary.
@@ -329,7 +330,7 @@ describe("the CLI's exit code tells a caller whether it got an answer", () => {
     // what fails first when someone hard-codes a total and leaves the rows real.
     expect(timings.retrievalMs).toBe(calls.reduce((sum, call) => sum + call.elapsedMs, 0))
     expect(timings.totalMs).toBeGreaterThanOrEqual(timings.retrievalMs)
-  }, 60_000)
+  }, SUBPROCESS_TIMEOUT_MS)
 })
 
 /**

@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { decodeOrFail, decodeSync, isOk, normalizeForMatch, EvalSet as EvalSetSchema, type CorpusRecord, type EvalAnchor, type EvalSet } from "@mizan/core"
 import { buildSnapshot } from "@mizan/corpus"
 import { ROOT } from "./committed-ledger.ts"
+import { boundedExit, SUBPROCESS_TIMEOUT_MS } from "./subprocess-budget.ts"
 
 /**
  * The benchmark's REFUSAL paths, end to end through the real command.
@@ -135,7 +136,13 @@ const isolatedRoot = (plant: (dir: string, snapshotHash: string, recordCount: nu
   return { dir, snapshotHash: built.snapshotHash, recordCount: built.recordCount }
 }
 
-/** Run the benchmark with `cwd` pointed at `dir`, and capture everything it said. */
+/**
+ * Run the benchmark with `cwd` pointed at `dir`, and capture everything it said.
+ *
+ * Bounded rather than awaited bare: this spawns `scripts/benchmark.ts`, which on the refusal paths
+ * below never reaches its corpus and on the success path replays every eval question, and either of
+ * those can outlast the runner's default while the machine is loaded. See `subprocess-budget.ts`.
+ */
 const runBenchmark = async (dir: string): Promise<{ readonly code: number; readonly output: string }> => {
   const proc = Bun.spawn(["bun", "run", join(ROOT, BENCHMARK_RELATIVE)], {
     cwd: dir,
@@ -143,7 +150,11 @@ const runBenchmark = async (dir: string): Promise<{ readonly code: number; reado
     stderr: "pipe",
   })
   const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()])
-  return { code: await proc.exited, output: `${stdout}${stderr}` }
+  const output = `${stdout}${stderr}`
+  const code = await boundedExit(proc.exited, () => {
+    proc.kill()
+  }, "bun run scripts/benchmark.ts", () => output)
+  return { code, output }
 }
 
 /** The five published figure labels, spelled as `report.ts` prints them. */
@@ -216,7 +227,7 @@ describe("a corpus with no attestation publishes no figure", () => {
     expect(code).toBe(EXIT_UNTRUSTED)
     expect(output).toContain("attestation_unreadable")
     expectNoPublishedFigures(output)
-  })
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test("the refusal is unmodified: nothing is written, and the artefact is not created", async () => {
     // "Prints no figure" is weaker than "writes no figure". A benchmark that refused but still
@@ -228,7 +239,7 @@ describe("a corpus with no attestation publishes no figure", () => {
 
     expect(filesUnder(dir)).toEqual(before)
     expect(filesUnder(dir)).not.toContain("data/benchmark/vs-search.json")
-  })
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test("an attestation.json that is a DIRECTORY is refused, not a raw EISDIR throw", async () => {
     // One of the named edge cases, and the one a `try`-less read gets wrong: `readFileSync` on a
@@ -249,7 +260,7 @@ describe("a corpus with no attestation publishes no figure", () => {
     expect(output).not.toMatch(/\n\s+at\s/)
     expectNoPublishedFigures(output)
     expect(code).toBe(EXIT_UNTRUSTED)
-  })
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test("an attestation.json that is empty is refused, not decoded into a zero", async () => {
     // The other named edge case. A `JSON.parse` that yielded `undefined` and then compared
@@ -264,7 +275,7 @@ describe("a corpus with no attestation publishes no figure", () => {
     expect(output).toContain("attestation_unreadable")
     expectNoPublishedFigures(output)
     expect(code).toBe(EXIT_UNTRUSTED)
-  })
+  }, SUBPROCESS_TIMEOUT_MS)
 })
 
 describe("a mismatch is a loud abort, and it names what disagreed", () => {
@@ -289,7 +300,7 @@ describe("a mismatch is a loud abort, and it names what disagreed", () => {
     expect(output).toContain("snapshotHash")
     expect(code).toBe(EXIT_UNTRUSTED)
     expectNoPublishedFigures(output)
-  })
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test("a right hash with the wrong record count names the count and refuses", async () => {
     // The other direction, and the case a hash-only check would pass: the records are the same, so
@@ -320,7 +331,7 @@ describe("a mismatch is a loud abort, and it names what disagreed", () => {
     // The record count IS a number, and it is the one number a refusal is allowed to carry: it is
     // the diagnosis, not a measurement. Every *figure* is still absent.
     for (const label of FIGURE_LABELS) expect(output.includes(label)).toBe(false)
-  })
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test("the exit code is 3 and not 0 or 1, so one number means 'do not believe the output'", async () => {
     // Stated as its own assertion because a harness that special-cases 1 would treat a refusal as a
@@ -328,7 +339,7 @@ describe("a mismatch is a loud abort, and it names what disagreed", () => {
     const { dir } = isolatedRoot(() => undefined)
     const { code } = await runBenchmark(dir)
     expect(code).toBe(EXIT_UNTRUSTED)
-  })
+  }, SUBPROCESS_TIMEOUT_MS)
 })
 
 describe("there is no corpus at all", () => {
@@ -347,7 +358,7 @@ describe("there is no corpus at all", () => {
     expect(output).toContain("bun run ingest")
     expect(output).not.toContain("attestation")
     expectNoPublishedFigures(output)
-  })
+  }, SUBPROCESS_TIMEOUT_MS)
 })
 
 describe("there is nothing to measure", () => {
@@ -365,7 +376,7 @@ describe("there is nothing to measure", () => {
     expect(output).toContain("zero cases")
     expectNoPublishedFigures(output)
     expect(filesUnder(dir)).not.toContain("data/benchmark/vs-search.json")
-  })
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test("the refusal is not a crash, and it names the file that is empty", async () => {
     // Same standard as the `EISDIR` case above: an integrity refusal that surfaces as a stack trace
@@ -379,5 +390,5 @@ describe("there is nothing to measure", () => {
     expect(output).toContain("data/eval/redteam-fabricated.json")
     expect(output).not.toMatch(/\n\s+at\s/)
     expect(output).not.toContain("Traceback")
-  })
+  }, SUBPROCESS_TIMEOUT_MS)
 })

@@ -11,7 +11,7 @@ import {
 import { checkGateCountClaim, GATE_CLAIM_EXCLUDES, GATE_CLAIM_EXTENSIONS } from "./docs-gates.ts"
 import { checkSnapshotArithmetic } from "./docs-snapshot.ts"
 import { checkEvalBreadth } from "./docs-artifacts.ts"
-import { checkCollectionCoverage, checkCoverageTableRows, checkPresenceCollectionNamed, checkPresenceCoverageRecorded, COVERAGE_SET } from "./docs-coverage.ts"
+import { checkCollectionCoverage, checkCoverageTableRows, checkMeasuredSetDigest, checkPresenceCollectionNamed, checkPresenceCoverageRecorded, COVERAGE_SET } from "./docs-coverage.ts"
 import { checkLiveProviderClaim } from "./docs-egress.ts"
 import { checkAnswerQualityClaim, checkBenchmarkClaimUnbacked, statementBacking, type StatedBenchmark } from "./docs-value.ts"
 import { checkExternalClaimUnbacked, externalClaimFigures, EXTERNAL_CLAIMS_PATH } from "./docs-external.ts"
@@ -268,7 +268,7 @@ const readJson = (root: string, relative: string): unknown => {
  * line is drawn at *claiming* — an attestation that exists is a claim about the corpus, and one that
  * cannot answer R18's question has failed to keep it.
  */
-type ServedCollections = {
+export type ServedCollections = {
   readonly served: ReadonlySet<string>
   readonly usable: boolean
   /**
@@ -284,7 +284,7 @@ type ServedCollections = {
   readonly counts: ReadonlyMap<string, number>
 }
 
-const servedCollections = (root: string): ServedCollections => {
+export const servedCollections = (root: string): ServedCollections => {
   // `readJson` cannot tell an absent file from an unreadable one: both arrive as `null`. The
   // distinction is this rule's whole fail-closed edge — an absent attestation is a repository that
   // claims no corpus, and an unreadable one is a claim that failed to be made — so the presence of the
@@ -443,6 +443,12 @@ export const runDocsClaimChecks = (root: string): DocsCheckResult => {
     // whose figures are fine and whose prose is not reports the prose defect alone: two findings for one
     // drifting number is what makes a reader stop reading the second.
     claims.push(...checkCoverageTableRows(text, document, benchmark, served.counts))
+    // The provenance of that table, on the same artefact and for the same reason: a per-collection table
+    // states fifteen cases without saying which fifteen, and every other number here is checked against an
+    // artefact while that one was not. Runs immediately after the table rule so a document whose table is
+    // both stale and unattributed reports the numbers first — a reader can act on the count before they
+    // read about provenance.
+    claims.push(...checkMeasuredSetDigest(text, document, benchmark))
     if (document === DEMO_RUNBOOK) claims.push(...checkRunbookOrder(text, document))
   }
 

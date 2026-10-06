@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
 import { MAX_CITATIONS_PER_CLAIM as VERIFY_MAX_CITATIONS_PER_CLAIM } from "@mizan/verify"
 import { buildSnapshot, type Attestation, type SnapshotIdentity } from "@mizan/corpus"
-import type { Claim, ClaimVerdict, CorpusRecord } from "@mizan/core"
+import { conditionOf, ok, type Claim, type ClaimVerdict, type CorpusRecord, type Result } from "@mizan/core"
 import {
   createDispatcher,
   createServer,
@@ -25,6 +25,8 @@ import { MAX_LINE_CODE_UNITS, serve, type Port } from "../src/transport.ts"
 import {
   describeCorpusProblem,
   openCorpusVerifier,
+  refusingVerifier,
+  withoutAbsolutePaths,
   type CorpusProblem,
   type Verifier,
 } from "../src/verifier.ts"
@@ -199,9 +201,9 @@ const verdictFor = (claimId: string, verdict: ClaimVerdict["verdict"] = "verifie
 
 /** A verifier that echoes a decision per claim and records what it was asked. */
 const stubVerifier = (seen: Claim[][] = [], decide: (claim: Claim) => ClaimVerdict["verdict"] = () => "verified"): Verifier => {
-  return (input): readonly ClaimVerdict[] => {
+  return (input): Result<readonly ClaimVerdict[], CorpusProblem> => {
     seen.push([...input.claims])
-    return input.claims.map((claim) => verdictFor(claim.id, decide(claim)))
+    return ok(input.claims.map((claim) => verdictFor(claim.id, decide(claim))))
   }
 }
 
@@ -424,7 +426,7 @@ describe("the verify tool", () => {
     const budgets: number[] = []
     const verifier: Verifier = (input) => {
       if (input.deadlineExpired?.() === true) budgets.push(1)
-      return input.claims.map((claim) => verdictFor(claim.id, "unverifiable"))
+      return ok(input.claims.map((claim) => verdictFor(claim.id, "unverifiable")))
     }
     // `startedAt` is already older than the budget, so the predicate the verifier saw was expired.
     executeVerify(verifier, { claims: [claimArgs("c-1")] }, 0, 1)
@@ -435,7 +437,7 @@ describe("the verify tool", () => {
     const seen: boolean[] = []
     const verifier: Verifier = (input) => {
       seen.push(input.deadlineExpired?.() ?? false)
-      return input.claims.map((claim) => verdictFor(claim.id, "verified"))
+      return ok(input.claims.map((claim) => verdictFor(claim.id, "verified")))
     }
     executeVerify(verifier, { claims: [claimArgs("c-1")] }, Date.now(), 30_000)
     expect(seen).toEqual([false])
@@ -528,16 +530,24 @@ describe("the verify tool", () => {
  * before a client is answered, so those four tags were already covered and this path was not. A
  * `corpus.db` that is fine at startup and rotted by the third request raises `SQLITE_CORRUPT` from
  * inside `resolveCitations`, and that throw used to unwind `serve()` entirely — `main.ts` printed it
- * as `mcp transport failed` and exited 3. A *transport* label on a *corpus* fault, reported by the
- * one component that has no business diagnosing a corpus, on a session that one unreadable record
- * had no business ending (AGENTS.md section 16).
+ * as `mcp transport failed` and exited 3. A *transport* label on a *verifier* fault, reported by the
+ * one component that has no business diagnosing a fault, on a session that one unreadable record had
+ * no business ending (AGENTS.md section 16).
  *
  * ## What is asserted, and what deliberately is not
  *
- * Each test states one property: the throw is caught, the reason is `verifier_unavailable` rather
- * than `invalid_arguments`, the payload carries no verdict, and the session survives. None of them
- * asserts a specific wording of the driver's message, because a client pinned to this library's
- * error string would break on a Bun upgrade for no gain.
+ * Each test states one property: the throw is caught, the reason is a word from the shared degradation
+ * vocabulary rather than `invalid_arguments`, the payload carries no verdict, and the session survives.
+ * None of them asserts a specific wording of the driver's message, because a client pinned to this
+ * library's error string would break on a Bun upgrade for no gain.
+ *
+ * ## Why the tag is `verifier_faulted`
+ *
+ * The catch cannot know where its throw came from, so it no longer claims to: the tag used to be
+ * `corpus_unusable`, which asserts that the corpus file is present but unopenable and tells an
+ * operator to re-run `bun run ingest` — the wrong remedy for a fault raised downstream of the query,
+ * presented with the confidence of a diagnosis. These tests pin the tag, its projection onto
+ * `unverifiable`, and its absence of `corpus_unusable`.
  */
 describe("a verifier that throws is answered as a tool error, and the session survives", () => {
   const CORRUPT = "database disk image is malformed"
@@ -546,20 +556,58 @@ describe("a verifier that throws is answered as a tool error, and the session su
     expect(() => executeVerify(throwingVerifier(CORRUPT), { claims: [claimArgs("c-1")] }, 0, 30_000)).not.toThrow()
   })
 
-  test("the refusal is `verifier_unavailable`, because the call was well-formed and the fault is ours", () => {
+  test("the refusal is `unverifiable`, because the fault is in our verification and not in the client's call", () => {
     // The distinction that matters: `invalid_arguments` sends a client off to fix its own request,
-    // which would be wrong advice. The verifier is what failed, and the reason has to say so.
+    // which would be wrong advice. The shared word it gets is `unverifiable` — the honest
+    // product-level answer — and the MCP-specific tag beside it is `verifier_faulted`, so an
+    // integrator can see the fault without this server having to guess at a cause.
     const result = executeVerify(throwingVerifier(CORRUPT), { claims: [claimArgs("c-1")] }, 0, 30_000)
     expect(result.isError).toBe(true)
     const parsed = readJson(result.content[0]!.text) as { error: { reason: string; detail: string } }
-    expect(parsed.error.reason).toBe("verifier_unavailable")
+    expect(parsed.error.reason).toBe("unverifiable")
+    expect(parsed.error.detail).toContain("verifier_faulted")
     expect(parsed.error.detail).toContain(CORRUPT)
   })
 
-  test("the refusal carries no verdict at all, so a client cannot read a failure as an answer", () => {
+  test("the refusal is NOT `corpus_unusable`, because a catch cannot know the corpus rotted", () => {
+    // The regression this guards is a confident wrong diagnosis. `corpus_unusable` sends an operator
+    // to re-run `bun run ingest`; for a throw raised downstream of the query that produces the same
+    // snapshot and the same failure, so the label would send them round that loop. Claiming a cause
+    // the catch never established is fail-open (AGENTS.md section 3), and `openCorpusVerifier` is
+    // where a corpus diagnosis is actually made.
     const result = executeVerify(throwingVerifier(CORRUPT), { claims: [claimArgs("c-1")] }, 0, 30_000)
-    expect(result.content[0]!.text).not.toContain("verified")
-    expect(result.content[0]!.text).not.toContain("verdicts")
+    expect(result.content[0]!.text).not.toContain("corpus_unusable")
+    expect(result.content[0]!.text).not.toContain("corpus_missing")
+  })
+
+  test("the refusal is a declared degradation word, so a client can branch on the shared vocabulary", () => {
+    const result = executeVerify(throwingVerifier(CORRUPT), { claims: [claimArgs("c-1")] }, 0, 30_000)
+    const parsed = readJson(result.content[0]!.text) as { error: { reason: string } }
+    expect(conditionOf(parsed.error.reason).ok).toBe(true)
+  })
+
+  test("a verifier that refuses through the port is answered exactly as one that throws", () => {
+    // The port now carries the refusal, so the two ways a verifier can decline must not be
+    // distinguishable to a client — otherwise every integrator learns two code paths for one fault.
+    const thrown = executeVerify(throwingVerifier(CORRUPT), { claims: [claimArgs("c-1")] }, 0, 30_000)
+    const refused = executeVerify(refusingVerifier({ _tag: "corpus_unusable", detail: CORRUPT }), { claims: [claimArgs("c-1")] }, 0, 30_000)
+    expect(refused.isError).toBe(true)
+    expect(refused.content[0]!.text).toContain("corpus_unusable")
+    expect(thrown.isError).toBe(refused.isError)
+  })
+
+  test("the refusal carries no verdict at all, so a client cannot read a failure as an answer", () => {
+    // Asserted on the PARSED shape, not on a substring scan. A substring scan is the version that
+    // cannot be written here: `describeCondition("unverifiable")` contains the word `verified` —
+    // inside the sentence `Never verified` — so scanning for it asserts that the honest refusal
+    // must not contain the word it warns against. What a client can actually misread is a verdict
+    // FIELD, so that is what is asserted: no `verdicts` key, and no error value of `verified`.
+    const result = executeVerify(throwingVerifier(CORRUPT), { claims: [claimArgs("c-1")] }, 0, 30_000)
+    const parsed = readJson(result.content[0]!.text) as Record<string, unknown>
+    expect(Object.keys(parsed)).toEqual(["error"])
+    expect(parsed).not.toHaveProperty("verdicts")
+    expect(JSON.stringify(parsed)).not.toContain('"verdict":"verified"')
+    expect(JSON.stringify(parsed)).not.toContain('"verdicts":[')
   })
 
   test("a throw that is not an `Error` is still contained, because a thrown value is untyped", () => {
@@ -570,7 +618,7 @@ describe("a verifier that throws is answered as a tool error, and the session su
     }
     const result = executeVerify(throwing(), { claims: [claimArgs("c-1")] }, 0, 30_000)
     expect(result.isError).toBe(true)
-    expect(result.content[0]!.text).toContain("verifier_unavailable")
+    expect(result.content[0]!.text).toContain("verifier_faulted")
   })
 
   test("the next request is answered normally, because one bad record is not a reason to end the session", async () => {
@@ -678,22 +726,24 @@ describe("read-only — the surface has no write path", () => {
 
 describe("no corpus content in the response", () => {
   const withEvidence: Verifier = (input) =>
-    input.claims.map((claim) => ({
-      ...verdictFor(claim.id, "verified"),
-      evidence: {
-        recordId: "tirmidhi:1",
-        collection: "tirmidhi",
-        number: "1",
-        sourceUrl: "https://example.org/secret-source",
-        license: "secret-licence-string",
-        attribution: "secret-attribution-string",
-        grade: null,
-        gradeSource: "dataset",
-        gradeBasis: "collection",
-        matchedChars: 5,
-        quoteChars: 5,
-      },
-    }))
+    ok(
+      input.claims.map((claim) => ({
+        ...verdictFor(claim.id, "verified"),
+        evidence: {
+          recordId: "tirmidhi:1",
+          collection: "tirmidhi",
+          number: "1",
+          sourceUrl: "https://example.org/secret-source",
+          license: "secret-licence-string",
+          attribution: "secret-attribution-string",
+          grade: null,
+          gradeSource: "dataset",
+          gradeBasis: "collection",
+          matchedChars: 5,
+          quoteChars: 5,
+        },
+      })),
+    )
 
   test("evidence is dropped even when the verdict carries it", () => {
     const text = executeVerify(withEvidence, { claims: [claimArgs("c-1")] }, 0, 30_000).content[0]!.text
@@ -1155,11 +1205,54 @@ const refuseOn = (snapshot: PlantedSnapshot, attestationPath: string, message: s
 }
 
 describe("openCorpusVerifier — fail closed before any client is answered", () => {
-  test("a missing corpus is refused, and the refusal names the path", () => {
+  test("a missing corpus is refused, and the refusal names the ROLE rather than the operator's path", () => {
+    // The path an operator configured (`MIZAN_CORPUS_PATH`) is an absolute path on their machine, and
+    // `describeCorpusProblem` is the text a client receives. The refusal therefore has to survive
+    // being written at all — which is what `withoutAbsolutePaths` is for — while still naming which
+    // file is missing, because a client that cannot tell a missing corpus from a missing attestation
+    // has the two remedies backwards.
     const opened = openCorpusVerifier({ corpusPath: "does/not/exist/corpus.db", attestationPath: "does/not/exist/attestation.json" })
     if (!("error" in opened)) throw new Error("a missing corpus produced a verifier")
     expect(opened.error._tag).toBe("corpus_missing")
     expect(describeCorpusProblem(opened.error)).toContain("does/not/exist/corpus.db")
+  })
+
+  test("an absolute corpus path never reaches the wire, in either slash style", () => {
+    // The live repro: a customer running on Windows saw `C:\Users\somebody\AppData\Local\…` inside
+    // the MCP error payload. A client is a different trust domain from the operator who typed the
+    // path, and a filesystem layout is not something a tool error has to publish.
+    const windowsPath = "C:\\Users\\somebody\\AppData\\Local\\mizan\\corpus.db"
+    const posixPath = "/home/somebody/.mizan/corpus.db"
+    for (const corpusPath of [windowsPath, posixPath]) {
+      const opened = openCorpusVerifier({ corpusPath, attestationPath: "/home/somebody/.mizan/attestation.json" })
+      if (!("error" in opened)) throw new Error("a missing corpus produced a verifier")
+      const described = describeCorpusProblem(opened.error)
+      expect(described).not.toContain(corpusPath)
+      expect(described).not.toContain("somebody")
+      expect(described).toContain("<host path>")
+      expect(described).toContain("corpus_absent")
+    }
+  })
+
+  test("the operator still gets the path, on stderr, because that is where a layout belongs", () => {
+    // `describeCorpusProblem` is the wire. `main()` prints the same problem plus the two paths it
+    // resolved, on stderr, which only the operator reads — so redacting the client copy costs the
+    // operator nothing. The resolvers themselves are asserted in `main.test.ts`; this asserts the
+    // remaining half, end to end: a spawned server names the absolute path on stderr and does not
+    // put it in the `tools/call` payload.
+    const corpusPath = join(tmpdir(), "mizan-operator-only-corpus.db")
+    const spawned = Bun.spawnSync({
+      cmd: [process.execPath, join(import.meta.dir, "..", "src", "main.ts")],
+      env: { ...process.env, MIZAN_CORPUS_PATH: corpusPath, MIZAN_ATTESTATION_PATH: `${corpusPath}.attestation` },
+      stdin: Buffer.from(`${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: callArgs([claimArgs("c-1")]) })}\n`),
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const stderr = spawned.stderr.toString()
+    const stdout = spawned.stdout.toString()
+    expect(stderr).toContain(corpusPath)
+    expect(stdout).not.toContain(corpusPath)
+    expect(stdout).toContain("corpus_absent")
   })
 
   test("a file that exists but is not a database is refused as unusable rather than as missing", () => {
@@ -1217,7 +1310,9 @@ describe("openCorpusVerifier — fail closed before any client is answered", () 
     const open = opened.value
     try {
       expect(open.identity).toEqual(snapshot.identity)
-      expect(open.verifier({ claims: [plantedClaim()] }).map((verdict) => verdict.verdict)).toEqual(["verified"])
+      const answered = open.verifier({ claims: [plantedClaim()] })
+      if (!answered.ok) throw new Error(`an attested corpus refused a planted claim: ${answered.error.detail}`)
+      expect(answered.value.map((verdict) => verdict.verdict)).toEqual(["verified"])
       // The handle is read-only, so the strongest available statement that the tool does not write
       // is that a write through it fails rather than succeeding.
       expect(() => open.db.run("DELETE FROM records")).toThrow()
@@ -1239,6 +1334,7 @@ describe("openCorpusVerifier — fail closed before any client is answered", () 
     const problems: CorpusProblem[] = [
       { _tag: "corpus_missing", detail: "x" },
       { _tag: "corpus_unusable", detail: "y" },
+      { _tag: "verifier_faulted", detail: "q" },
       { _tag: "attestation_unreadable", detail: "z" },
       { _tag: "attestation_mismatch", detail: "w" },
     ]
@@ -1258,5 +1354,131 @@ describe("openCorpusVerifier — fail closed before any client is answered", () 
 
   test("a missing corpus tells the operator the one command that fixes it", () => {
     expect(describeCorpusProblem({ _tag: "corpus_missing", detail: "x" })).toContain("bun run ingest")
+  })
+})
+
+/**
+ * `withoutAbsolutePaths` as a property of its own, not only through a refusal.
+ *
+ * ## Why this is tested apart from `describeCorpusProblem`
+ *
+ * The redaction is the control that keeps an operator's filesystem layout out of a client's error
+ * payload, and a control tested only through one caller is a control that can be bypassed by the
+ * next caller. These cases pin the two halves separately: the paths that MUST go, and the strings
+ * that must survive. The second half is the one that is easy to break — a blunter pattern that
+ * swallows a URL, or a relative path this module deliberately names, breaks the module's own
+ * diagnostics and nobody notices because a leaked path is not what anyone was looking at.
+ */
+describe("withoutAbsolutePaths — the wire never carries a filesystem layout", () => {
+  const LEAKS: readonly string[] = [
+    "C:\\Users\\somebody\\AppData\\Local\\mizan\\corpus.db",
+    "c:/users/somebody/corpus.db",
+    "/home/somebody/.mizan/corpus.db",
+    "/var/lib/mizan/data/corpus.db",
+    "/etc/attestation.json",
+    // The CR's Finding 3, planted. These three shapes all reached a client's error payload intact, and
+    // for one reason: the lookbehind that stops `https://` from being read as a drive letter also stops a
+    // drive letter that a scheme or a key label put in front of one. The path is the same path.
+    "path:C:\\Users\\somebody\\AppData\\Local\\mizan\\corpus.db",
+    "file:///C:/Users/somebody/AppData/Local/mizan/corpus.db",
+    "unix:///var/lib/mizan/data/corpus.db",
+  ]
+
+  test("every absolute path is replaced, in both slash styles and either case", () => {
+    for (const path of LEAKS) {
+      expect(withoutAbsolutePaths(`the corpus at ${path} could not be read`)).toBe(
+        "the corpus at <host path> could not be read",
+      )
+    }
+  })
+
+  test("a scheme-prefixed path is redacted whole, because half of a URI is still a path", () => {
+    // A replace scoped to the bare alternatives that follows `file:` would leave `/Users/somebody/…`
+    // behind — which is the operator's home directory and the half of the string worth hiding. The prefix
+    // is consumed with the path or not at all.
+    expect(withoutAbsolutePaths("ENOENT: file:///C:/Users/somebody/AppData/Local/mizan/corpus.db")).toBe(
+      "ENOENT: <host path>",
+    )
+    expect(withoutAbsolutePaths("unix:///var/lib/mizan/data/corpus.db is unreadable")).toBe(
+      "<host path> is unreadable",
+    )
+  })
+
+  test("a key-prefixed path is redacted, and a bare `path:` label in prose is not", () => {
+    // Both halves. An inspected `SystemError` prints `{ code: 'ENOENT', path: 'C:\\…' }`; quoted, the
+    // drive alternative catches it. Unquoted, `path:` plus the path is one token and the scheme
+    // alternative takes both. And the word `path:` on its own is prose this module still needs in order
+    // to name a role, so a control that ate it would mangle a diagnosis to fix a leak.
+    expect(withoutAbsolutePaths("SystemError { code: 'ENOENT', path: 'C:\\Users\\somebody\\corpus.db' }")).toBe(
+      "SystemError { code: 'ENOENT', path: '<host path>' }",
+    )
+    expect(withoutAbsolutePaths("path:C:\\Users\\somebody\\corpus.db is not readable")).toBe(
+      "<host path> is not readable",
+    )
+    expect(withoutAbsolutePaths("the configured path: is not readable")).toBe("the configured path: is not readable")
+  })
+
+  test("a non-filesystem URL scheme is still not a path, so the allow-list stays an allow-list", () => {
+    // The reason the scheme alternative enumerates `file`/`unix`/`path` instead of matching any scheme:
+    // a driver that quotes an HTTP endpoint has told the client something diagnostic, and redacting it
+    // loses the only actionable part of the message.
+    for (const url of [
+      "HTTP 404 from https://api.example.com/v1/models",
+      "refused by http://127.0.0.1:8080/v1",
+      "provider endpoint data:stream failed",
+    ]) {
+      expect(withoutAbsolutePaths(url)).toBe(url)
+    }
+  })
+
+  test("a Windows path embedded in a driver message is replaced, not half-copied", () => {
+    // SQLite names the file it failed on, and that file is a sidecar of the corpus
+    // (`corpus.db-wal`). A replaceAll of the corpus path alone would leave the suffix, which is
+    // still the operator's layout.
+    const scrubbed = withoutAbsolutePaths("SQLITE_CORRUPT: C:\\mizan\\data\\corpus.db-wal is malformed")
+    expect(scrubbed).toBe("SQLITE_CORRUPT: <host path> is malformed")
+  })
+
+  test("a URL is left intact, because a driver may quote one and mangling it loses the diagnosis", () => {
+    expect(withoutAbsolutePaths("HTTP 404 from https://api.example.com/v1/models")).toBe(
+      "HTTP 404 from https://api.example.com/v1/models",
+    )
+  })
+
+  test("a repository-relative path is left intact, because it is the name we want to keep saying", () => {
+    // The redaction rules added later — the scheme prefixes, the `path:` label, the URL — all end in
+    // something like `path`. So the shapes that must SURVIVE are as much a part of the contract as the
+    // shapes that must not: a guard proved only by its redacting direction would still be green with a
+    // prefix like `./` that swallowed every relative path this server is required to name. Each of
+    // these is spelled the way an operator or a document writes it, and the plain `data/corpus.db`
+    // case above is the one that was already there — the other three are the regression.
+    for (const detail of [
+      "data/corpus.db is not present",
+      "./data/corpus.db is not present",
+      "../data/corpus.db is not present",
+      "..\\data\\corpus.db is not present",
+      "run bun run ingest",
+    ]) {
+      expect({ detail, redacted: withoutAbsolutePaths(detail) }).toEqual({ detail, redacted: detail })
+    }
+  })
+
+  test("a detail with no path is returned unchanged, so the function cannot corrupt prose", () => {
+    const detail = "the snapshot recorded no usable identity (snapshotHash length 0, recordCount abc)"
+    expect(withoutAbsolutePaths(detail)).toBe(detail)
+  })
+
+  test("the corpus text rule still holds: no record content is carried by a refusal", () => {
+    // §13 in the same breath as the path rule, because the two leak different things and a test
+    // that checked one used to be read as checking both.
+    for (const problem of [
+      { _tag: "corpus_missing", detail: "C:\\mizan\\corpus.db" },
+      { _tag: "verifier_faulted", detail: "/var/lib/mizan/corpus.db" },
+      { _tag: "attestation_mismatch", detail: "snapshotHash" },
+    ] as const satisfies readonly CorpusProblem[]) {
+      const described = describeCorpusProblem(problem)
+      expect(described).not.toContain("mizan\\corpus")
+      expect(described).not.toContain("/var/lib")
+    }
   })
 })

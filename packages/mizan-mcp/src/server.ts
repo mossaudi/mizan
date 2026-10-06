@@ -1,5 +1,5 @@
 import { err, isErr, normalizeQuote, ok, summariseVerdict, type Claim, type ClaimVerdict, type Result } from "@mizan/core"
-import type { Verifier } from "./verifier.ts"
+import { conditionOfCorpusProblem, describeCorpusProblem, type CorpusProblem, type Verifier } from "./verifier.ts"
 import { serve, stdioPort, type Port, type ServeOptions } from "./transport.ts"
 
 /**
@@ -237,11 +237,17 @@ const toolError = (reason: string, detail: string): McpToolResult => ({
   isError: true,
 })
 
-/** The `reason` on a tool error whose cause is the verifier or the corpus behind it, not the client's call. */
+/**
+ * The `reason` on a tool error whose cause is the verifier or the corpus behind it, not the client's call.
+ *
+ * The fallback, not the normal answer: a refusal that can be projected onto the shared vocabulary carries
+ * the condition itself, so an integrator branches on `corpus_absent` rather than on this. This is what a
+ * refusal that is not about the corpus — and it stays in the type because a future problem could be.
+ */
 export const VERIFIER_UNAVAILABLE = "verifier_unavailable"
 
 /**
- * Ask the verifier, or report that asking it threw.
+ * Ask the verifier, or report that asking it failed.
  *
  * ## Why this catch exists, and why it is here rather than in `verifier.ts`
  *
@@ -251,11 +257,22 @@ export const VERIFIER_UNAVAILABLE = "verifier_unavailable"
  * as `mcp transport failed` and exited 3: a *transport* label on a *corpus* fault, and one that
  * ends the session a corpus problem had no business ending (AGENTS.md section 16).
  *
- * `verifier.ts` is the wrong place to absorb it, because its refusals are all *pre-flight* — the
- * corpus is opened and attested once, before any client is answered. A file that rots on disk
- * *during* a session is not a pre-flight condition, so it needs its own surface, and this is it:
- * `verifier_unavailable` as an MCP tool error, which is what the story asks for ("MCP errors
- * returned as tool errors"; "if verification fails, return honest error via MCP").
+ * `verifier.ts` is the wrong place to absorb it, because a file that rots on disk *during* a
+ * session is not one of its pre-flight conditions, so it needs its own surface, and this is it.
+ *
+ * ## Why the tag is `verifier_faulted` and was not `corpus_unusable`
+ *
+ * This catch cannot tell where the throw came from, so it must not claim it did. `corpus_unusable`
+ * asserts a fact about the corpus file — present, but not openable — and it tells an operator to re-run
+ * `bun run ingest`. For a throw raised downstream of the query that is both an unproven diagnosis and
+ * the wrong remedy: the ingest would produce the same snapshot and the same failure, and the operator
+ * would be sent round that loop by a confident label. `verifier_faulted` claims only what is
+ * established (our verification faulted) and projects onto `unverifiable`, which is the product-level
+ * truth either way — the claim reached the verifier and could not be decided.
+ *
+ * The concrete corpus diagnosis is not lost, it is moved to where it can be *made*: `openCorpusVerifier`
+ * already reports `corpus_unusable` for a corpus that is unopenable at pre-flight, when the cause is
+ * actually in hand. Guessing a cause in a catch is the fail-open move AGENTS.md section 3 forbids.
  *
  * ## Why the message may be forwarded
  *
@@ -264,18 +281,25 @@ export const VERIFIER_UNAVAILABLE = "verifier_unavailable"
  * class and the failure reason, never a row. Suppressing it would produce a refusal a client
  * cannot diagnose — the exact "unavailable, for reasons we decline to give" surface section 16
  * forbids. `transport.ts` carries the second, coarser guard for a throw raised anywhere else in
- * the dispatch path.
+ * the dispatch path. A driver that quotes the corpus file path does leak a filesystem layout, so
+ * `describeCorpusProblem` strips absolute paths from this detail on its way to the wire.
  */
-const askVerifier = (verifier: Verifier, claims: readonly Claim[], startedAt: number, budgetMs: number): Result<readonly ClaimVerdict[], string> => {
+const askVerifier = (
+  verifier: Verifier,
+  claims: readonly Claim[],
+  startedAt: number,
+  budgetMs: number,
+): Result<readonly ClaimVerdict[], CorpusProblem> => {
   try {
-    return ok(
-      verifier({
-        claims,
-        deadlineExpired: () => Date.now() - startedAt >= budgetMs,
-      }),
-    )
+    return verifier({
+      claims,
+      deadlineExpired: () => Date.now() - startedAt >= budgetMs,
+    })
   } catch (cause) {
-    return err(cause instanceof Error ? cause.message : String(cause))
+    return err({
+      _tag: "verifier_faulted",
+      detail: `the verifier faulted during the call: ${cause instanceof Error ? cause.message : String(cause)}`,
+    })
   }
 }
 
@@ -368,16 +392,20 @@ export const decodeVerifyArgs = (params: unknown): { readonly claims: readonly C
  * The clock is read here and handed to the verifier as a deadline predicate, so the timeout's
  * surface is `verification_timeout` rather than a second, transport-shaped error.
  *
- * A verifier that throws is answered the same way a refusal is: a tool error the client can read,
- * with `isError: true` so no client mistakes it for verdicts. It is `VERIFIER_UNAVAILABLE` and not
- * `invalid_arguments` because the call was well-formed — the failure is ours, not the caller's.
+ * A refusal from the verifier is answered the same way a bad argument is: a tool error the client can
+ * read, with `isError: true` so no client mistakes it for verdicts. The `reason` is the shared
+ * degradation condition — `corpus_absent` on a clone, `unverifiable` when the verifier itself faulted
+ * mid-session — because the client asked a well-formed question and the failure is ours, so
+ * `invalid_arguments` would send it off to fix a request that was never wrong.
  */
 export const executeVerify = (verifier: Verifier, params: unknown, startedAt: number, budgetMs: number): McpToolResult => {
   const decoded = decodeVerifyArgs(params)
   if ("error" in decoded) return toolError("invalid_arguments", decoded.error)
 
   const answered = askVerifier(verifier, decoded.claims, startedAt, budgetMs)
-  if (isErr(answered)) return toolError(VERIFIER_UNAVAILABLE, answered.error)
+  if (isErr(answered)) {
+    return toolError(conditionOfCorpusProblem(answered.error) ?? VERIFIER_UNAVAILABLE, describeCorpusProblem(answered.error))
+  }
 
   const summaries = answered.value.map(summariseVerdict)
   return { content: [{ type: "text", text: JSON.stringify({ verdicts: summaries }) }] }

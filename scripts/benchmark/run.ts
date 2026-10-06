@@ -233,7 +233,17 @@ const runAttested = (db: Database): number => {
   for (const row of disagreements(comparisons)) console.error(`NOTE system arm disagrees with the set — ${row}`)
 
   const outcomes = score(arms.baseline, runBaseline(db, toBaselineCases(arms.baseline), HONEST_OPTIONS))
-  const figures = figuresOf(outcomes, systemFigures(comparisons))
+  const computed = figuresOf(outcomes, systemFigures(comparisons))
+  // The two arms are built by two functions over two inputs, so a defect in either surfaces here as a
+  // refusal naming the two denominators. Before this was a `Result` it surfaced as an uncaught throw out
+  // of the command that publishes `delta` and `falseVerifiedCount` — the one place in this repository
+  // where a stack trace replaces a sentence about which arms disagree (AGENTS.md §2, §16).
+  if (isErr(computed)) {
+    console.error(`FAIL ${computed.error}`)
+    console.error("No figures were computed.")
+    return EXIT_UNTRUSTED
+  }
+  const figures = computed.value
 
   const result = {
     schemaVersion: BENCHMARK_SCHEMA_VERSION,

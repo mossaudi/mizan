@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { DegradationCondition, conditionOf, decodeCondition, describeCondition } from "@mizan/core"
+import { DegradationCondition, conditionOf, decodeCondition, describedConditions, describeCondition } from "@mizan/core"
 
 /**
  * The degradation vocabulary as a contract, not as prose.
@@ -17,9 +17,20 @@ import { DegradationCondition, conditionOf, decodeCondition, describeCondition }
  * eye, and there is no test that could fail when they diverged.
  */
 
-/** One name per row of the AGENTS.md section 16 table, plus the one non-failure state. */
+/**
+ * One name per row of the AGENTS.md section 16 table, plus the states a surface reports instead of
+ * entering the pipeline.
+ *
+ * `corpus_unusable` and `attestation_unreadable` are not in that table: they are the two states the
+ * shipped surfaces hit before a run exists — a corpus file that is present and cannot be opened, and
+ * an attestation that is present and cannot be read. They were added deliberately rather than being
+ * projected onto `corpus_absent` / `attestation_mismatch`, which would have told a client the corpus
+ * was missing when it was on disk and corrupt; see the header of `src/schema/degradation.ts`.
+ */
 const CONDITIONS = [
   "corpus_absent",
+  "corpus_unusable",
+  "attestation_unreadable",
   "no_sources_found",
   "model_unavailable",
   "unverifiable",
@@ -57,13 +68,13 @@ describe("DegradationCondition", () => {
     expect(refused.error._tag).toBe("decode_failed")
   })
 
-  test("the set is exactly the eight declared names, so a ninth cannot be added in one file", () => {
+  test("the set is exactly the ten declared names, so an eleventh cannot be added in one file", () => {
     // `schema/degradation.ts` is the authority and this list is its reading; a divergence between
     // the two is what would let a surface report a state nobody adjudicated.
     const source = readFileSync(join(import.meta.dir, "..", "src", "schema", "degradation.ts"), "utf8")
     const declared = [...source.matchAll(/"([a-z_]+)"/g)].map((match) => match[1] ?? "")
     for (const condition of CONDITIONS) expect(declared).toContain(condition)
-    expect(CONDITIONS).toHaveLength(8)
+    expect(CONDITIONS).toHaveLength(10)
   })
 })
 
@@ -91,6 +102,43 @@ describe("describeCondition", () => {
   test("`unmeasured` is visibly distinct from a measured zero", () => {
     const described = describeCondition("unmeasured")
     expect(described).toContain("not the same as a figure of zero")
+  })
+
+  test("the wording table and the vocabulary agree in BOTH directions", () => {
+    // One direction is not enough, and the direction that is usually written is the useless one.
+    // `for (const condition of CONDITIONS) describeCondition(condition)` passes even when the
+    // schema has grown a literal nobody wrote a sentence for — which is precisely the hole the
+    // nine-branch `if` chain left open, where a tenth condition rendered as `unmeasured`.
+    //
+    // So the comparison runs the other way too: every key in the wording table must still be a
+    // condition the schema admits. A name deleted from `DegradationCondition` with its sentence left
+    // behind fails here instead of being reported by a surface that no longer has a condition to
+    // report.
+    expect(describedConditions()).toEqual([...CONDITIONS].toSorted())
+  })
+
+  test("no condition's sentence opens with another condition's name, so a mistyped key cannot read as coverage", () => {
+    // The sharper form of the distinctness assertion above: distinct sentences are not enough if a
+    // sentence was copied under the wrong key, because the prefix is what a client branches on and
+    // it is the only part of the line that is machine-read. A copy-paste that left `unmeasured:` at
+    // the head of a fault sentence would satisfy "distinct" and mislabel every fault.
+    for (const condition of describedConditions()) {
+      const described = describeCondition(condition)
+      for (const other of describedConditions()) {
+        if (other === condition) continue
+        expect(described.startsWith(`${other}:`)).toBe(false)
+      }
+    }
+  })
+
+  test("the two pre-run corpus states are distinct from the absences they resemble", () => {
+    // The reason they are in the set rather than projected. A present-but-broken corpus and a corpus
+    // that is not there send an operator to different places, and a present-but-unreadable
+    // attestation is not a disagreement with the corpus.
+    expect(describeCondition("corpus_unusable")).toContain("not the same as an absent corpus")
+    expect(describeCondition("corpus_absent")).not.toContain("corrupt")
+    expect(describeCondition("attestation_unreadable")).not.toBe(describeCondition("attestation_mismatch"))
+    expect(describeCondition("attestation_mismatch")).toContain("is not the corpus attestation.json authorises")
   })
 
   test("the tafsir row of the section 16 table is absent, because no tafsir backend ships", () => {

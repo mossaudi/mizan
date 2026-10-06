@@ -1,18 +1,29 @@
 import { join, resolve } from "node:path"
 import { isErr } from "@mizan/core"
 import { createServer } from "./server.ts"
-import { describeCorpusProblem, openCorpusVerifier } from "./verifier.ts"
+import { describeCorpusProblem, openCorpusVerifier, refusingVerifier, type Verifier } from "./verifier.ts"
 
 /**
  * MCP server entry point.
  *
- * ## Why the corpus is opened before stdio is touched
+ * ## Why a missing corpus still starts a server
  *
- * A server that answers with a verdict while its corpus is missing, or while the corpus does not
- * match the committed attestation, is a server whose every answer is unearned. So the corpus is
- * opened and attested FIRST, and a refusal exits before a single JSON-RPC line is read. The client
- * sees a process that died with a named reason on stderr rather than a well-formed response that
- * means nothing.
+ * A server that answers with a verdict while its corpus is missing is a server whose every answer is
+ * unearned, and that part has not changed: `refusingVerifier` computes nothing and returns no verdict,
+ * so `verified` is unreachable when there is no corpus. What changed is where the refusal is *said*.
+ *
+ * It used to be said by exiting, before a single JSON-RPC line was read, because a process that died at
+ * startup cannot be mistaken for one that is serving. But an MCP client cannot distinguish that from a
+ * server that failed to start for any other reason: both are "no response", and neither carries the word
+ * `corpus_absent`. Story 7 asks for a completed `tools/call` round-trip carrying the degradation
+ * condition, so an integrator can branch on it — which requires the transport, because the protocol is
+ * how a client learns anything at all.
+ *
+ * So the refusal moved inside the protocol rather than being replaced by it. `initialize` and
+ * `tools/list` are answered normally, because a client that can see which tools exist can also see that
+ * every one of them refuses; `tools/call` answers `isError: true` with the shared condition as its
+ * machine-readable `reason` and no verdict anywhere in the payload. The operator still gets the reason on
+ * stderr at startup, once, unprompted.
  *
  * ## Paths
  *
@@ -29,8 +40,8 @@ import { describeCorpusProblem, openCorpusVerifier } from "./verifier.ts"
  *
  * ## Exit codes
  *
- * - 0 — stdin closed cleanly (the client disconnected)
- * - 2 — the corpus is absent, unreadable, or not the one `attestation.json` authorises
+ * - 0 — stdin closed cleanly (the client disconnected), whether the session served verdicts or refusals
+ * - 2 — unused; kept out of the list because nothing exits on a corpus problem any more
  * - 3 — the transport failed
  *
  * ## Why `main` is guarded, and why the resolvers are exported
@@ -50,14 +61,14 @@ export const defaultCorpusPath = (): string => process.env["MIZAN_CORPUS_PATH"] 
 export const defaultAttestationPath = (): string =>
   process.env["MIZAN_ATTESTATION_PATH"] ?? join(REPOSITORY_ROOT, "attestation.json")
 
-export const main = async (): Promise<number> => {
-  const opened = openCorpusVerifier({ corpusPath: defaultCorpusPath(), attestationPath: defaultAttestationPath() })
-  if (isErr(opened)) {
-    console.error(`mcp server cannot serve: ${describeCorpusProblem(opened.error)}`)
-    return 2
-  }
-
-  const { verifier, db } = opened.value
+/**
+ * Serve one session on stdio, closing whatever the session owned.
+ *
+ * One function for both the corpus-backed and the refusing server, because the only thing that differs is
+ * the `Verifier` and whether there is a handle to close — and a second copy of the transport's exit code
+ * would be a second thing to get wrong.
+ */
+const serveSession = async (verifier: Verifier, release: () => void): Promise<number> => {
   const server = createServer(verifier)
   try {
     await server.start()
@@ -66,8 +77,25 @@ export const main = async (): Promise<number> => {
     console.error(`mcp transport failed: ${cause instanceof Error ? cause.message : String(cause)}`)
     return 3
   } finally {
-    db.close()
+    release()
   }
+}
+
+export const main = async (): Promise<number> => {
+  const corpusPath = defaultCorpusPath()
+  const attestationPath = defaultAttestationPath()
+  const opened = openCorpusVerifier({ corpusPath, attestationPath })
+  if (isErr(opened)) {
+    console.error(`mcp server cannot serve: ${describeCorpusProblem(opened.error)}`)
+    // The refusal text an MCP client receives has every absolute path stripped from it, because a
+    // client is a different trust domain from the operator. stderr is not: it is the one surface the
+    // operator alone reads, and a filesystem layout is the first thing they need. So the two paths
+    // are named here, once, in full, and nowhere else.
+    console.error(`mcp server looked for the corpus at: ${corpusPath}`)
+    console.error(`mcp server looked for the attestation at: ${attestationPath}`)
+    return serveSession(refusingVerifier(opened.error), () => undefined)
+  }
+  return serveSession(opened.value.verifier, () => opened.value.db.close())
 }
 
 if (import.meta.main) {

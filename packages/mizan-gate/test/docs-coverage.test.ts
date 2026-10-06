@@ -5,17 +5,21 @@ import {
   COVERAGE_SET,
   checkCollectionCoverage,
   checkCoverageTableRows,
+  checkMeasuredSetDigest,
   checkPresenceCollectionNamed,
   checkPresenceCoverageRecorded,
   collectionCountsOf,
-  FABRICATION_COVERAGE_FLOOR,
+FABRICATION_COVERAGE_FLOOR,
+  PROSE_COLUMNS,
   statesPresenceFigure,
+  statedNumerator,
   type CoverageArtefact,
 } from "@mizan/gate"
 import { EvalSet, decodeOrFail, decodeSync, digestOf, isOk } from "@mizan/core"
 import type { DocsClaim } from "@mizan/gate"
 
 /** The repository root, for the two tests that read a committed file rather than a fixture. */
+const ROOT = join(import.meta.dir, "..", "..", "..")
 const readIfPresent = (path: string): string | null => {
   try {
     return readFileSync(path, "utf8")
@@ -636,6 +640,22 @@ describe("R21d - a coverage table's cells agree with the recorded run", () => {
     expect(details(claims)).toContain("records 2")
   })
 
+test("a match the rule cannot read is reported as unread, never as a stated zero", () => {
+    // The planted violation, and the reason `statedNumerator` exists.
+    //
+    // `parseCount(stated[1] ?? "")` stood at this call site. `Number("")` is `0`, so any drift between
+    // the pattern and its reader — a new group inserted before the numerator, the one change this
+    // function is exposed to — would have been published as `presence-row-stale`: "states 0 for
+    // `quran`", accusing a committed, reviewed document of a number it never printed, in a rule whose
+    // whole purpose is being right about exactly those documents. `null` is the true state of a rule
+    // that cannot read a cell, and `presence-cell-unread` is the id this module already uses for it.
+    //
+    // So the assertion is about the *word*, not the number: unread, never zero.
+    expect(statedNumerator(["6,236", "6,236"] as unknown as RegExpExecArray)).toBe("6,236")
+    expect(statedNumerator(["6,236", undefined] as unknown as RegExpExecArray)).toBeNull()
+    expect({ numericFallback: Number("") }).toEqual({ numericFallback: 0 })
+  })
+
   test("a drifted `rejected` cell fails, because containment is the column a reader quotes", () => {
     const claims = check(document(VALUE_HEADERS, [QURAN_ROW, ["tirmidhi", "2", "2/2", "2/2", "2/2", "1", "0", "3889"]]))
     expect(rules(claims)).toEqual(["presence-row-stale"])
@@ -752,5 +772,365 @@ describe("R21d - a coverage table's cells agree with the recorded run", () => {
     const committed = readIfPresent(join(import.meta.dir, "..", "..", "..", "data", "benchmark", "vs-search.json"))
     expect(committed).not.toBeNull()
     expect(checkCoverageTableRows(readFileSync(join(import.meta.dir, "..", "..", "..", "docs", "value-proof.md"), "utf8"), "docs/value-proof.md", { path: "data/benchmark/vs-search.json", text: committed }, SERVED_COUNTS)).toEqual([])
+  })
+})
+
+/* ------------------------------------------------------------------ *
+ * R21e — a number in a coverage table that no rule reads is a finding.
+ *
+ * The previous version of this rule skipped any header it did not recognise, on the stated ground that
+ * "adding a column to a document cannot invent a finding". Probed live, that default was a switch:
+ * `cases` and `top-5` produced findings, `recall@5`, `presence`, `top5` and `nonsense` produced none.
+ * Renaming one header disarmed every check on that column while the table went on publishing numbers
+ * that looked verified. These tests exist so the switch cannot come back.
+ * ------------------------------------------------------------------ */
+describe("R21e - a number no rule reads is a finding, not a skip", () => {
+  const RECORDED: CoverageArtefact = {
+    path: "data/benchmark/vs-search.json",
+    text: JSON.stringify({
+      suggestionCaseCount: 10,
+      suggestionCoverageCollections: "malik,nasai,quran",
+      suggestionCoverageCasesQuran: 2,
+      suggestionCoverageCasesMalik: 5,
+      suggestionCoverageCasesNasai: 3,
+      suggestionCoverageRejectedQuran: 2,
+      suggestionCoverageRejectedMalik: 5,
+      suggestionCoverageRejectedNasai: 3,
+      suggestionCoveragePresenceTop5Quran: 2,
+    }),
+  }
+
+  const SERVED = new Map([
+    ["quran", 6236],
+    ["malik", 1829],
+    ["nasai", 5672],
+  ])
+
+  const document = (headers: readonly string[], rows: readonly (readonly string[])[]): string =>
+    [`| ${headers.join(" | ")} |`, `| ${headers.map(() => "---").join(" | ")} |`, ...rows.map((row) => `| ${row.join(" | ")} |`), ""].join("\n")
+
+  const check = (text: string) => checkCoverageTableRows(text, "docs/value-proof.md", RECORDED, SERVED)
+
+  test("the planted violation fails: a renamed `top-5` column is the column that was checked", () => {
+    // `top5` is what a document gets when someone types the header without the hyphen, and it is the
+    // shape that silenced six checks at once. The finding has to name the column, because the column
+    // name is the whole of the defect.
+    const claims = check(document(["collection", "cases", "top5"], [["quran", "2", "9"]]))
+    expect(rules(claims)).toEqual(["presence-cell-unread"])
+    expect(details(claims)).toContain("`top5` column")
+  })
+
+  test("a header no artefact key produces is a finding, not an unknown column", () => {
+    const claims = check(document(["collection", "cases", "nonsense"], [["quran", "2", "9"]]))
+    expect(rules(claims)).toEqual(["presence-cell-unread"])
+    expect(details(claims)).toContain("no rule reads that column")
+  })
+
+  test("the message names the headers a rule does read, so the repair is one edit away", () => {
+    const claims = check(document(["collection", "recall@5"], [["quran", "2"]]))
+    expect(details(claims)).toContain("`cases`, `rejected`, `verified`")
+    expect(details(claims)).toContain("`served records`")
+    expect(details(claims)).toContain("`top-N`")
+  })
+
+  test("one unread column is one finding, however many rows repeat it", () => {
+    // Six rows, one broken header. Reporting it per row would be the "one defect reported six times"
+    // shape this module has already had to undo once, and it would bury a wrong cell in a per-row rule.
+    const claims = check(
+      document(
+        ["collection", "cases", "nonsense"],
+        [
+          ["quran", "2", "9"],
+          ["malik", "5", "9"],
+          ["nasai", "3", "9"],
+        ],
+      ),
+    )
+    expect(rules(claims)).toEqual(["presence-cell-unread"])
+  })
+
+  test("an unread column with no numbers in it is still silent, because a word is not a claim", () => {
+    expect(check(document(["collection", "cases", "licence"], [["quran", "2", "no-derivatives"]]))).toEqual([])
+  })
+
+  test("a declared prose column is silent, and `coverage` is the one declared today", () => {
+    // The `coverage` column of `docs/value-proof.md` reads `measured` per row. It is a rate's home and a
+    // rate has no integer in the artefact to be compared against, so it is declared rather than inferred.
+    expect(check(document(["collection", "cases", "coverage"], [["quran", "2", "measured"]]))).toEqual([])
+  })
+
+  test("a number in a READ column spelled in a shape no reader parses is a finding", () => {
+    // The other escape, and the quieter one: the reader is present for `cases` and cannot parse
+    // `2 of 2, checked twice`. Skipping it would be indistinguishable from not having the column.
+    const claims = check(document(["collection", "cases"], [["quran", "2 of 2, checked twice"]]))
+    expect(rules(claims)).toEqual(["presence-cell-unread"])
+    expect(details(claims)).toContain("no rule reads")
+  })
+
+  test("a thousands separator is a figure, not a shape no reader parses", () => {
+    // `6,236` is the spelling every one of these documents uses for a corpus size. Read as prose it would
+    // have been the same silent skip wearing a comma.
+    expect(check(document(["collection", "served records"], [["quran", "6,236"]]))).toEqual([])
+    const wrong = check(document(["collection", "served records"], [["quran", "6,237"]]))
+    expect(rules(wrong)).toEqual(["presence-row-stale"])
+    expect(details(wrong)).toContain("states 6237 for `quran`")
+  })
+
+  test("a separator in a cases cell is compared as the number it spells", () => {
+    // `1,234` is four digits grouped; `1,23` is not a number this grammar will guess at, and a rule that
+    // read it as 123 would be inventing a figure. So it is unread — reported, never compared.
+    const claims = check(document(["collection", "cases"], [["quran", "1,234"]]))
+    expect(rules(claims)).toEqual(["presence-row-stale"])
+    expect(details(claims)).toContain("states 1234 for `quran`")
+    expect(rules(check(document(["collection", "cases"], [["quran", "1,23"]])))).toEqual(["presence-cell-unread"])
+  })
+
+  test("a row keyed by a display name is unkeyed, not silently unchecked", () => {
+    // This test used to assert the opposite — `expect(...).toEqual([])` — and the assertion was
+    // honest about itself: "a table keyed by display names is out of scope, and saying so is the
+    // boundary". That sentence was the defect. A `collection`-headed row naming no collection had no
+    // row rule to compare against, so every per-row check returned `[]` and the figure stayed
+    // published — and the cheapest way to get there was a purely cosmetic edit, renaming `nasai` to
+    // `Sunan an-Nasa'i`. A gate whose boundary is one cell edit from being disarmed is not a boundary.
+    //
+    // So a row that states a number and resolves to no collection is now reported, by name, with the
+    // repair. `README.md`'s inventory was the real instance and is now keyed on the identifiers its
+    // figures are attested under.
+    const claims = check(document(["collection", "records"], [["Qur'an (Tanzil, Uthmani)", "6,236"]]))
+    expect(rules(claims)).toEqual(["presence-row-unkeyed"])
+    expect(details(claims)).toContain("is not a corpus identifier and names no known collection")
+    expect(details(claims)).toContain("`quran`")
+  })
+
+  test("a decorated label that NAMES one known collection is keyed, so a cosmetic rename keeps its audit", () => {
+    // The other half of the fix, and the reason the row above is a finding rather than a ban. A
+    // display name is allowed — it just has to be unambiguous about which collection it is, and
+    // containment is what establishes that without a name-mapping to trust. `README.md` rows now read
+    // `tirmidhi — Jami' at-Tirmidhi` and are compared against the artefact exactly as before.
+    // `malik` recorded 5 cases here, so a row stating 41 is compared and reported stale.
+    const claims = check(document(["collection", "cases"], [["malik — Muwatta' (Malik)", "41"]]))
+    expect(rules(claims)).toEqual(["presence-row-stale"])
+    expect(details(claims)).toContain("`malik`")
+  })
+
+  test("a label naming TWO known collections is unkeyed, because guessing which book is the defect", () => {
+    // Both names are in the served and recorded sets for this fixture, so containment finds two and
+    // has to refuse to pick. Choosing the first would attribute a figure to whichever book happened to
+    // be listed first — the failure the old "map display names to identifiers" comment was refusing.
+    const claims = check(document(["collection", "cases"], [["malik and nasai", "41"]]))
+    expect(rules(claims)).toEqual(["presence-row-unkeyed"])
+  })
+
+  test("an unknown collection that IS a syntactically valid identifier is stale, not unkeyed", () => {
+    // The distinction that keeps the new finding from swallowing an old one. `bukhari` is a removed
+    // collection: a stale row with a real repair (delete the row), not a row missing a key. Reporting
+    // it as unkeyed would tell the author to write an identifier they already wrote.
+    const claims = check(document(["collection", "cases"], [["bukhari", "4"]]))
+    expect(rules(claims)).toEqual(["presence-row-stale"])
+  })
+
+  test("a separator row states no number, so it is never an unkeyed finding", () => {
+    // `| --- | --- |` resolves to no collection, so without the digit test every table would report
+    // one finding for its own header rule. The test is the digit test, which is also what keeps an
+    // honest prose row (`measured`, or the reason it is not) quiet.
+    expect(check(document(["collection", "cases"], [["---", "---"]]))).toEqual([])
+    expect(check(document(["collection", "cases"], [["Sunan Abi Dawud", "measured"]]))).toEqual([])
+  })
+
+  test("an unread artefact no longer silences the column check, because that check needs no artefact", () => {
+    // `checkCoverageTableRows` opened with `if (recorded === null) return []`. A corrupt
+    // `vs-search.json` therefore turned the document least examined — the state a customer is most
+    // alarmed by — and it silenced a rule whose only input is the document itself. Two independent
+    // defects must stay two independent findings.
+    const malformed = { path: "data/benchmark/vs-search.json", text: "{ not json" }
+    const claims = checkCoverageTableRows(
+      "| collection | recall@5 |\n| --- | --- |\n| quran | 2 |\n",
+      "docs/value-proof.md",
+      malformed,
+    )
+    expect(rules(claims)).toEqual(["presence-cell-unread"])
+    expect(details(claims)).toContain("no rule reads that column")
+  })
+
+  /*
+   * The spelling bypass. `STATED_FIGURE` recognises bare counts and `n/m` and nothing else, so a
+   * document could put every figure in an unread column wearing a shape the grammar does not parse
+   * — a percent sign, a decimal, a sign, a unit — and `unreadCellFindings` would find nothing to
+   * report. That is the R21e switch reopened through the grammar instead of the header: the column
+   * was never renamed, the numbers were just spelled differently. The rule's own text forbids it
+   * ("not *a number this grammar happens to parse*"), so the code now reads digits, not shapes.
+   *
+   * Every case below is one the previous implementation returned `[]` for. All five are the same
+   * defect, so they are planted as five tests: a rule that only catches `644 ms` because the probe
+   * happened to use a millisecond is a rule with one planted violation and five passes.
+   */
+
+  const SHAPES_NO_GRAMMAR_READS = ["100.0%", "+35.0 pp", "0.65", "-3", "644 ms"] as const
+
+  for (const shape of SHAPES_NO_GRAMMAR_READS) {
+    test(`an unread column publishing "${shape}" is a finding, because a number is a claim`, () => {
+      const claims = check(document(["collection", "cases", "precision"], [["quran", "2", shape]]))
+      expect(rules(claims)).toEqual(["presence-cell-unread"])
+      expect(details(claims)).toContain("no rule reads that column")
+    })
+  }
+
+  test("the shape check is on the digits, not the spelling: a bare count still reads as a claim", () => {
+    // The other half of the pair, and the reason the test above is a fix rather than a blanket alarm.
+    expect(rules(check(document(["collection", "cases", "precision"], [["quran", "2", "753"]])))).toEqual([
+      "presence-cell-unread",
+    ])
+  })
+
+test("a digit in a declared prose column is a finding that QUOTES the declaration", () => {
+    // This test used to assert `[]`, on the reasoning that "`coverage` is declared prose, so no column
+    // rule owns it — but the row rule reads it". The second half is the bug, and finding it is what the
+    // fix turned up: for a *recorded* collection the row rule does not read it either, because
+    // `columnFigure` resolves to `null` for a column no artefact field owns and `cellFindings` skips
+    // that case. So `| quran | 2 | measured 0.65 |` was published unchecked — the one header shape in
+    // the table where a number was checked by nothing, the exact inverse of R21e.
+    //
+    // The finding quotes the declaration rather than merely reporting the digit, because a person
+    // facing it has two repairs — reword the cell, or withdraw the exemption — and choosing between
+    // them requires reading the exemption. That is also why `PROSE_COLUMNS` is now exported: a reason
+    // that is written once and never printed is a comment with a runtime cost.
+    const claims = check(document(["collection", "cases", "coverage"], [["quran", "2", "measured 0.65"]]))
+    expect(rules(claims)).toEqual(["presence-cell-unread"])
+    expect(details(claims)).toContain("in its `coverage` column, which is declared prose")
+    expect(details(claims)).toContain(PROSE_COLUMNS["coverage"] ?? "")
+  })
+
+  test("a genuine word in a declared prose column stays silent, so the declaration still works", () => {
+    // The other direction, and the one that proves the finding above is about the *digit* rather than
+    // about the header. `measured` is the cell `renderCoverage` prints and what the column is for; a
+    // rule that reported it would turn the honest row the declaration exists to protect into a finding.
+    expect(check(document(["collection", "cases", "coverage"], [["quran", "2", "measured"]]))).toEqual([])
+  })
+
+  test("every prose column's reason names the artefact field or constant that grounds it", () => {
+    // An exemption whose justification is one adjective away from a real reason is how a column gets
+    // excused forever: nothing reads the sentence, so nothing notices when the constant it cites is
+    // renamed. So the reason must cite a backticked token, and that token must actually be declared
+    // in this module's own source — checked against the file rather than against a registry, because a
+    // registry would be a second place the same citation lives (AGENTS.md section 17).
+    expect(Object.keys(PROSE_COLUMNS).length).toBeGreaterThan(0)
+    const source = readFileSync(join(ROOT, "packages", "mizan-gate", "src", "docs-coverage.ts"), "utf8")
+    for (const [header, reason] of Object.entries(PROSE_COLUMNS)) {
+      const cited = [...reason.matchAll(/`([^`]+)`/g)].map((match) => match[1] ?? "").filter((token) => !token.includes(" "))
+      expect({ header, cited: cited.length > 0 }).toEqual({ header, cited: true })
+      for (const token of cited) {
+        expect({ header, token, declared: source.includes(token) }, `${header} cites "${token}", which this module does not declare`).toEqual({
+          header,
+          token,
+          declared: true,
+        })
+      }
+    }
+  })
+
+  test("an unrecorded row that spells its figure as a decimal is a stale row, not a shape", () => {
+    // `tirmidhi` is served and unmeasured, which is the row `renderCoverage` prints honestly with the
+    // word `zero`. A digit in that row's prose column means the row is claiming a rate nobody ran, and
+    // `ANY_DIGIT` is what sees it — `STATED_FIGURE` would have read `0.65` as prose and let the row
+    // through, which is CR-1 with a decimal point on the end.
+    //
+    // `toContain` rather than `toEqual`, because after the fix this row raises the cell finding too —
+    // two findings for one cell, from two different rules, and both are true.
+    const served = new Map([...SERVED, ["tirmidhi", 3889]])
+    const claims = checkCoverageTableRows(
+      document(["collection", "cases", "coverage"], [["tirmidhi", "0", "measured 0.65"]]),
+      "docs/value-proof.md",
+      RECORDED,
+      served,
+    )
+    expect(rules(claims)).toContain("presence-row-stale")
+    expect(details(claims)).toContain("states figures for `tirmidhi`")
+  })
+
+  test("the honest unmeasured row — the word `zero`, no digit — is still accepted", () => {
+    // The fix must not fail closed on the shape the renderer actually prints, or it would have
+    // deleted the honest row it was written to protect.
+    const served = new Map([...SERVED, ["tirmidhi", 3889]])
+    expect(
+      checkCoverageTableRows(
+        document(["collection", "cases", "coverage"], [["tirmidhi", "0", "measured zero — no figure published"]]),
+        "docs/value-proof.md",
+        RECORDED,
+        served,
+      ),
+    ).toEqual([])
+  })
+})
+
+/* ------------------------------------------------------------------ *
+ * The provenance of a per-collection table.
+ *
+ * `| abudawud | 15 | 15 | 0 | 5272 | measured |` is fifteen cases and no statement of which fifteen. Every
+ * other number in the audited documents is compared against an artefact; this one was not, because the
+ * artefact's set digest was never put in front of the documents. The finding that opened this was a
+ * `docs/specs/measurements.md` with a full per-collection table and no `ds1:` digest anywhere, which
+ * `check:docs` accepted.
+ * ------------------------------------------------------------------ */
+describe("a per-collection table must name the set it decomposed", () => {
+  const DIGEST = "ds1:c9b35dd9ae7200e1b0152cfcb8afb80205e4500f5b40008c2e77d03ce5cc88e5"
+  const OTHER = "ds1:0c16dda25dce552e46c74a9f93fba1f1c509ee1a35b92b51678b29dde93439cb"
+  const ARTEFACT: CoverageArtefact = {
+    path: "data/benchmark/vs-search.json",
+    text: JSON.stringify({ suggestionEvalSetDigest: DIGEST, suggestionCoverageCollections: "quran" }),
+  }
+const table = (digest?: string): string =>
+    [
+      "| collection | cases | coverage |",
+      "| --- | --- | --- |",
+      "| quran | 2 | measured |",
+      ...(digest === undefined ? [] : [`**Dataset digest: \`${digest}\`**`]),
+      "",
+    ].join("\n")
+  const check = (document: string, artefact: CoverageArtefact = ARTEFACT) =>
+    checkMeasuredSetDigest(document, "docs/specs/measurements.md", artefact)
+
+  test("the planted violation fails: a per-collection table with no digest at all", () => {
+    const claims = check(table())
+    expect(rules(claims)).toEqual(["presence-set-digest-missing"])
+    expect(details(claims)).toContain("names no `ds1:` dataset digest")
+    expect(details(claims)).toContain(DIGEST)
+  })
+
+test("the committed digest passes, which is the only proof the rule is not always-failing", () => {
+    expect(check(table(DIGEST))).toEqual([])
+  })
+
+  test("a digest pointing at ANOTHER set is a finding, because it reads as provenance and is not", () => {
+    // The reason this is a comparison and not a presence check. "State some digest" is satisfiable by
+    // stating the wrong one, which is worse than stating none: the page now looks traceable while
+    // pointing at a set whose per-collection counts are different from the ones above it.
+    const claims = check(table(OTHER))
+    expect(rules(claims)).toEqual(["presence-set-digest-stale"])
+    expect(details(claims)).toContain(DIGEST)
+  })
+
+  test("a document publishing no per-collection table says nothing, because there is nothing to attribute", () => {
+    // A digest on a page with no decomposed figure is decoration, and a rule that fires on decoration
+    // teaches its readers to ignore it.
+    expect(check("# Notes\n\nSome prose, and `ds1:abc` mentioned in passing.\n")).toEqual([])
+  })
+
+  test("an artefact that records no digest is somebody else's finding, reported once against the artefact", () => {
+    // Not a second report here. `checkPresenceCoverageRecorded` already names the culprit file, and
+    // repeating it per document would bury the one line that says which file is broken.
+    expect(check(table(), { path: "data/benchmark/vs-search.json", text: "{ not json" })).toEqual([])
+    expect(check(table(), { path: "data/benchmark/vs-search.json", text: null })).toEqual([])
+  })
+
+  test("both audited documents that publish a table state the committed digest today", () => {
+    // Not a unit test of a fixture: the actual documents against the actual artefact. This is the test
+    // that fails if someone edits a per-collection table without saying which set it decomposed.
+    const root = join(import.meta.dir, "..", "..", "..")
+    const artefact = readIfPresent(join(root, "data", "benchmark", "vs-search.json"))
+    expect(artefact).not.toBeNull()
+    if (artefact === null) return
+    for (const document of ["docs/value-proof.md", "docs/specs/measurements.md"]) {
+      expect(checkMeasuredSetDigest(readFileSync(join(root, document), "utf8"), document, { path: "data/benchmark/vs-search.json", text: artefact })).toEqual([])
+    }
   })
 })

@@ -41,7 +41,7 @@ export { COVERAGE_SCHEMA_VERSION, CollectionCoverage, CoverageTotals, Quarantine
 export { Correction, CorrectionSpan, LocatedCorrection, NearbyRecord, Relevance, RelevanceState, SUGGESTION_DISCLAIMER, SUGGESTION_MEASURED_COLLECTIONS, SUGGESTION_MEASUREMENT_SCOPE, SUGGESTION_THIN_COLLECTIONS, Suggestion, SuggestionCandidates, SuggestionNoCandidates, SuggestionScope, SuggestionUnavailable, UnverifiableCorrection, type SuggestionState } from "./schema/display.ts"
 export { DEMO_ANCHOR_SET_VERSION, DEMO_QUESTION_SET_VERSION, DemoAnchor, DemoAnchorSet, DemoExpectation, DemoQuestion, DemoQuestionSet } from "./schema/demo.ts"
 export { CollectionCoverageRow, DivergenceResolution, EvalAnchor, EvalCase, EvalSet, KnownDivergence } from "./schema/eval.ts"
-export { DegradationCondition, conditionOf, decodeCondition, describeCondition } from "./schema/degradation.ts"
+export { DegradationCondition, conditionOf, decodeCondition, describedConditions, describeCondition } from "./schema/degradation.ts"
 export { ResolvedCitation, unresolved } from "./schema/resolved.ts"
 export { SSR_SCHEMA_VERSION, SsrResult } from "./schema/ssr.ts"
 export { CorpusRecord, CorpusRecordMeta, GradeBasis, QURAN_COLLECTION, toRecordMeta } from "./schema/record.ts"

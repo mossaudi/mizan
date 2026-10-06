@@ -2,6 +2,7 @@ import { afterAll, beforeAll } from "bun:test"
 import { existsSync } from "node:fs"
 import { readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import { boundedExit } from "./subprocess-budget.ts"
 
 /**
  * Keeping a test that spawns the real CLI from dirtying the committed run ledger.
@@ -85,7 +86,13 @@ export const preserveCommittedLedger = (): LedgerGuard => {
   return { appendedTrace }
 }
 
-/** Spawn the real CLI from the repository root, which is where its committed inputs live. */
+/**
+ * Spawn the real CLI from the repository root, which is where its committed inputs live.
+ *
+ * Bounded rather than awaited bare: the two files that use this spawn the whole composition root, and
+ * an unbounded wait turns a wedged child into a five-second runner timeout that says nothing about
+ * which step wedged. See `subprocess-budget.ts` for the budget and why it is the one it is.
+ */
 export const spawnCli = async (
   question: string,
   env: Readonly<Record<string, string>> = { MIZAN_LLM_API_KEY: "" },
@@ -97,5 +104,9 @@ export const spawnCli = async (
     env: { ...process.env, ...env },
   })
   const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()])
-  return { code: await proc.exited, output: `${stdout}${stderr}` }
+  const output = `${stdout}${stderr}`
+  const code = await boundedExit(proc.exited, () => {
+    proc.kill()
+  }, "bun run apps/cli/src/main.ts", () => output)
+  return { code, output }
 }

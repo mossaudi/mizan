@@ -14,6 +14,7 @@ import {
   type PackagePlan,
   type Toolchain,
 } from "@mizan/gate"
+import { defaultLaneTestPaths } from "./ci-lanes.ts"
 
 /**
  * `bun run ci` — the one command that decides whether this repository may ship.
@@ -39,7 +40,7 @@ import {
  * nothing.
  */
 
-type Plan = { readonly root: string; readonly checks: readonly CheckName[]; readonly tools: Toolchain }
+type Plan = { readonly root: string; readonly checks: readonly CheckName[]; readonly tools: Toolchain; readonly scriptsTests: readonly string[] }
 
 /**
  * The repository root, as a target in its own right.
@@ -51,13 +52,17 @@ type Plan = { readonly root: string; readonly checks: readonly CheckName[]; read
  * every package typecheck, every gate and the whole test suite were green while `bun run ingest`
  * failed on a missing export.
  *
- * The test half is scoped with `testPaths: ["scripts"]` rather than omitted. A bare `bun test` at
- * the root walks every package and silently skips any that fails to load, which section 8
- * forbids; a named directory discovers only what is under it, so `scripts/verify-chain.test.ts`
- * becomes a guard that can actually fail rather than a file CI typechecks and never runs.
+ * The test half is a list of corpus-free files rather than `testPaths: ["scripts"]`, for the reason
+ * `ci-lanes.ts` states at length: `bun run ci` is a step `accept:customer` declares
+ * corpus-independent, and the benchmark tests that measure the committed corpus were in this
+ * directory, so a clean clone could not pass its own acceptance. `ci-lanes.test.ts` asserts the
+ * list plus `CORPUS_LANE_TESTS` is every discovered `scripts/` test, so naming a file here cannot
+ * quietly stop it being collected. A named directory keeps the run narrow in both directions — a
+ * bare `bun test` at the root walks every package and silently skips any that fails to load, which
+ * AGENTS.md section 8 forbids — and a named file list keeps it narrower still.
  */
-const rootScripts = (root: string): ExtraPlan => ({
-  plan: { name: "@mizan/scripts", dir: root, rel: "scripts", testPaths: ["scripts"] } satisfies PackagePlan,
+const rootScripts = (root: string, scriptsTests: readonly string[]): ExtraPlan => ({
+  plan: { name: "@mizan/scripts", dir: root, rel: "scripts", testPaths: scriptsTests } satisfies PackagePlan,
   checks: ["typecheck", "test"],
 })
 
@@ -74,7 +79,12 @@ const prepare = async (checks: readonly CheckName[]): Promise<Result<Plan, strin
   if (isErr(root)) return err(root.error)
   const tools = resolveToolchain(root.value)
   if (isErr(tools)) return err(tools.error)
-  return ok({ root: root.value, checks, tools: tools.value })
+  // Scanned here rather than inside `rootScripts` so a failure to enumerate the test files lands in
+  // the same `Result` channel as a missing toolchain: a run that cannot say which tests it would
+  // collect has not started, and reporting it as a test failure would name a file it never read.
+  const scriptsTests = defaultLaneTestPaths(root.value)
+  if (isErr(scriptsTests)) return err(scriptsTests.error)
+  return ok({ root: root.value, checks, tools: tools.value, scriptsTests: scriptsTests.value })
 }
 
 const gateReport = (gates: readonly GateOutcome[]): CiReport => ({
@@ -106,9 +116,9 @@ const main = async (): Promise<number> => {
     console.error(`ci could not start: ${prepared.error}`)
     return 2
   }
-  const { root, tools } = prepared.value
+  const { root, tools, scriptsTests } = prepared.value
   const plans = await discoverPackages(root, ["packages/*", "apps/*"])
-  const report = await runCi(plans, checks, tools, () => runGates({ root }), [rootScripts(root)])
+  const report = await runCi(plans, checks, tools, () => runGates({ root }), [rootScripts(root, scriptsTests)])
   console.log(summariseReport(report))
   return report.ok ? 0 : 1
 }

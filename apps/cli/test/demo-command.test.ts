@@ -8,6 +8,7 @@ import { attestAllAnchors, attestDemoAnchor, buildDemoCorpus, describeDemoCorpus
 import { readDemoQuestionSet } from "../src/demo-questions.ts"
 import { EXIT_DEGRADED, EXIT_OK, EXIT_UNTRUSTED, EXIT_USAGE } from "../src/exit-codes.ts"
 import { preserveCommittedLedger, ROOT } from "./committed-ledger.ts"
+import { boundedExit, subprocessBudgetFor, SUBPROCESS_TIMEOUT_MS } from "./subprocess-budget.ts"
 
 /**
  * The `bun run demo` composition root, and the attestation it stands on.
@@ -63,6 +64,10 @@ const withAnchor = (overrides: Partial<DemoAnchor>): DemoAnchor => ({
  * The script path stays absolute so the isolated root contains only the data the demo is allowed
  * to read. Bun resolves the script's own imports from its location in the repository, so the
  * workspace packages still load; what the isolated root denies is `data/corpus.db`.
+ *
+ * Bounded rather than awaited bare, because this is the whole composition root in a child process
+ * and a hang here surfaces as a runner timeout that names neither the step nor the child. See
+ * `subprocess-budget.ts`.
  */
 const runDemoCommand = async (cwd: string): Promise<{ readonly code: number; readonly output: string }> => {
   const proc = Bun.spawn(["bun", "run", join(ROOT, DEMO_RELATIVE)], {
@@ -74,7 +79,11 @@ const runDemoCommand = async (cwd: string): Promise<{ readonly code: number; rea
     env: { ...process.env, MIZAN_LLM_API_KEY: "", MIZAN_LLM_BASE_URL: "" },
   })
   const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()])
-  return { code: await proc.exited, output: `${stdout}${stderr}` }
+  const output = `${stdout}${stderr}`
+  const code = await boundedExit(proc.exited, () => {
+    proc.kill()
+  }, "bun run apps/cli/src/demo.ts", () => output)
+  return { code, output }
 }
 
 /**
@@ -260,7 +269,7 @@ describe("bun run demo", () => {
     expect(output).toContain("[REJECTED] knowledge-fading-1 — quote_absent_at_cited_id")
     expect(output).toContain("2/2 questions reached the outcome")
     expect(code).toBe(EXIT_OK)
-  })
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test("it says on screen that the transcript is a replay and that it wrote no ledger entry", async () => {
     const dir = isolatedRoot()
@@ -270,7 +279,7 @@ describe("bun run demo", () => {
     // The source-level half — that the banner derives it rather than typing it — is in demo.test.ts.
     expect(output).toContain(transcriptLabel("precomputed"))
     expect(output).toContain("appends nothing to data/runs.jsonl")
-  })
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test("the demo banner states that the verdicts were computed, not replayed", async () => {
     // The scope clause, from the other end. A `PRECOMPUTED` label with no scope reads as a
@@ -279,7 +288,7 @@ describe("bun run demo", () => {
     const dir = isolatedRoot()
     const { output } = await runDemoCommand(dir)
     expect(output).toContain("verdicts computed live")
-  })
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test("it prints the corpus fingerprint in full, so a reader can check it", async () => {
     const dir = isolatedRoot()
@@ -288,7 +297,7 @@ describe("bun run demo", () => {
     expect(printed).not.toBeNull()
     if (printed === null) return
     expect(printed[1]).toHaveLength(64)
-  })
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test("it shows the record's display text and never its folded matching key", async () => {
     // MIZ-104: "the folded matching key textMatch never appears in the output". The two fields
@@ -306,7 +315,7 @@ describe("bun run demo", () => {
       expect(output).toContain(anchor.textDisplay)
       expect(output).not.toContain(folded)
     }
-  })
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test("two runs produce the same corpus fingerprint and the same verdicts", async () => {
     const dir = isolatedRoot()
@@ -315,13 +324,13 @@ describe("bun run demo", () => {
     const fingerprint = (output: string): string | null => /corpus\s+([0-9a-f]{64})/.exec(output)?.[1] ?? null
     expect(fingerprint(first.output)).toBe(fingerprint(second.output))
     expect(fingerprint(first.output)).not.toBeNull()
-  })
+  }, subprocessBudgetFor(2))
 
   test("it appends nothing to the committed run ledger", async () => {
     const dir = isolatedRoot()
     await runDemoCommand(dir)
     expect(await ledger.appendedTrace()).toBeNull()
-  })
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test("a tampered demo corpus stops the demo with no verdict and the untrusted exit code", async () => {
     const dir = isolatedRoot()
@@ -339,7 +348,7 @@ describe("bun run demo", () => {
     expect(output).not.toContain("[VERIFIED]")
     expect(output).not.toContain("[REJECTED]")
     expect(code).toBe(EXIT_UNTRUSTED)
-  })
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test("a missing anchors file exits as a usage error, not as an untrusted run", async () => {
     const dir = isolatedRoot()
@@ -347,7 +356,7 @@ describe("bun run demo", () => {
     const { code, output } = await runDemoCommand(dir)
     expect(output).toContain("the demo corpus file is missing")
     expect(code).toBe(EXIT_USAGE)
-  })
+  }, SUBPROCESS_TIMEOUT_MS)
 })
 
 describe("the shared pipeline constants", () => {

@@ -44,16 +44,57 @@
  * `recallRegression` refusing to read an absent baseline key as "no regression".
  */
 
-import { existsSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { spawn } from "node:child_process"
 import { isOk, type DegradationCondition } from "@mizan/core"
-import { requireRepositoryRoot } from "@mizan/gate"
+import { BENCHMARK_ARTEFACT, COVERAGE_SET, requireRepositoryRoot, servedCollections } from "@mizan/gate"
+import { figuresFrom, renderFigures, type Evidence, type PublishedFigures } from "./acceptance/figures.ts"
+import { scrubbedEnv } from "./acceptance/child-env.ts"
+import { SURFACES, conditionIn, surfaceStepId, type Surface } from "./acceptance/surface-state.ts"
 
 /** The corpus this command checks for. Absent on a clean clone, and that is a stated state, not a failure. */
 export const CORPUS_PATH = "data/corpus.db"
 
-/** Wall-clock budget for one step. Generous, because a step that times out is not a verdict. */
-export const STEP_TIMEOUT_MS = 600_000
+/**
+ * Wall-clock budget for one step, unless the step declares a different one.
+ *
+ * ## Why a minute
+ *
+ * A hung step is not a verdict, so the budget has to be short enough that "hung" is distinguishable from
+ * "slow" by the time an operator stops watching. The previous budget was ten minutes for *every* step, and
+ * that is the same defect as an unbounded one: it cannot fail in a time a person will wait for, so a step
+ * that wedges consumes the whole rehearsal before anything says which one. Sixty seconds is above every
+ * step measured in this repository except the two with declared budgets below — `bun run check:docs` at
+ * 1.2 s, the two surface checks at 1.3 s, `ingest:check` at 0.7 s, the fabrication eval at 1.0 s and
+ * `ci:corpus` at 2.9 s — so it separates "hung" from "slow" without endangering a step that is merely
+ * cold.
+ *
+ * ## Why two steps carry their own budget
+ *
+ * An override is not a licence; each one names a measured reason, because a blanket override is exactly
+ * what this constant just stopped being.
+ */
+export const STEP_TIMEOUT_MS = 60_000
+
+/**
+ * `bun run ci` typechecks thirteen packages, runs every suite in the tree and then runs the seven gates.
+ * Measured 217 s warm on the development machine, so a sixty-second budget would fail a step that works,
+ * and a ten-minute blanket budget would let a wedged typecheck hold the rehearsal for as long as a person
+ * would sit and watch it. Nine minutes is the CI job's own `timeout-minutes` for the same command, so the
+ * step budget and the pipeline budget cannot disagree about how long this is allowed to take.
+ */
+export const FULL_CI_TIMEOUT_MS = 900_000
+
+/**
+ * `eval:suggestions --check` reads every record in the published snapshot at three recall floors. Measured
+ * 56.1 s warm — within four seconds of the default budget, which is a coin toss on a cold runner rather
+ * than a budget. Five minutes is the headroom a page-cold snapshot needs; it is still five times shorter
+ * than the value this check used to run under.
+ */
+export const RECALL_TIMEOUT_MS = 300_000
+
+/** How much of a step's stdout the report may echo. Enough for a state name, not enough for a transcript. */
+const OBSERVED_CAP = 200
 
 /** What one step is, declared as data. See the file header for why this is not a closure. */
 export type AcceptanceStep = {
@@ -65,6 +106,14 @@ export type AcceptanceStep = {
   readonly argv: readonly string[]
   /** Package-relative directory to run in, for the steps whose tool must not run at the root (§8). */
   readonly workdir?: string
+  /**
+   * Wall-clock budget, when this step genuinely needs longer than `STEP_TIMEOUT_MS`.
+   *
+   * Optional on purpose. A step that does not declare one gets the default, so the table cannot grow a
+   * silent ten-minute step by forgetting a field, and a step that does declare one has to justify it in
+   * the constant's own comment.
+   */
+  readonly timeoutMs?: number
   /** Whether this step needs `data/corpus.db`. A step that does is skipped, not failed, when it is absent. */
   readonly needsCorpus: boolean
   /** The degradation reported when this step is skipped for want of a corpus. */
@@ -83,6 +132,7 @@ export const ACCEPTANCE_STEPS: readonly AcceptanceStep[] = [
     id: "types-and-gates",
     purpose: "the whole repository typechecks and every structural gate passes",
     argv: ["bun", "run", "ci"],
+    timeoutMs: FULL_CI_TIMEOUT_MS,
     needsCorpus: false,
     whenCorpusAbsent: "unmeasured",
   },
@@ -105,9 +155,38 @@ export const ACCEPTANCE_STEPS: readonly AcceptanceStep[] = [
     whenCorpusAbsent: "unmeasured",
   },
   {
+    id: surfaceStepId("cli"),
+    purpose: "the CLI on a checkout with no corpus names a shared degradation state and refuses",
+    // Story 7's clean-clone promise, checked per surface, because a check that covered both at once could
+    // not say which one degraded. The step passes when the script exits 0, which it does when the surface
+    // named `corpus_absent` — so a green row here means the CLI said which state it was in, not that it
+    // served an answer. The state itself is printed beside the row.
+    argv: ["bun", "run", "acceptance:surface-state", "--surface", "cli"],
+    needsCorpus: false,
+    whenCorpusAbsent: "unmeasured",
+  },
+  {
+    id: surfaceStepId("mcp"),
+    purpose: "the MCP server on a checkout with no corpus names a shared degradation state and refuses",
+    argv: ["bun", "run", "acceptance:surface-state", "--surface", "mcp"],
+    needsCorpus: false,
+    whenCorpusAbsent: "unmeasured",
+  },
+  {
     id: "corpus-attested",
     purpose: "the corpus this repository would search is present and matches its committed attestation",
     argv: ["bun", "run", "ingest:check"],
+    needsCorpus: true,
+    whenCorpusAbsent: "corpus_absent",
+  },
+  {
+    id: "published-benchmark-run",
+    purpose: "the committed corpus still reproduces the published benchmark report byte for byte",
+    // `ci:corpus` is the opt-in lane `ci-lanes.ts` names: the benchmark's own correctness test has
+    // to measure the real corpus, and the corpus is not on a clean clone, so the test cannot live in
+    // `bun run ci` — which this command's first step runs. It sits here rather than nowhere so the
+    // exclusion is visible in the one table an operator reads before a demo.
+    argv: ["bun", "run", "ci:corpus"],
     needsCorpus: true,
     whenCorpusAbsent: "corpus_absent",
   },
@@ -122,6 +201,7 @@ export const ACCEPTANCE_STEPS: readonly AcceptanceStep[] = [
     // has no path to the writer; a bare run cannot move the floor either, so pointing the gate at it
     // was harmless to the artefact and useless as evidence.
     argv: ["bun", "run", "eval:suggestions", "--check"],
+    timeoutMs: RECALL_TIMEOUT_MS,
     needsCorpus: true,
     whenCorpusAbsent: "corpus_absent",
   },
@@ -138,6 +218,15 @@ export type StepResult = {
   readonly reason: string
   /** Present only for `skipped`, and only because a skipped step needs an honest label. */
   readonly condition?: DegradationCondition
+  /**
+   * What a passing step *named*, when it named a value.
+   *
+   * "pass" is the weakest row in a report: it says a command exited 0 and nothing about what the command
+   * found. A check that has an answer — the CLI said `corpus_absent` — should print it, or the reader is
+   * left to take the number in the table below on faith, which is the thing this command exists to avoid.
+   * Read from stdout, capped at `OBSERVED_CAP`, and never used in the decision: only the outcome is.
+   */
+  readonly observed?: string
 }
 
 /** The overall verdict. `accepted` requires every step to have passed. */
@@ -189,7 +278,25 @@ export const decide = (
 }
 
 /**
- * The report as the operator reads it: one line per step, then the verdict.
+ * Everything the report prints that is not a step outcome.
+ *
+ * ## Why the figures are a parameter and not something `renderReport` reads
+ *
+ * Because a report that fetches its own evidence is a report whose output depends on when it ran, and the
+ * two properties this repository cares about — every number is derived, and every derivation is testable —
+ * both die the moment the renderer opens a file. So the caller reads (or, in a test, hands over) the
+ * evidence, and the renderer is a pure function of it. It is a required parameter for the same reason the
+ * step table is the denominator: a disclosure that a caller can leave out is a disclosure that gets left
+ * out, and this one was left out for a sprint before it was written.
+ */
+export type Disclosure = {
+  readonly figures: PublishedFigures
+  /** What each shipped surface named on a checkout with no corpus, keyed by its step id. */
+  readonly surfaceStates: ReadonlyMap<string, string>
+}
+
+/**
+ * The report as the operator reads it: one line per step, the figures, the surface states, then the verdict.
  *
  * A line names the step and its outcome, and nothing else. No corpus text, no claim text, no duration —
  * AGENTS.md section 13 applies to an acceptance report too, because a report is a thing people paste
@@ -199,12 +306,16 @@ export const renderReport = (
   steps: readonly AcceptanceStep[],
   results: readonly StepResult[],
   decision: AcceptanceDecision,
+  disclosure: Disclosure,
 ): string => {
   const byId = new Map(results.map((result) => [result.id, result]))
   const lines = steps.map((step) => {
     const result = byId.get(step.id)
     if (result === undefined) return `  MISSING  ${step.id} — this check never ran`
-    if (result.outcome === "passed") return `  pass     ${step.id}`
+    if (result.outcome === "passed") {
+      const named = disclosure.surfaceStates.get(step.id)
+      return `  pass     ${step.id}${named === undefined ? "" : ` — ${named}`}`
+    }
     if (result.outcome === "skipped") return `  skipped  ${step.id} — ${result.reason}`
     return `  ${result.outcome.padEnd(7)} ${step.id} — ${result.reason}`
   })
@@ -217,38 +328,49 @@ export const renderReport = (
     : decision.skipped.length === 0
       ? "ACCEPTED — every check ran and passed"
       : `ACCEPTED WITH ${decision.skipped.length} CHECK(S) NOT RUN — ${decision.skipped.map((entry) => `${entry.id} (${entry.condition})`).join(", ")}. Everything that could be checked here was checked; these did not run and their claims are unverified.`
-  return ["customer acceptance", ...lines, "", verdict].join("\n")
+  return ["customer acceptance", ...lines, "", ...renderFigures(disclosure.figures), "", verdict].join("\n")
 }
 
 /** How a step's process actually ran. Injected so the orchestrator can be tested without a corpus. */
-export type Spawned = { readonly outcome: StepOutcome; readonly reason: string }
+export type Spawned = { readonly outcome: StepOutcome; readonly reason: string; readonly observed: string }
 
 /** Runs one command, turning a non-zero exit and a timeout into values rather than exceptions. */
-export const runStep = (argv: readonly string[], cwd: string): Promise<Spawned> =>
+export const runStep = (argv: readonly string[], cwd: string, timeoutMs: number = STEP_TIMEOUT_MS): Promise<Spawned> =>
   new Promise((resolve) => {
-    const child = spawn(argv[0] as string, argv.slice(1), { cwd, stdio: ["ignore", "pipe", "pipe"] })
+    // `env` is passed explicitly, because `spawn` inherits `process.env` when it is omitted — and an
+    // inherited `MIZAN_CORPUS_PATH` or `MIZAN_LLM_API_KEY` would make this report describe the
+    // developer's machine instead of the checkout under test. See `acceptance/child-env.ts`.
+    const child = spawn(argv[0] as string, argv.slice(1), { cwd, env: scrubbedEnv(process.env), stdio: ["ignore", "pipe", "pipe"] })
     let stderr = ""
+    // stdout is kept only for a step that passed, only as its LAST non-empty line, and only up to the cap:
+    // a passing check may *name* something worth reporting, and this is the last place that happens without
+    // the command having to be told it is being watched. A failing step's transcript still goes through
+    // `stderr` below, because a refusal is useless without the line that refused it.
+    let stdout = ""
     child.stderr?.on("data", (chunk: Buffer | string) => {
-      // Kept only as the LAST lines: a step's output can be long, and the report carries a reason, not a
-      // transcript. A refusal is useless without the line that refused it.
       const text = typeof chunk === "string" ? chunk : chunk.toString()
       stderr = `${stderr}${text}`.trim().split("\n").slice(-3).join(" ")
     })
+    child.stdout?.on("data", (chunk: Buffer | string) => {
+      const text = (typeof chunk === "string" ? chunk : chunk.toString()).trim()
+      const last = text.split("\n").filter((line) => line.trim().length > 0).slice(-1)[0]
+      if (last !== undefined) stdout = last.trim().slice(0, OBSERVED_CAP)
+    })
     const timer = setTimeout(() => {
       child.kill()
-      resolve({ outcome: "timedOut", reason: `no result within ${STEP_TIMEOUT_MS}ms` })
-    }, STEP_TIMEOUT_MS)
+      resolve({ outcome: "timedOut", reason: `no result within ${timeoutMs}ms`, observed: "" })
+    }, timeoutMs)
     child.on("error", (cause: Error) => {
       clearTimeout(timer)
-      resolve({ outcome: "failed", reason: `could not start: ${cause.message}` })
+      resolve({ outcome: "failed", reason: `could not start: ${cause.message}`, observed: "" })
     })
     child.on("close", (code) => {
       clearTimeout(timer)
       if (code === 0) {
-        resolve({ outcome: "passed", reason: "" })
+        resolve({ outcome: "passed", reason: "", observed: stdout })
         return
       }
-      resolve({ outcome: "failed", reason: `exited ${code ?? "with no code"}${stderr === "" ? "" : `: ${stderr}`}` })
+      resolve({ outcome: "failed", reason: `exited ${code ?? "with no code"}${stderr === "" ? "" : `: ${stderr}`}`, observed: "" })
     })
   })
 
@@ -280,26 +402,120 @@ export const orchestrate = async (
     // repository root an invalid cwd for one: `bun test` there globs every package, silently skips the
     // ones that fail to load, and can report green having collected nothing.
     const cwd = step.workdir === undefined ? root : `${root}/${step.workdir}`
-    const spawned = await runStep(step.argv, cwd)
-    results.push({ id: step.id, outcome: spawned.outcome, reason: spawned.reason })
+    const spawned = await runStep(step.argv, cwd, step.timeoutMs ?? STEP_TIMEOUT_MS)
+    results.push({
+      id: step.id,
+      outcome: spawned.outcome,
+      reason: spawned.reason,
+      ...(spawned.outcome === "passed" && spawned.observed !== "" ? { observed: spawned.observed } : {}),
+    })
   }
   return results
 }
 
-/** Exit 0 accepted, 1 not accepted. The report is printed either way — a silent red exit helps nobody. */
-const main = async (): Promise<number> => {
-  const root = requireRepositoryRoot(process.cwd())
+/**
+ * The committed evidence, read once, for the figures block.
+ *
+ * Three committed files and nothing else: the attestation for what is served, the fabrication set for what
+ * was tested, and the measurement artefact for what came out. No corpus, no database, no network — which is
+ * what lets the disclosure survive the clean clone this command is most likely to be run on.
+ */
+export const evidenceFrom = (root: string): Evidence => {
+  const attestation = servedCollections(root)
+  const read = (relative: string): string | null => {
+    try {
+      return readFileSync(`${root}/${relative}`, "utf8")
+    } catch {
+      // Absent and unreadable reach the same `null` here, and the disclosure prints `unmeasured` for both.
+      // The distinction that matters — an attestation that exists and cannot answer — is carried by
+      // `servedCollections().usable`, which asks for the file's presence rather than inferring it.
+      return null
+    }
+  }
+  return {
+    served: attestation.counts,
+    servedNames: attestation.served,
+    servedUsable: attestation.usable,
+    redteam: read(COVERAGE_SET),
+    benchmark: read(BENCHMARK_ARTEFACT),
+  }
+}
+
+/**
+ * What each surface row shows, decoded from the check's own output.
+ *
+ * Decoded rather than echoed: the row prints a word from the shared vocabulary or it prints that no word
+ * was named. A row that pasted whatever the subprocess wrote would put an integrator's scraper and this
+ * report on the same footing as the subprocess, and this repository's whole claim is that the two agree
+ * because something checked it.
+ */
+export const describeSurfaceState = (result: StepResult | undefined): string => {
+  if (result === undefined) return "no state: this check never ran"
+  if (result.outcome !== "passed") return `no shared state named — ${result.outcome} (${result.reason})`
+  const named = conditionIn(result.observed ?? "")
+  if (named === null) return "no shared state named, although the check passed"
+  return `${named} on a checkout with no corpus`
+}
+
+/** One row's state per surface, keyed by the step that established it. */
+export const surfaceStatesFrom = (results: readonly StepResult[]): ReadonlyMap<string, string> => {
+  const byId = new Map(results.map((result) => [result.id, result]))
+  return new Map(SURFACES.map((surface: Surface) => [surfaceStepId(surface), describeSurfaceState(byId.get(surfaceStepId(surface)))]))
+}
+
+/**
+ * The disclosure for a completed run: the figures, and what each surface said.
+ *
+ * One function so `main` cannot print the figures from one checkout and the surface states from another.
+ */
+export const disclosureFrom = (root: string, results: readonly StepResult[]): Disclosure => ({
+  figures: figuresFrom(evidenceFrom(root)),
+  surfaceStates: surfaceStatesFrom(results),
+})
+
+/**
+ * The exit codes, in one place.
+ *
+ * `0` and `1` are the verdict a caller acts on: the run completed and either every check that ran passed,
+ * or at least one did not. `2` is a different fact — the rehearsal never started, so *no* verdict exists.
+ * Collapsing that into `1` is the fail-open move AGENTS.md section 3 forbids read from the other side: a
+ * script that reported "a check failed" when in fact it could not find the repository would send an
+ * operator to debug the acceptance table for a missing `package.json` one directory up.
+ */
+export const EXIT_ACCEPTED = 0
+export const EXIT_NOT_ACCEPTED = 1
+export const EXIT_COULD_NOT_START = 2
+
+/**
+ * The process exit code, as a pure function of the decision.
+ *
+ * Exported so a test can assert the code the operator gets without spawning a second full acceptance
+ * run — the mapping "accepted is 0, anything else is 1" is a contract with CI and with the README, and
+ * a contract asserted only by reading `main` is a contract nobody tested.
+ */
+export const exitCodeFor = (decision: AcceptanceDecision): number => (decision.accepted ? EXIT_ACCEPTED : EXIT_NOT_ACCEPTED)
+
+/**
+ * Exit 0 accepted, 1 not accepted, 2 could not start. The report is printed either way — a silent red
+ * exit helps nobody.
+ *
+ * `from` is a parameter so a test can drive the startup path without changing the working directory of
+ * the test runner: `process.cwd()` is read at the default, not captured at module load, because a module
+ * that captured it would resolve the root of whoever imported it rather than of whoever ran it.
+ */
+export const main = async (from: string = process.cwd()): Promise<number> => {
+  const root = requireRepositoryRoot(from)
   if (!isOk(root)) {
-    console.error(`FAIL ${root.error}`)
-    return 1
+    console.error(`accept:customer could not start (exit ${EXIT_COULD_NOT_START}): ${root.error}`)
+    return EXIT_COULD_NOT_START
   }
   const results = await orchestrate(root.value)
   const decision = decide(results)
-  console.log(renderReport(ACCEPTANCE_STEPS, results, decision))
+  console.log(renderReport(ACCEPTANCE_STEPS, results, decision, disclosureFrom(root.value, results)))
   if (!decision.accepted) {
     console.error(`\n${decision.skipped.length} step(s) did not run: ${decision.skipped.map((entry) => `${entry.id} (${entry.condition})`).join(", ")}`)
   }
-  return decision.accepted ? 0 : 1
+  return exitCodeFor(decision)
 }
 
 if (import.meta.main) process.exit(await main())

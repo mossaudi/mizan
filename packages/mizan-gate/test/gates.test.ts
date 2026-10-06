@@ -41,6 +41,7 @@ checkNoSimilarity,
   findRepositoryRoot,
   findRoot,
   requireRepositoryRoot,
+  GITLEAKS_VERSION,
   VERIFY_PREFIX,
 } from "../src/index.ts"
 
@@ -820,7 +821,41 @@ describe("the gate must not be able to pass by looking at nothing", () => {
     expect(found).toBe(import.meta.dir)
   })
 
-  test("findRoot terminates at the filesystem root instead of looping", () => {
+test("findRoot terminates at the filesystem root instead of looping", () => {
     expect(findRoot(import.meta.dir, () => false)).toBeNull()
+  })
+})
+
+/**
+ * G-4's binary, and the jobs that need it.
+ *
+ * Two facts, both of which have been wrong: the missing-binary message pointed at a workflow step that did
+ * not exist, and the install was written inline in one job while a second job started running `bun run ci`.
+ * A gate that fails closed for an environmental reason is correct behaviour and useless in practice, so the
+ * install is now one composite action and its version is pinned to `GITLEAKS_VERSION` — asserted here,
+ * because a version that drifts between the message and the download is an unpinned scan tool wearing a
+ * pin.
+ */
+describe("G-4 the pinned binary and the jobs that spawn it", () => {
+  const actionPath = (): string => join(findRepositoryRoot(import.meta.dir) ?? "", ".github", "actions", "setup-gitleaks", "action.yml")
+
+  test("the composite action pins the same version the gate names, or the pin is a claim", () => {
+    expect(existsSync(actionPath())).toBe(true)
+    const action = readFileSync(actionPath(), "utf8")
+    expect(action).toContain(`default: "${GITLEAKS_VERSION}"`)
+  })
+
+  test("every job that runs `bun run ci` installs the binary, because G-4 fails closed without it", () => {
+    // Not a count of jobs, and not the `gate` job by name: the failure this guards against is a *new* job
+    // running `bun run ci` without the install, which is exactly the state the previous message pointed a
+    // developer into. So it is asserted as a relationship — every `bun run ci` step co-located with the
+    // install step — rather than as a list that goes stale the moment a job is added.
+    const root = findRepositoryRoot(import.meta.dir)
+    if (root === null) throw new Error("no root")
+    const workflow = readFileSync(join(root, ".github", "workflows", "ci.yml"), "utf8")
+    const jobs = workflow.split(/\n {2}(?=\S)/)
+    const jobsRunningCi = jobs.filter((job) => job.includes("run: bun run ci"))
+    expect(jobsRunningCi.length).toBeGreaterThan(0)
+    for (const job of jobsRunningCi) expect(job).toContain("./.github/actions/setup-gitleaks")
   })
 })

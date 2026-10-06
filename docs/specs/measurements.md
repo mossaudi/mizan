@@ -46,6 +46,16 @@ table is the same run decomposed, from the `## presence per collection` block th
 | quran | 2 | 2/2 | 2/2 | 2/2 | 2 | 0 | 6236 |
 | tirmidhi | 2 | 2/2 | 2/2 | 2/2 | 2 | 0 | 3889 |
 
+**Dataset digest: `ds1:c9b35dd9ae7200e1b0152cfcb8afb80205e4500f5b40008c2e77d03ce5cc88e5`** —
+the `data/eval/redteam-fabricated.json` every row above decomposes. It is the `ds1` digest of that
+document with its own `datasetDigest` key removed, so any reader can recompute it, and it is the same
+value `--record` compares against before it will write a new baseline. Without it the table above is
+fifteen numbers per row and no statement of *which* fifteen: a 40-case set spread over six collections
+in a different proportion produces a different table, and nothing on the page would tell the two apart.
+`bun run check:docs` requires this line and requires it to match `data/benchmark/vs-search.json`'s
+`suggestionEvalSetDigest`, because a digest pointing at another set reads as provenance while pointing
+somewhere else.
+
 The `rejected` and `verified` columns answer a different question from `top-N`. `top-N` is a
 **ranking** figure — where the adjudicated record landed. `rejected` is a **containment** figure — how
 many of that collection's fabrications the quoted span failed to match at the cited identifier, which is

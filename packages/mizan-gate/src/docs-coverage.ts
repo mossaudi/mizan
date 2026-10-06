@@ -352,6 +352,29 @@ const readCoverageRecorded = (text: string | null): RecordedCoverage | null => {
 const recordedCell = (recorded: RecordedCoverage, collection: string, column: string): number | null =>
   recorded.cells.get(collection)?.get(column) ?? null
 
+/** The artefact's record of WHICH set it measured — the digest the documents must publish beside a table. */
+const EVAL_SET_DIGEST_KEY = "suggestionEvalSetDigest"
+
+/** A `ds1:` digest, in the one shape `scripts/build-eval-set.ts` writes. */
+const DS1_DIGEST = /ds1:[0-9a-f]{64}/g
+
+/** The `ds1:` digests a document states, in order and un-deduplicated. */
+const statedDigests = (document: string): readonly string[] => document.match(DS1_DIGEST) ?? []
+
+/** The artefact's recorded set digest, or `null` when the artefact cannot say. */
+const recordedEvalSetDigest = (text: string | null): string | null => {
+  if (text === null) return null
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return null
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null
+  const digest = (parsed as Readonly<Record<string, unknown>>)[EVAL_SET_DIGEST_KEY]
+  return typeof digest === "string" && /^ds1:[0-9a-f]{64}$/.test(digest) ? digest : null
+}
+
 /** One collection's case count — the denominator `checkPresenceCollectionNamed` reasons about. */
 const recordedCases = (recorded: RecordedCoverage, collection: string): number | null =>
   recordedCell(recorded, collection, "cases")
@@ -568,22 +591,118 @@ const tableCells = (line: string): readonly string[] | null => {
 }
 
 /**
- * A stated figure in one cell: a bare count, or a count over a denominator.
+ * The count a figure cell states, with its thousands separators removed.
+ *
+ * The separators are the reason this is a function rather than `Number(match[1])`. `6,236` is the
+ * spelling every one of these documents uses for a corpus size, and a rule that recognised only bare
+ * digits would read that cell as *not a figure at all* — which is a silent skip, not a check. The
+ * published `collection | … | served records` tables happen to carry unseparated counts today, so the
+ * hole is invisible until someone formats a number the way the rest of the prose does.
+ */
+const parseCount = (digits: string): number => Number(digits.replace(/,/g, ""))
+
+/**
+ * A stated figure in one cell: a bare count, or a count over a denominator, separators tolerated.
  *
  * A cell that is not a figure — `measured`, `measured zero — no figure published`, `—` — matches
  * nothing and is skipped by the row check. That is deliberate and is the whole reason this rule can
  * be applied to a table that documents its own unmeasured rows honestly: a word is a statement that
  * no number was published, and a word has nothing to disagree with. Only digits make a claim.
  */
-const STATED_FIGURE = /^(\d+)(?:\s*(?:\/|of)\s*(\d+))?$/
+const STATED_FIGURE = /^(\d{1,3}(?:,\d{3})*|\d+)(?:\s*(?:\/|of)\s*(\d{1,3}(?:,\d{3})*|\d+))?$/
+
+/**
+ * The numerator a `STATED_FIGURE` match states, or `null` when it carries no first group.
+ *
+ * ## Why this is a function and not `stated[1] ?? ""`
+ *
+ * Group 1 of `STATED_FIGURE` is mandatory, so the `undefined` branch is unreachable through the regex
+ * today — which is exactly why `?? ""` sat there unexamined, and exactly why it had to go. `Number("")`
+ * is `0`, so if the pattern ever gains a group before the numerator, every stale row would have been
+ * reported as "states 0 for `quran`": a finding that accuses a committed, reviewed document of
+ * publishing a number nobody wrote, in a rule whose entire job is to be right about such documents.
+ *
+ * Returning `null` lets the caller say the true thing — the rule cannot read the cell — instead of the
+ * plausible thing. Exported for the self-test, because a guard nobody can watch fail has not been shown
+ * to fail (AGENTS.md section 14), and the branch cannot be reached through the pattern by design.
+ */
+export const statedNumerator = (stated: RegExpExecArray): string | null => stated[1] ?? null
+
+/**
+ * Any digit at all, which is what separates "this cell is prose" from "this cell is a number
+ * wearing a spelling no reader recognises".
+ *
+ * The two are not the same, and the difference is the whole of `unreadCellFindings`. A cell reading
+ * `measured` states no number, so there is nothing to disagree with and the rule must stay silent. A
+ * cell reading `40 of 40 (checked 2x)` states a number, and a number in a column is a claim whether
+ * or not the grammar recognises its shape — so a shape the grammar misses is a finding about the
+ * shape, not a reason to look away.
+ */
+const ANY_DIGIT = /\d/
+
+/** One data row, with the collection it names. */
+type CoverageRow = {
+  readonly cells: readonly string[]
+  /**
+   * The corpus identifier this row is about, or `null` when its first cell resolves to no single
+   * collection this repository knows.
+   *
+   * ## Why `null` is a finding and not a skip
+   *
+   * `null` used to mean "this row is not a per-collection disclosure" and was returned early by every
+   * row rule, which made the whole gate removable by editing one cell. Renaming `nasai` to
+   * `Sunan an-Nasa'i` — a purely cosmetic edit, the kind that happens when someone tidies a table —
+   * left zero keyed rows, and every check on that table silently switched itself off while the
+   * numbers stayed published. That is AGENTS.md §3's fail-open, reached through restraint: the rule
+   * declining to guess which collection a display name means.
+   *
+   * So the guess is not made, and the silence is not either. A row resolves by *containment* when its
+   * first cell names exactly one known identifier (`nasai` inside `Sunan an-Nasa'i (Nasa'i)`, `malik`
+   * inside `Muwatta', Malik`), which keeps a decorated label auditable without a name-mapping. When
+   * nothing matches, or two do, the row is `null` and `unkeyedRowFindings` reports it as
+   * `presence-row-unkeyed` — so the repair is stated rather than assumed, and a reader who sees a
+   * figure in an unkeyed row knows no gate compared it.
+   */
+  readonly collection: string | null
+}
 
 type CoverageTable = {
   readonly headers: readonly string[]
-  readonly rows: readonly (readonly string[])[]
+  readonly rows: readonly CoverageRow[]
 }
 
 /**
- * Every table in `document` whose header row names a `collection` column.
+ * The corpus identifier a row's first cell is about, or `null`.
+ *
+ * ## Why a syntactically valid identifier is a key even when this repository does not serve it
+ *
+ * Because "unknown collection" and "not a collection" are different defects with different repairs. A
+ * row keyed `bukhari` in a repository that serves no Bukhari is a **stale row** — a collection that was
+ * removed, which `unrecordedRowFindings` reports against the served set. Collapsing it into `null` would
+ * relabel it as unkeyed, and the repair would be "write an identifier", which the row already has.
+ *
+ * So the grammar decides keyhood and `known` only widens it: a cell matching `COLLECTION_NAME` is keyed
+ * whatever it says, and `known` exists solely for the decorated-label case below.
+ *
+ * ## Why containment, and why only unambiguous containment
+ *
+ * Exact matching alone is what made the label rename a switch: a display name is not an identifier, so
+ * every row of a legitimately decorated table resolves to `null`. Containment recovers those rows without
+ * a mapping, because a cell that *contains* an identifier is naming that collection.
+ *
+ * Two matches is `null` rather than a choice. A cell containing `malik` and `tirmidhi` is either two
+ * collections in one row or a label this rule cannot segment, and picking the first is a guess about
+ * which book's figure a reader is looking at — the precise failure the old comment refused to risk.
+ */
+const collectionFor = (first: string, known: readonly string[]): string | null => {
+  if (COLLECTION_NAME.test(first)) return first
+  const haystack = first.toLowerCase()
+  const contained = known.filter((id) => haystack.includes(id.toLowerCase()))
+  return contained.length === 1 ? (contained[0] as string) : null
+}
+
+/**
+ * Every table in `document` whose header row names a `collection` column, keyed against `known`.
  *
  * ## Why the header has to be read rather than guessed
  *
@@ -597,13 +716,13 @@ type CoverageTable = {
  * ## Why the separator row cannot be mistaken for data
  *
  * Because it is all `---` and `-`, and `STATED_FIGURE` matches neither: `COLLECTION_NAME` rejects
- * `---` as a first cell, so the separator and every `| --- |` filler row in either document is
- * skipped by the collection test before any cell is read.
+ * `---` as a first cell and no identifier is contained in `---`, so the separator resolves to `null`
+ * — and `unkeyedRowFindings` then asks whether it states a number, which it does not.
  */
-const coverageTables = (document: string): readonly CoverageTable[] => {
+const coverageTables = (document: string, known: readonly string[]): readonly CoverageTable[] => {
   const tables: CoverageTable[] = []
   let headers: readonly string[] | null = null
-  let rows: string[][] = []
+  let rows: CoverageRow[] = []
   const close = (): void => {
     if (headers === null) return
     tables.push({ headers, rows })
@@ -621,7 +740,8 @@ const coverageTables = (document: string): readonly CoverageTable[] => {
       headers = cells.map((cell) => cell.toLowerCase())
       continue
     }
-    rows.push([...cells])
+    const first = cells[0] ?? ""
+    rows.push({ cells, collection: collectionFor(first, known) })
   }
   close()
   return tables
@@ -657,6 +777,18 @@ const coverageTables = (document: string): readonly CoverageTable[] => {
  *
  * @param servedCounts collection -> served record count, from `attestation.json`. Empty means the
  *   served set could not be enumerated, which disables only the stale-row distinction above.
+ *
+ * ## Why an unreadable artefact no longer returns early
+ *
+ * This function used to begin `if (recorded === null) return []`. The intent was "no artefact, nothing
+ * to compare against", and the effect was that a corrupt `vs-search.json` disarmed **every** check on
+ * the document — including `unreadCellFindings`, which needs no artefact at all and only reports that
+ * a column nobody reads carries figures. So the most alarming evidence state a customer can produce, a
+ * broken artefact, was also the state in which the document was least examined, and the second finding
+ * to appear was never a finding about the document at all.
+ *
+ * Now the artefact is read once, the table rules that need it are skipped when it is unreadable, and
+ * the rules that do not need it run regardless. Two independent defects stay two independent findings.
  */
 export const checkCoverageTableRows = (
   document: string,
@@ -664,30 +796,238 @@ export const checkCoverageTableRows = (
   artefact: CoverageArtefact,
   servedCounts: ReadonlyMap<string, number> = new Map(),
 ): readonly DocsClaim[] => {
-  const recorded = readCoverageRecorded(artefact.text)
-  if (recorded === null) return []
   const findings: DocsClaim[] = []
-  for (const table of coverageTables(document)) {
+  // Keying happens before the artefact is read, because it does not depend on it: the served set comes
+  // from `attestation.json` and the recorded set from the artefact, and a row is resolvable against
+  // either. Reading the artefact first and returning early on a parse failure is what used to silence
+  // this function, so the ordering here is load-bearing — see the note on `recorded` below.
+  const recorded = readCoverageRecorded(artefact.text)
+  const known = [...new Set([...servedCounts.keys(), ...(recorded?.collections ?? [])])].toSorted()
+  for (const table of coverageTables(document, known)) {
+    // Once per table, not once per row: an unreadable COLUMN is one defect, and six rows of it is the
+    // "one finding reported six times" shape this module has already had to undo once (see
+    // `checkPresenceCoverageRecorded`). It runs BEFORE and independently of `recorded`, because a
+    // malformed artefact is one finding and a column no reader owns is another, and one of them must
+    // not be able to hide the other.
+    findings.push(...unreadCellFindings(file, table))
     for (const row of table.rows) {
+      findings.push(...unkeyedRowFindings(file, row))
+      if (recorded === null) continue
       findings.push(...rowFindings(file, table.headers, row, recorded, servedCounts, artefact.path))
     }
   }
   return findings
 }
 
+/* ------------------------------------------------------------------ *
+ * R21e — fail closed on a number no rule reads.
+ *
+ * The gap that produced the first version of this rule, stated as a mechanism rather than a
+ * mishap: `cellFindings` skipped any header it did not recognise, on the stated grounds that "adding
+ * a column to a document cannot invent a finding". Probed live against the committed artefact, that
+ * default is a **switch**, and the cheapest kind to flip by accident:
+ *
+ *   cases / top-5 / rejected / verified  -> a finding   (read)
+ *   recall@5 / presence / top5 / nonsense -> NO finding (unread)
+ *
+ * So renaming a header — `top-5` to `top5`, or writing the metric under a name the artefact does not
+ * use — silently disarmed every check on that column, and the table carried on publishing numbers
+ * nobody verified. That is the fail-open AGENTS.md §3 forbids, arrived at by the one route that
+ * looks like restraint: a rule declining to be wrong. It is worse than no rule, because the column
+ * still looks checked.
+ *
+ * The replacement is one sentence, and it is the constitution's: **a number in a coverage table cell
+ * is a claim, and a claim no reader reads is a finding.** Not "a number in a recognised column", and
+ * not "a number this grammar happens to parse" — both of those are the same switch with more words.
+ * ------------------------------------------------------------------ */
+
+/** `served records` reads from the attestation rather than the artefact — see `columnFigure`. */
+const SERVED_RECORDS_COLUMN = "served records"
+
+/** The `cases` column, whose header is `FIGURE_FAMILIES`' first entry rather than a bare literal. */
+const CASES_COLUMN = "cases"
+
+/** `top-<N>` — the cut-off is a number, so the column name carries one. Matches the artefact's key. */
+const PRESENCE_COLUMN = /^top-\d+$/
+
+/** The headers a reader owns: `FIGURE_FAMILIES`' columns, the attestation's size column, `top-N`. */
+const isReadColumn = (header: string): boolean =>
+  PRESENCE_COLUMN.test(header) || header === SERVED_RECORDS_COLUMN || FIGURE_FAMILIES.some(([, column]) => column === header)
+
+/**
+ * Columns whose cells are words, each with the reason no reader needs one.
+ *
+ * A declaration rather than an inference, because the alternative is a rule that has to guess whether
+ * an unrecognised header is a rate, a label or a figure — and a guess here is the switch. To add a
+ * prose column, add its name here with the sentence that explains why it carries no number; to add a
+ * *figure* column, add a reader that says which artefact field it is, and the two lists cannot both
+ * claim the same header because a name in either is a name checked in neither.
+ *
+ * ## Why the reasons are exported
+ *
+ * Because a reason that is written once and never read is a comment with a runtime cost, and this is
+ * the one place in the module where a comment does real work: a prose column is an *exemption*, and an
+ * exemption nobody can check is how a rule gets switched off one column at a time. So the declaration is
+ * exported, `columnFinding` prints the reason whenever a declared prose column turns out to carry a
+ * number, and `docs-coverage.test.ts` asserts each reason names the artefact field or constant that
+ * grounds it — so an entry cannot be added with an excuse that no artefact backs, and an entry whose
+ * grounding is renamed goes red instead of quietly excusing itself forever.
+ *
+ * ## Why a digit in a declared prose column is a finding rather than a skip
+ *
+ * The declaration is about the *column*; the digit is in the *cell*, and the two have drifted. Before
+ * this, `PROSE_COLUMNS[header] !== undefined` returned `null` before the digit was ever looked at, which
+ * made a prose column the one header shape where a number is checked by nothing — the exact inverse of
+ * the rule the same function exists to enforce, and the same fail-open the module has had to undo twice.
+ * The cell is now read on its own terms: `measured` is prose and stays silent, `measured 90%` is a claim
+ * no reader owns, and the finding says so *and* quotes the declaration that would otherwise excuse it,
+ * because a person facing that choice needs both halves — whether to reword the cell or to withdraw the
+ * exemption.
+ */
+export const PROSE_COLUMNS: Readonly<Record<string, string>> = {
+  coverage:
+    "the row's coverage state (`measured`, or the reason it is not), which is prose by construction: a rate has no integer in the artefact to be compared against, and the floor that produces the state is `FABRICATION_COVERAGE_FLOOR`, asserted per collection by `checkCollectionCoverage`",
+}
+
+/**
+ * Every number in this table that no reader will compare, as one finding per offending column.
+ *
+ * Two escapes, one rule id, because the repair is the same in both cases: write the cell so a rule can
+ * read it. A column no reader owns (`recall@5`, `top5`, `nonsense`) carries numbers nothing checks; a
+ * cell whose spelling the grammar misses (`40 of 40, twice`) carries a number the reader is present for
+ * but cannot parse. Both were silent before this rule, and both are the same defect seen from two sides.
+ *
+ * ## Why the scope is the table's keyed rows and not its headers
+ *
+ * The rule is R21e's own: **a number in a coverage table cell is a claim, and a claim no reader reads is
+ * a finding.** Narrowing it to tables that declare a column a reader owns would be a second, quieter
+ * version of the switch `CoverageRow.collection` describes — "no recognised header" becomes "no finding",
+ * which is the fail-open this module has already had to undo twice.
+ *
+ * The one condition that does silence this rule is a table in which *no* row resolves to a collection,
+ * and that is not a silence: every such row that states a number is reported by `unkeyedRowFindings`
+ * instead, with a different and more specific message. So the two halves together leave no edit that
+ * turns a populated table unchecked — a label rename moves the finding from "no reader owns that column"
+ * to "no rule can tell which collection that is", and both name the repair.
+ *
+ * Every row is scanned, keyed or not. Leaving unkeyed rows out of the sample would mean a table whose
+ * labels are all wrong reports its worst column as clean, which is the one conclusion this module must
+ * not reach.
+ */
+const unreadCellFindings = (file: string, table: CoverageTable): readonly DocsClaim[] => {
+  if (table.rows.every((row) => row.collection === null)) return []
+  const findings: DocsClaim[] = []
+  for (const [index, header] of table.headers.entries()) {
+    if (index === 0) continue
+    const finding = columnFinding(file, header, table.rows, index)
+    if (finding !== null) findings.push(finding)
+  }
+  return findings
+}
+
+/**
+ * A row that states a number and resolves to no single collection, as one finding.
+ *
+ * ## Why an unkeyed row with figures is a finding
+ *
+ * Because the alternative is the switch this rule exists to remove. A row whose label names no known
+ * collection has no collection to compare against, so every per-row check returns `[]` and the row's
+ * figures are published unchecked — silently, with no rule even having looked.
+ *
+ * ## Why there is no header-based exemption here
+ *
+ * An earlier attempt scoped this to tables declaring a recognised measurement column, on the reasoning
+ * that `README.md`'s corpus inventory declares none. That exemption is exactly the thing to be suspicious
+ * of: a table can drop its measurement columns one edit at a time and land in the exempt region with all
+ * its numbers intact. The inventory turned out to be checkable — its record counts are the attestation's,
+ * and it now names the identifiers they are keyed on — so the exemption bought nothing and cost the
+ * audit.
+ *
+ * The separator row is not a false positive: it is `---`, which states no number, which is the same test
+ * that keeps a row of honest prose (`measured`, or the reason it is not) quiet.
+ */
+const unkeyedRowFindings = (file: string, row: CoverageRow): readonly DocsClaim[] => {
+  if (row.collection !== null) return []
+  const example = row.cells.slice(1).find((cell) => ANY_DIGIT.test(cell)) ?? null
+  if (example === null) return []
+  return [
+    claim(
+      "presence-row-unkeyed",
+      file,
+      `publishes "${example}" in a row whose first cell, "${row.cells[0] ?? ""}", is not a corpus identifier and names no known collection, so no rule can tell which collection those figures belong to; write the identifier the corpus and the attestation key on in the first cell — \`quran\`, \`nasai\`, \`abudawud\`, \`ibnmajah\`, \`tirmidhi\`, \`malik\` — optionally followed by the display name`,
+    ),
+  ]
+}
+
+/**
+ * The first cell that states a number in a shape `STATED_FIGURE` cannot parse, or `null`.
+ *
+ * The pair of tests, not one: `ANY_DIGIT` alone would fire on every prose cell, and `STATED_FIGURE`
+ * alone is the switch this rule exists to remove.
+ */
+const unparsedFigure = (cells: readonly string[]): string | null =>
+  cells.find((cell) => ANY_DIGIT.test(cell) && STATED_FIGURE.exec(cell) === null) ?? null
+
+const columnFinding = (
+  file: string,
+  header: string,
+  rows: readonly CoverageRow[],
+  index: number,
+): DocsClaim | null => {
+  const cells = rows.map((row) => row.cells[index] ?? "")
+  const read = isReadColumn(header)
+  // Read and unread columns fail for different reasons, and only the read one gets to complain about
+  // grammar. In a read column the reader is present and the *shape* is wrong (`40 of 40, twice`). In an
+  // unread column the reader is absent, so any digit is the finding — and `ANY_DIGIT`, not
+  // `STATED_FIGURE`, because the module's own rule above says "a number in a coverage table cell is a
+  // claim": `100.0%`, `+35.0 pp`, `0.65`, `-3` and `644 ms` are numbers no reader owns, and matching
+  // only bare counts would let a document hide every figure behind a `%` or a unit and still pass
+  // `checkEvalBreadth`, which is precisely the fail-open shape R21e was written to close.
+  const example = read ? unparsedFigure(cells) : cells.find((cell) => ANY_DIGIT.test(cell)) ?? null
+  if (example === null) return null
+  if (read) {
+    return claim(
+      "presence-cell-unread",
+      file,
+      `states "${example}" in its \`${header}\` column, which carries a number in a shape no rule reads; write it as the bare count the artefact records, because a figure no reader can parse is unchecked exactly as much as a column no reader owns`,
+    )
+  }
+  const prose = PROSE_COLUMNS[header]
+  if (prose === undefined) {
+    return claim(
+      "presence-cell-unread",
+      file,
+      `publishes figures in its \`${header}\` column, and no rule reads that column: \`${READ_COLUMN_NAMES}\` are read, \`${Object.keys(PROSE_COLUMNS).join("`, `")}\` is declared prose, and anything else is a number this repository will not check. Rename the header to one a rule reads, or state the cell in words`,
+    )
+  }
+  // Declared prose, and a cell carries a number — `example` is non-null here, because the check above
+  // returned on silence. That is a real finding, and the reason is quoted in it: a person deciding
+  // between rewording the cell and withdrawing the exemption needs to read the exemption, and this
+  // module's own documentation says a reason nobody can read is not one.
+  return claim(
+    "presence-cell-unread",
+    file,
+    `states "${example}" in its \`${header}\` column, which is declared prose — ${prose}. So either write the cell as the word the column is for, or drop the declaration and add the reader that owns the number; this repository will not check a figure whose column says on its own that nobody needs to`,
+  )
+}
+
+/** The readable headers, for the message above. One list, so the rule names what it accepts. */
+const READ_COLUMN_NAMES = `\`${FIGURE_FAMILIES.map(([, column]) => column).join("`, `")}\`, \`${SERVED_RECORDS_COLUMN}\`, \`top-N\``
+
 const rowFindings = (
   file: string,
   headers: readonly string[],
-  row: readonly string[],
+  row: CoverageRow,
   recorded: RecordedCoverage,
   servedCounts: ReadonlyMap<string, number>,
   path: string,
 ): readonly DocsClaim[] => {
-  const collection = row[0] ?? ""
-  // `---` and every other filler cell fails this, which is how a separator row is skipped.
-  if (!COLLECTION_NAME.test(collection)) return []
-  if (recorded.cells.has(collection)) return cellFindings(file, headers, row, recorded, servedCounts, path, collection)
-  return unrecordedRowFindings(file, headers, row, recorded, servedCounts, path, collection)
+  // `null` is `---` and every other filler cell, plus any row keyed by a display name rather than a
+  // corpus identifier. Both are out of this rule's scope for the same reason: there is no collection
+  // to compare the figures against.
+  if (row.collection === null) return []
+  if (recorded.cells.has(row.collection)) return cellFindings(file, headers, row.cells, recorded, servedCounts, path, row.collection)
+  return unrecordedRowFindings(file, headers, row.cells, recorded, servedCounts, path, row.collection)
 }
 
 /** A row whose collection the artefact did record: compare every cell that states a number. */
@@ -708,7 +1048,24 @@ const cellFindings = (
     if (stated === null) continue
     const figure = columnFigure(recorded, servedCounts, collection, header)
     if (figure === null) continue
-    const numerator = Number(stated[1])
+const digits = statedNumerator(stated)
+    if (digits === null) {
+      // `parseCount(stated[1] ?? "")` is what stood here, and it is the worse of the two: `Number("")`
+      // is `0`, so a pattern that ever gains a group before the numerator would have been reported as
+      // "states 0 for `quran`" — a stale-row finding accusing a committed, reviewed artefact of
+      // publishing a number nobody wrote. The honest claim is the one this module already makes for
+      // every figure it cannot read — unread — which fails closed on the rule and says nothing false
+      // about the row (AGENTS.md section 3). See `statedNumerator` for why the branch exists at all.
+      findings.push(
+        claim(
+          "presence-cell-unread",
+          file,
+          `states "${stated[0]}" for \`${collection}\` in its \`${header}\` column, and the rule cannot read the numerator of it; the cell matches the stated-figure grammar but carries no first group, which is a defect in this rule rather than in the document`,
+        ),
+      )
+      continue
+    }
+    const numerator = parseCount(digits)
     const denominator = stated[2]
     const wrongNumerator = numerator === figure ? [] : [
       claim(
@@ -720,13 +1077,13 @@ const cellFindings = (
     // `served records` is not over a case count, so a denominator beside it is not this rule's business.
     const wrongDenominator = denominator === undefined || cases === null || header === SERVED_RECORDS_COLUMN
       ? []
-      : Number(denominator) === cases
+      : parseCount(denominator) === cases
         ? []
         : [
             claim(
               "presence-row-stale",
               file,
-              `states "${stated}" for \`${collection}\`; ${path} records ${cases} cases in that collection, so the denominator of that column is ${cases}`,
+              `states "${stated[0]}" for \`${collection}\`; ${path} records ${cases} cases in that collection, so the denominator of that column is ${cases}`,
             ),
           ]
     findings.push(...wrongNumerator, ...wrongDenominator)
@@ -734,20 +1091,14 @@ const cellFindings = (
   return findings
 }
 
-/** `served records` reads from the attestation rather than the artefact — see `columnFigure`. */
-const SERVED_RECORDS_COLUMN = "served records"
-
-/** The `cases` column, whose header is `FIGURE_FAMILIES`' first entry rather than a bare literal. */
-const CASES_COLUMN = "cases"
-
 /**
  * The figure a column's header names, from whichever source owns it.
  *
  * `served records` is a corpus size, not a measurement of ours, so it comes from the attestation's
  * collection counts — the same source `checkCollectionCoverage` uses to decide which collections exist,
  * and therefore the same number a reader would recompute from the corpus itself. Everything else is a
- * recorded measurement. A header this table does not publish a figure for (`coverage`) resolves to
- * `null` and is skipped, so adding a column to a document cannot invent a finding.
+ * recorded measurement, and a header this table does not publish a figure for resolves to `null` and
+ * is left to `unreadCellFindings`, which reports a number in it rather than skipping it (AGENTS.md §3).
  */
 const columnFigure = (
   recorded: RecordedCoverage,
@@ -796,7 +1147,11 @@ const unrecordedRowFindings = (
     .map((header, offset) => ({ header, cell: row[offset + 1] ?? "" }))
     .filter((entry) => entry.header !== SERVED_RECORDS_COLUMN && entry.header !== CASES_COLUMN)
   const known = recorded.collections.length === 0 ? "no collection" : recorded.collections.join(", ")
-  if (stated.some((entry) => STATED_FIGURE.test(entry.cell))) {
+  // `ANY_DIGIT`, for the reason `columnFinding` gives: whether this row states `40` or `0.65` or
+  // `644 ms`, it states a number no run measured. Grammar has no vote here — the collection is
+  // missing from the artefact either way, so the question is only *what* the row claims, never
+  // whether the claim is spelled in a shape this file happens to parse.
+  if (stated.some((entry) => ANY_DIGIT.test(entry.cell))) {
     return [
       claim(
         "presence-row-stale",
@@ -811,6 +1166,65 @@ const unrecordedRowFindings = (
       "presence-row-stale",
       file,
       `carries a row for \`${collection}\`, which attestation.json does not list among the served collections, so it is a stale row from a collection this repository no longer serves`,
+    ),
+  ]
+}
+
+/**
+ * A per-collection table must name the dataset it decomposed, and the name must be the committed one.
+ *
+ * ## Why a table of per-collection counts is not self-describing
+ *
+ * `| abudawud | 15 | 15 | 0 | 5272 | measured |` is fifteen cases and no statement of which fifteen. Any
+ * 40-case set spread over six collections in a different proportion produces a different table, and a
+ * reader has no way to tell from the table whether the numbers came from `redteam-fabricated`, from a
+ * local edit to it, or from a set nobody has committed. Every other number in these documents is checked
+ * against an artefact; this one was not, because the artefact did not record which set produced it —
+ * and a figure whose *provenance* is unchecked is the figure a re-run cannot falsify.
+ *
+ * `--record` already refuses to write when the case set is not the one the baseline was measured over
+ * (`suggestionEvalSetDigest`), so the artefact knows. The documents were simply never asked to say so.
+ *
+ * ## Why the digest is compared, not merely required
+ *
+ * Because "state some digest" is satisfiable by stating the wrong one, which is worse than stating
+ * none: it looks like provenance while pointing somewhere else. The comparison is against the artefact's
+ * own record, so the document and the artefact can only both be right or one be wrong — and which one is
+ * wrong is visible in the message.
+ *
+ * ## Why a document with no per-collection table is silent
+ *
+ * Because there is nothing to attribute. A digest on a page that publishes no decomposed figure would be
+ * decoration, and a rule that fires on decoration teaches its readers to ignore it (the same reasoning
+ * `checkPresenceCollectionNamed` uses to stay silent on a document stating no presence figure).
+ *
+ * ## Why an unreadable artefact is silent here
+ *
+ * Because it is already somebody else's finding, reported once against the artefact rather than once per
+ * document. Inventing a second report of it here would bury the line that names the right culprit — the
+ * reasoning `checkPresenceCoverageRecorded` states for the same reason.
+ */
+export const checkMeasuredSetDigest = (document: string, file: string, artefact: CoverageArtefact): readonly DocsClaim[] => {
+  const publishes = coverageTables(document, []).some((table) => table.rows.some((row) => row.collection !== null))
+  if (!publishes) return []
+  const recorded = recordedEvalSetDigest(artefact.text)
+  if (recorded === null) return []
+  const stated = statedDigests(document)
+  if (stated.length === 0) {
+    return [
+      claim(
+        "presence-set-digest-missing",
+        file,
+        `publishes a per-collection table of measured counts and names no \`ds1:\` dataset digest, so nothing on the page says which case set it decomposed; state the \`${recorded}\` digest of \`data/eval/redteam-fabricated.json\` beside the table, because a per-collection count without its provenance is a number no re-run can falsify`,
+      ),
+    ]
+  }
+  if (stated.includes(recorded)) return []
+  return [
+    claim(
+      "presence-set-digest-stale",
+      file,
+      `publishes a per-collection table of measured counts beside ${stated.map((entry) => `\`${entry}\``).join(", ")}, and ${artefact.path} records this run's set as \`${recorded}\`; state the recorded digest, because a digest that points at another set is worse than none — it reads as provenance while pointing somewhere else`,
     ),
   ]
 }

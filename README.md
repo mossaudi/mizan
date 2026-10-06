@@ -128,6 +128,29 @@ bun run mcp                    # the read-only verifier as a Model Context Proto
 bun run ci                     # typecheck + tests + the seven structural gates
 ```
 
+`bun run ci` is the whole gate and it is deliberately **corpus-free**: every test it collects passes
+on a fresh clone that has never run `bun run ingest`. Two checks need the snapshot and therefore run
+under their own commands, each for a stated reason recorded in `scripts/ci-lanes.ts` and asserted to
+be a partition of the discovered test files by `scripts/ci-lanes.test.ts`:
+
+```bash
+bun run ci:corpus       # the published benchmark run, measured against data/corpus.db
+bun run ci:clean-clone  # the whole acceptance table, run for real on this checkout
+```
+
+`bun run accept:customer` runs `ci:corpus` as one of its steps when the corpus is present, and reports
+`corpus_absent` for it — and for `ingest:check` and the recall check — when it is not, so the one
+number a reader needs is which claims are unverified. It exits `0` when every check that ran passed,
+`1` when a check failed, and `2` when the rehearsal could not start at all — a directory that is not
+the repository is a different fact from a failing check, and a red exit that cannot tell them apart
+sends an operator to debug the wrong thing.
+
+CI runs both lanes, in a job of its own called `evidence`: it builds the snapshot with `bun run ingest`
+and then runs `ci:corpus` and `ci:clean-clone` on both runners. It is a separate job because `ingest`
+reaches the network, and a gate whose red build is caused by somebody else's uptime is a gate people
+learn to re-run. `scripts/ci-lanes.test.ts` asserts that every lane in the table is invoked by the
+workflow, because a lane nothing runs is an exclusion that looks exactly like a gate.
+
 `bun run ingest` writes `attestation.json`, and every surface that publishes a number now refuses
 to publish one until that attestation matches the snapshot on disk — the benchmark exits 3 and
 prints zero figures, and a disagreement names both digests in full. The published snapshot is
@@ -314,14 +337,20 @@ The attestation carries the count and the reason, not a per-collection breakdown
 statement made above is the served set, read from the attestation by name, and no claim is made about
 which collection any held-back row came from.
 
-| Collection | Records | Licence class |
+| Collection | served records | Licence class |
 | --- | --- | --- |
-| Qur'an (Tanzil, Uthmani) | 6,236 | no-derivatives |
-| Sunan an-Nasa'i | 5,672 | content-only |
-| Sunan Abi Dawud | 5,272 | content-only |
-| Sunan Ibn Majah | 4,336 | content-only |
-| Jami' at-Tirmidhi | 3,889 | content-only |
-| Muwatta' (Malik) | 1,829 | content-only |
+| quran — Qur'an (Tanzil, Uthmani) | 6,236 | no-derivatives |
+| nasai — Sunan an-Nasa'i | 5,672 | content-only |
+| abudawud — Sunan Abi Dawud | 5,272 | content-only |
+| ibnmajah — Sunan Ibn Majah | 4,336 | content-only |
+| tirmidhi — Jami' at-Tirmidhi | 3,889 | content-only |
+| malik — Muwatta' (Malik) | 1,829 | content-only |
+
+The first column is the **corpus identifier**, then the book's display name. That is not
+typographic preference: `bun run check:docs` refuses a row whose first cell names no collection,
+because a record count attached to a name no rule can key is a number nobody re-derived. The
+`served records` column is the attestation's own `collectionCounts`, so those six figures are
+compared against it rather than merely typed.
 
 Every quote in the eval sets is reproduced under its own collection's licence with its
 attribution intact, in `data/registry/sources.json` and per-anchor in the artefacts. Qur'an text

@@ -22,6 +22,7 @@ import { longestRunFor, resolutionKey, verifyAnswer } from "@mizan/verify"
 import { renderReport, type SourceExcerpt } from "../src/render.ts"
 import { readDemoQuestionSet } from "../src/demo-questions.ts"
 import { preserveCommittedLedger, spawnCli } from "./committed-ledger.ts"
+import { subprocessBudgetFor, SUBPROCESS_TIMEOUT_MS } from "./subprocess-budget.ts"
 
 /**
  * Best-effort removal of a temp directory that holds a SQLite file.
@@ -552,7 +553,7 @@ describe.skipIf(!CORPUS_PRESENT)("every committed demo question replays to its d
         expect(output).toContain("source:")
       }
     }
-  }, 120_000)
+  }, subprocessBudgetFor(2))
 
   test("the fabricated run prints a REJECTED badge and no VERIFIED one at all", async () => {
     const demo = await loadDemoSet()
@@ -562,7 +563,7 @@ describe.skipIf(!CORPUS_PRESENT)("every committed demo question replays to its d
     expect(code).toBe(0)
     expect(output).toContain("[REJECTED]")
     expect(output).not.toContain("[VERIFIED]")
-  }, 120_000)
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test("the fabricated run shows the genuine source text beside the failure", async () => {
     const demo = await loadDemoSet()
@@ -576,7 +577,7 @@ describe.skipIf(!CORPUS_PRESENT)("every committed demo question replays to its d
     // own `raw` string — the renderer never sees `raw`, and asserting on it would pin a spelling
     // this repository does not own.
     expect(output).toContain(`${published.citation.collection} ${published.citation.number ?? ""}`.trim())
-  }, 120_000)
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test("retrieval actually found sources — the rejection is not a retrieval miss in disguise", async () => {
     const demo = await loadDemoSet()
@@ -585,12 +586,12 @@ describe.skipIf(!CORPUS_PRESENT)("every committed demo question replays to its d
     const { output } = await run(fabrication.question)
     expect(output).toContain("from the local snapshot")
     expect(output).not.toContain("no_sources_found")
-  }, 120_000)
+  }, SUBPROCESS_TIMEOUT_MS)
 
   test("a question the transcript does not cover still degrades honestly", async () => {
     const { code, output } = await run("What is the ruling on cryptocurrency?")
     expect(code).not.toBe(0)
     expect(output).toContain("model unavailable")
     expect(output).not.toContain("VERIFIED")
-  }, 120_000)
+  }, SUBPROCESS_TIMEOUT_MS)
 })

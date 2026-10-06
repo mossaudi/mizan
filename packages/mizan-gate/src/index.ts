@@ -24,7 +24,7 @@ export {
   type DocsClaim,
   type DocsRule,
 } from "./docs-claims.ts"
-export { checkedPaths, runDocsClaimChecks, AUDITED_DOCUMENTS, BENCHMARK_ARTEFACT, DEMO_RUNBOOK, GITIGNORE, REQUIRED_DOCUMENTS, ATTESTATION, ENV_EXAMPLE, GOLDEN_EVAL, PROVIDER_SOURCE, REDTEAM_EVAL, REGISTRY, VALUE_PROOF, type AuditTier, type CheckedFile, type DocsCheckResult } from "./docs-check.ts"
+export { checkedPaths, runDocsClaimChecks, servedCollections, AUDITED_DOCUMENTS, BENCHMARK_ARTEFACT, DEMO_RUNBOOK, GITIGNORE, REQUIRED_DOCUMENTS, ATTESTATION, ENV_EXAMPLE, GOLDEN_EVAL, PROVIDER_SOURCE, REDTEAM_EVAL, REGISTRY, VALUE_PROOF, type AuditTier, type CheckedFile, type DocsCheckResult, type ServedCollections } from "./docs-check.ts"
 export { formatDocsFailure, formatDocsSuccess, TIER_CAPTION } from "./docs-report.ts"
 export { checkAnswerQualityClaim, checkBenchmarkClaimUnbacked, isRate, ANSWER_QUALITY_PHRASES, QUANTITIES, benchmarkScope, figuresIn, groupFigure, renderingsOf, statementBacking, type ExternalFigure, type Quantity, type StatedBenchmark } from "./docs-value.ts"
 export { checkExternalClaimUnbacked, externalClaimFigures, EXTERNAL_CLAIMS_PATH, type FigurePromise } from "./docs-external.ts"
@@ -37,7 +37,7 @@ export { checkRunbookOrder, KEYED_LIVE_PATH, REPLAY_PATH } from "./docs-runbook.
 export { checkGateCountClaim, extractGateCountClaims, tokenToNumber, GATE_CLAIM_EXCLUDES, GATE_CLAIM_EXTENSIONS, type GateCountClaim } from "./docs-gates.ts"
 export { checkSnapshotArithmetic } from "./docs-snapshot.ts"
 export { checkEvalBreadth, type StatedSet } from "./docs-artifacts.ts"
-export { checkCollectionCoverage, checkCoverageTableRows, checkPresenceCollectionNamed, checkPresenceCoverageRecorded, collectionCountsOf, coverageCaseKey, coveragePresenceKey, coverageVerdictKey, COVERAGE_KEYS, COVERAGE_SET, FABRICATION_COVERAGE_FLOOR, statesPresenceFigure, VERDICT_KEY_PREFIX, type CoverageArtefact } from "./docs-coverage.ts"
+export { checkCollectionCoverage, checkCoverageTableRows, checkMeasuredSetDigest, checkPresenceCollectionNamed, checkPresenceCoverageRecorded, collectionCountsOf, coverageCaseKey, coveragePresenceKey, coverageVerdictKey, COVERAGE_KEYS, COVERAGE_SET, FABRICATION_COVERAGE_FLOOR, PROSE_COLUMNS, statesPresenceFigure, statedNumerator, VERDICT_KEY_PREFIX, type CoverageArtefact } from "./docs-coverage.ts"
 export { checkLiveProviderClaim } from "./docs-egress.ts"
 export { checkLicenceFields, REGISTRY_PATH } from "./gates/g5-licence-fields.ts"
 export { gateNoFalseVerified, assertNoFalseVerified, checkOneConstructionSite, checkOneSchemaSite, checkNoComputedPercent, checkNoAdHocMatchStrength, checkVerdictPathClosure, VERDICT_PATH, VERDICT_PATH_ENTRY, VERDICT_CONSTRUCTION_SITES, PERCENT_OWNERS } from "./gates/g6-no-false-verified.ts"

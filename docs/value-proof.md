@@ -158,6 +158,12 @@ The committed set is spread across all six, in a fixed round-robin (ADR-15):
 | quran | 2 | 2 | 0 | 6236 | measured |
 | tirmidhi | 2 | 2 | 0 | 3889 | measured |
 
+**Dataset digest: `ds1:c9b35dd9ae7200e1b0152cfcb8afb80205e4500f5b40008c2e77d03ce5cc88e5`** — the
+`data/eval/redteam-fabricated.json` the table above decomposes, and the same value
+`docs/specs/measurements.md` states for its figures. `bun run check:docs` requires it to match
+`data/benchmark/vs-search.json`'s `suggestionEvalSetDigest`, so the two documents cannot be describing
+different case sets while agreeing on every number in them.
+
 **Measured** means at least one fabrication was attempted against that collection, and every served
 collection carries at least two — the floor ADR-15 sets, enforced by `checkCollectionCoverage` and by the
 two directions it checks: a served collection below the floor, and a case naming a collection the

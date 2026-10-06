@@ -9,6 +9,7 @@ import {
   decodeSync,
   EvalSet as EvalSetSchema,
   HONEST_BASELINE,
+  isErr,
   isOk,
   normalizeForMatch,
   PRE_REGISTERED_HYPOTHESIS,
@@ -22,7 +23,7 @@ import {
 import { buildSnapshot, openSnapshot } from "@mizan/corpus"
 import { stripCommentsOnly } from "@mizan/gate"
 import { HONEST_OPTIONS, runBaseline, FTS5_GRAMMAR_CHARACTERS, PUBLISHED_BASELINE_TOP1_HITS, type BaselineCase, type BaselineOptions } from "../../../scripts/benchmark/baseline.ts"
-import { assertBaselineIsHonest, figuresOf, score, toDeclaration, type ScoredCase } from "../../../scripts/benchmark/score.ts"
+import { assertBaselineIsHonest, figuresOf, score, toDeclaration, type Figures, type ScoredCase } from "../../../scripts/benchmark/score.ts"
 import { runSystemArm, type SystemOutcome } from "../../../scripts/benchmark/system-arm.ts"
 import { compare, figuresOf as systemFigures, type ComparisonFigures, type LabelledCase } from "../../../scripts/benchmark/compare.ts"
 import { BASELINE_FIELDS, movedFieldsOf, RIGGED_BASELINES, RIGGED_COUNT } from "../../../scripts/benchmark/rigged.ts"
@@ -57,6 +58,18 @@ import { renderBenchmarkReport } from "../../../scripts/benchmark/report.ts"
  */
 const ROOT = join(import.meta.dir, "..", "..", "..")
 const REDTEAM_PATH = join(ROOT, "data", "eval", "redteam-fabricated.json")
+
+/**
+ * Unwrap a success channel for an assertion whose subject is something else.
+ *
+ * Written once here because `figuresOf` is called from four places in this file and the alternative
+ * was either a `.value` on every line or an `if` per call. It fails with the message the caller would
+ * have printed, so a refusal inside a passing test still names the denominator that disagreed.
+ */
+const expectOk = <T, E>(result: { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: E }): T => {
+  if (isErr(result)) throw new Error(`expected a figure, got the refusal: ${result.error}`)
+  return result.value
+}
 
 /** A committed artefact, read through the schema the generator writes it with. Never `any`. */
 const readSet = (path: string): EvalSet => {
@@ -148,11 +161,21 @@ afterAll(() => {
   }
 })
 
-/** Score the red-team set with one declaration, against the hermetic snapshot. */
-const runArm = (options: BaselineOptions) => {
+/**
+ * Score the red-team set with one declaration, against the hermetic snapshot.
+ *
+ * `figuresOf` returns a `Result`, so this unwraps it — and this is the only place in the file that
+ * throws. AGENTS.md §2 allows a raw throw to escape a test helper and nowhere else, which is exactly
+ * this: the two arm fixtures below have their case counts asserted to agree, so a refusal here is a
+ * broken fixture, not a product behaviour under test. The refusals themselves are asserted as
+ * `Result`s further down, where they are the subject rather than an accident.
+ */
+const runArm = (options: BaselineOptions): Figures => {
   const db = openSnapshot(snapshotPath)
   try {
-    return figuresOf(score(cases, runBaseline(db, baselineCases, options)), runSystemArmFigures(db))
+    const computed = figuresOf(score(cases, runBaseline(db, baselineCases, options)), runSystemArmFigures(db))
+    if (isErr(computed)) throw new Error(`the fixture's two arms disagree: ${computed.error}`)
+    return computed.value
   } finally {
     db.close()
   }
@@ -410,7 +433,13 @@ describe("a case cannot quietly leave the comparison", () => {
     // `0.0%` detection, `0.0%` baseline and a delta of `0.0` — an artefact reading "mizan caught
     // nothing" when the truth is "nothing ran". `run.ts` refuses it earlier with exit 3; this is
     // the invariant underneath, asserted where it lives.
-    expect(() => figuresOf(score([], []), systemFigures([]))).toThrow(/zero cases/)
+    //
+    // Asserted as a `Result` rather than through `toThrow`, because the return type is the thing under
+    // test: `toThrow` would still pass against a function that threw a *string*, and it would not
+    // compile if someone widened the signature back to `Figures | undefined` and dropped the refusal.
+    const refusal = figuresOf(score([], []), systemFigures([]))
+    expect(isOk(refusal)).toBe(false)
+    expect(isErr(refusal) && refusal.error).toMatch(/zero cases/)
   })
 
   test("a one-case set is still scored, so the refusal above is not a size limit", () => {
@@ -419,9 +448,8 @@ describe("a case cannot quietly leave the comparison", () => {
     // exists, and the two must not be the same claim.
     const oneCase = cases[0]
     if (oneCase === undefined) throw new Error("the committed red-team set has no cases")
-    const figures = figuresOf(
-      score([oneCase], []),
-      systemFigures(compare(declared, [{ caseId: "a", verdict: "unverifiable", reason: "not contained" }])),
+    const figures = expectOk(
+      figuresOf(score([oneCase], []), systemFigures(compare(declared, [{ caseId: "a", verdict: "unverifiable", reason: "not contained" }]))),
     )
     expect(figures.caseCount).toBe(1)
     expect(figures.systemDetectionRate).toBe(1)
