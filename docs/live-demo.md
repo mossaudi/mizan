@@ -94,12 +94,50 @@ Two different things share the word, and the page keeps them apart:
 
 ## Docker: the real corpus, and the live model route
 
-Two independent switches. The first needs no key at all, because searching and verifying are
-offline: the corpus and its attestation.
+`data/corpus.db` is ~83 MB, gitignored, and reproducible from the pinned URLs and sha256 sums in
+`data/registry/sources.json`. A cloud build clones from git, so it has no database to copy — and
+before the rebuild step existed, that meant every cloud deployment served the demo anchors while
+advertising 27,234 records. The image now builds the corpus itself.
 
-**1. The full snapshot (no key).** The image is built with `ENV MIZAN_PROVIDER=scripted` and
-without `data/corpus.db`, so out of the box it searches the anchor corpus. Mounting the two
-files below makes the verify form search all 27,234 records instead:
+Two independent switches follow. The first needs no key at all, because searching and verifying
+are offline: the corpus and its attestation.
+
+### The corpus arrives two ways, and which one runs depends on the build
+
+| Build | What happens | Verified |
+| --- | --- | --- |
+| Local `docker build` | `.dockerignore` no longer excludes `data/corpus.db`, so the exact attested snapshot is copied in. The rebuild step sees the file and does nothing. | 27,234 records, hash `7b3b66fb…` |
+| Cloud build (git clone) | Nothing to copy, so `bun run ingest` fetches the two pinned sources and rebuilds the database. | **Rebuilt from pinned URLs in a clean container and produced the byte-identical hash `7b3b66fbca7fb9df471b49524f31409391addea87f8d0f262d84f7812a48240d`**, which is the attestation's own value — the reproducibility the 2 KB attestation exists to prove |
+
+**Cost:** the cloud path downloads ~42k records and takes roughly **10–15 minutes** on a throttled
+connection, so check your platform's build timeout before relying on it. Where that is a problem,
+build locally (fast, and it embeds the snapshot) and push the image.
+
+**Opt out** with `--build-arg MIZAN_BUILD_CORPUS=0` for an offline or size-constrained build. That
+is a real option with a real cost, and the cost is visible rather than silent: the server then
+serves the demo anchors, the home page says "demo anchors only", and **every search result carries a
+`NOT THE FULL CORPUS` banner** above the verdict. A four-record answer that says so is preferable
+to a 27,234-record claim the deployment cannot honour.
+
+If the rebuild fails, the build fails. Shipping an image whose verify form silently searches four
+records is the exact failure mode the step exists to prevent, and an operator who wants the anchors
+has an explicit flag rather than an accident.
+
+Two files must therefore reach the image, and both are committed: `attestation.json` (the
+authority the snapshot is checked against) and `AGENTS.md` (`requireRepositoryRoot` qualifies a
+directory as the workspace only when it holds *both* a workspace `package.json` and `AGENTS.md`;
+omitting the second made the rebuild exit 2 with "not a mizan checkout").
+
+**1. Running the built image (no key).** Both build paths above produce an image that already
+contains the 27,234-record snapshot, so a plain run needs no mounts at all:
+
+```bash
+docker run -d --name mizan-demo -p 3456:3000 mizan-demo
+```
+
+That is the deployment that was verified end to end: 27,234 records examined, `quran:6222`
+VERIFIED by containment, the one-word fabrication REJECTED at 35/60 shared characters, Arabic
+pages rendering with no script tags. Mounting is only needed to substitute a *different* corpus:
 
 ```bash
 docker run -d --name mizan-demo \
@@ -109,11 +147,8 @@ docker run -d --name mizan-demo \
   mizan-demo
 ```
 
-`data/corpus.db` is gitignored — it is reproducible from the pinned URLs in `attestation.json`
-via `bun run ingest` — so it must be mounted rather than baked in. This is the exact
-combination that was verified: 27,234 records, hash
-`7b3b66fbca7fb9df471b49524f31409391addea87f8d0f262d84f7812a48240d`, Arabic page rendering with
-no script tags.
+A mounted corpus is checked against the mounted attestation before a single verdict is served; a
+mismatch refuses with no badge rather than showing the wrong one's.
 
 **2. The live model route (needs your key).** A `.env` file on the host is **not** visible
 inside the container, so it has to be mounted, and the image sets `MIZAN_PROVIDER=scripted`,

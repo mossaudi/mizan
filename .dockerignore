@@ -7,14 +7,9 @@ dist
 out
 .env
 .env.*
-# attestation.json is DELIBERATELY not excluded. It is a 2 KB committed artefact, the authority
-# the server checks the snapshot against before serving anything, and a 2,000-line answer is
-# strictly worse than the four anchors. Excluding it shipped an image whose corpus was 2 records.
-# `data/corpus.db` is likewise NOT excluded: it is gitignored rather than un-buildable, so a local
-# `docker build` embeds the exact attested snapshot, and a cloud build — which clones from git and
-# therefore has no database to copy — rebuilds it from the pinned registry URLs. See the Dockerfile.
-# The SQLite sidecars stay excluded: they are transient, written whenever the DB is opened outside
-# WAL mode, and shipping them is shipping a rollback journal.
+# The raw 80 MB database is excluded; its 13.7 MB compressed form (data/corpus.db.gz) is NOT, and is
+# what the Dockerfile expands. Shipping the raw file would triple the build context for no gain.
+data/corpus.db
 data/corpus.db-shm
 data/corpus.db-wal
 data/corpus.db-journal
