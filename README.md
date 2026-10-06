@@ -496,8 +496,8 @@ verdict, or a silent downgrade presented as full fidelity.
 Stated plainly, because an over-claim in this domain is a correctness problem rather than a
 marketing one.
 
-- **Registration status and Track 4 selection are unconfirmed.** The engineering work does not
-  depend on them; the submission does.
+- **Registration and Track 4 selection are confirmed** — submitted through the portal
+  as Track 04, Knowledge & verification tools.
 - **The official guide, participant guide, judging criteria and scientific appendix have not been
   read by a human.** Nothing here should be read as compliance with them.
 - **The anchor spans are hand-drawn**, one per adjudicated case across both sets, so the anchored

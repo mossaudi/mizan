@@ -27,7 +27,7 @@ mizan (ميزan, "the balance") answers a question about the Qur'an and hadith a
 ## 4. Track note
 
 ```
-Track 04 — Knowledge & verification tools. The pipeline is also reachable from Track 01 Q&A: any conversational answer inherits the same per-claim badges. Please confirm the track selection in the portal before the registration close; the README notes this is pending confirmation.
+Track 04 — Knowledge & verification tools, confirmed in the portal. The pipeline is also reachable from Track 01 Q&A: any conversational answer inherits the same per-claim badges.
 ```
 
 ## 5. Presentation / deliverables checklist
@@ -35,14 +35,14 @@ Track 04 — Knowledge & verification tools. The pipeline is also reachable from
 ```
 Presentation: submission/mizan-idea-10slides.pptx (10 slides, includes a continuation-plan slide). PDF mirror generated with Arabic-capable fonts: submission/mizan-idea-10slides.pdf. Arabic deck: submission/mizan-idea-7slides-ar.pptx. Terminal capture for the video: submission/demo-terminal.png. Video script: submission/video-script.md.
 GitHub: https://github.com/mossaudi/mizan (public)
-Live demo: Render free web service via Dockerfile + render.yaml (health-checked at /health); static fallback exhibit via netlify.toml.
+Live demo: Render free web service via Dockerfile + render.yaml (health-checked at /health, env-var set in the dashboard only); static exhibit on GitHub Pages via .github/workflows/pages.yml, with Cloudflare Pages and Netlify as alternatives (docs/live-demo.md).
 Offline proof for any judge: bun install --frozen-lockfile && bun run demo — no key, no network, ~1s.
 ```
 
 ## 6. Live demo description (portal "Live demo" field)
 
 ```
-A hosted server-rendered HTML form over the same CLI judges run locally. POST /verify builds one claim, resolves its citation against an attested two-record demo corpus, and shows the computed badge with full evidence — including a one-word fabrication (redteam-005) that reaches REJECTED at the cited identifier. POST /ask sample buttons replay the committed transcript labelled PRECOMPUTED (deterministic replay); every badge in that output is computed by the verifier on the run. No client JavaScript runs in the browser. Deployment: Render free tier through Dockerfile + render.yaml, health-checked at GET /health; Netlify static fallback for the exhibit page. Degradation is honest: without a configured key the page states model unavailable and offers the samples; there is no canned answer and no guessed one.
+A hosted server-rendered HTML form over the same CLI judges run locally. POST /verify builds one claim, resolves its citation against an attested two-record demo corpus, and shows the computed badge with full evidence — including a one-word fabrication (redteam-005) that reaches REJECTED at the cited identifier. POST /ask sample buttons replay the committed transcript labelled PRECOMPUTED (deterministic replay); every badge in that output is computed by the verifier on the run. No client JavaScript runs in the browser. Deployment: Render free tier through Dockerfile + render.yaml, health-checked at GET /health, with the model key set in the service environment only; the static exhibit page is published on GitHub Pages, Cloudflare Pages or Netlify. Degradation is honest: without a configured key the page states model unavailable and offers the samples; there is no canned answer and no guessed one.
 ```
 
 ## 7. Scientific Appendix reconciliation note

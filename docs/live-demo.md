@@ -37,8 +37,18 @@ Two different things share the word, and the page keeps them apart:
 
 - **Render (primary).** `render.yaml` declares a Docker web service with a `/health`
   check. Point Render at the repository root; the `Dockerfile` installs the workspace and
-  starts `bun run demo-server`. The free web service sleeps after inactivity; the first
-  request after sleep waits for the container to boot.
+  starts `bun run demo-server`. Set `MIZAN_LLM_API_KEY` in the service's environment
+  (the dashboard, never the repository) to enable the live-model path for typed
+  questions; without it the page states `model unavailable` and offers the samples. The
+  free web service sleeps after inactivity; the first request after sleep waits for the
+  container to boot.
+- **GitHub Pages (static exhibit).** `.github/workflows/pages.yml` installs with a frozen
+  lockfile, runs `bun run build:web`, and deploys `apps/web` as the Pages artifact. In
+  the repository settings, set Pages source to GitHub Actions. The served bytes are a
+  fresh render of the committed fixture at deploy time, not a hand-edited file.
+- **Cloudflare Pages (static exhibit).** Create a Pages project from the repository.
+  Build command: `bun install --frozen-lockfile && bun run build:web`. Output
+  directory: `apps/web`. Root: `/`. Same honest limits as the Netlify build.
 - **Netlify (fallback).** `netlify.toml` builds the static exhibit in `apps/web` and
   serves it. The static page cannot compute verdicts; it says so.
 
