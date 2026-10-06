@@ -195,14 +195,14 @@ describe("the repository's own ADRs — the acceptance criteria, against the rea
     // than left open because a new decision that does not land here is a decision no citation can
     // resolve, and that is exactly what rule twelve exists to prevent. It is the one count in this
     // file that stays typed, deliberately: rule twelve above proves every citation resolves, so what is
-    // left for this to catch is a file added to the directory without anyone reading it.
-    //
-    // The identifier immediately before ADR-17 is absent, and deliberately: it was retired between
-    // drafts, and renumbering an accepted decision to close the hole would invalidate the citations
-    // already pointing at its neighbours. Its number is therefore never written literally in this
-    // file — rule twelve sweeps this file too, and a prose mention of a retired identifier would be
-    // read as a citation to a document that does not exist.
-    expect(files).toHaveLength(26)
+    // left for this to catch is a file added to the directory without anyone reading it. ADR-16 and
+    // ADR-18 are the Sprint 1 dispositions of the v7 milestone reviews: each records a decision made
+    // this cycle (one era supported; the claim surface artefact-backed), whose alternative reading
+    // was rejected for this cycle and is recorded there, not here. ADR-16 also closed the numbering
+    // hole the earlier revision of this comment described — the identifier before ADR-17 now
+    // resolves, which is why the citation sweep above passes and why the count below is 28 rather
+    // than 26. Every identifier written literally in this comment resolves to a document.
+    expect(files).toHaveLength(28)
     const incomplete: string[] = []
     for (const name of files) {
       const claims = checkAdrDocument(readFileSync(join(ADR_ROOT, name), "utf8"), `${ADR_DIRECTORY}/${name}`)

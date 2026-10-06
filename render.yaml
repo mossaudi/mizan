@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: mizan-demo
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: MIZAN_PROVIDER
+        value: "scripted"

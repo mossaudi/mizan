@@ -11,7 +11,7 @@ import {
 import { checkGateCountClaim, GATE_CLAIM_EXCLUDES, GATE_CLAIM_EXTENSIONS } from "./docs-gates.ts"
 import { checkSnapshotArithmetic } from "./docs-snapshot.ts"
 import { checkEvalBreadth } from "./docs-artifacts.ts"
-import { checkCollectionCoverage, checkCoverageTableRows, checkMeasuredSetDigest, checkPresenceCollectionNamed, checkPresenceCoverageRecorded, COVERAGE_SET } from "./docs-coverage.ts"
+import { checkCollectionCoverage, checkCoverageBasis, checkCoverageTableRows, checkMeasuredSetDigest, checkPresenceCollectionNamed, checkPresenceCoverageRecorded, COVERAGE_SET } from "./docs-coverage.ts"
 import { checkLiveProviderClaim } from "./docs-egress.ts"
 import { checkAnswerQualityClaim, checkBenchmarkClaimUnbacked, statementBacking, type StatedBenchmark } from "./docs-value.ts"
 import { checkExternalClaimUnbacked, externalClaimFigures, EXTERNAL_CLAIMS_PATH } from "./docs-external.ts"
@@ -532,6 +532,10 @@ export const runDocsClaimChecks = (root: string): DocsCheckResult => {
     claims.push(...checkCorpusAbsenceUnstated(surface.text, surface.path))
     if (served.usable) claims.push(...checkCorpusPresenceContradiction(surface.text, surface.path, served.served))
     claims.push(...checkVerdictPolarityInverted(surface.text, surface.path))
+    // SB-005's scope note rides the same surface set as R20 for the same reason: a document's
+    // coverage basis is claimed on the document a judge reads, and the scope list inside the rule
+    // keeps it to the two files that publish the measurement.
+    claims.push(...checkCoverageBasis(surface.text, surface.path))
   }
 
   // R19 is the one new rule that reads a source file rather than a document, because its subject is

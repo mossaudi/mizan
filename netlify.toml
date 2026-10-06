@@ -1,0 +1,11 @@
+[build]
+  publish = "apps/web"
+  command = "bun install --frozen-lockfile && bun run build:web"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

@@ -26,6 +26,7 @@
     "build:web": "bun run apps/web/scripts/build-page.ts",
     "ask": "bun run apps/cli/src/main.ts",
     "demo": "bun run apps/cli/src/demo.ts",
+    "demo-server": "bun run apps/cli/src/demo-server.ts",
     "benchmark:vs-search": "bun run scripts/benchmark/run.ts",
     "eval:suggestions": "bun run scripts/eval/suggest-coverage.ts",
     "verify:ledger": "bun run scripts/verify-ledger.ts",

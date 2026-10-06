@@ -2,8 +2,11 @@ import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import {
+  COVERAGE_BASIS_DOCUMENTS,
+  COVERAGE_BASIS_PHRASE,
   COVERAGE_SET,
   checkCollectionCoverage,
+  checkCoverageBasis,
   checkCoverageTableRows,
   checkMeasuredSetDigest,
   checkPresenceCollectionNamed,
@@ -1131,6 +1134,48 @@ test("the committed digest passes, which is the only proof the rule is not alway
     if (artefact === null) return
     for (const document of ["docs/value-proof.md", "docs/specs/measurements.md"]) {
       expect(checkMeasuredSetDigest(readFileSync(join(root, document), "utf8"), document, { path: "data/benchmark/vs-search.json", text: artefact })).toEqual([])
+    }
+  })
+})
+
+/* ------------------------------------------------------------------ *
+ * SB-005 — a coverage figure without the basis it was measured over.
+ *
+ * The defect class: this repository's suggestion measurement ran over the 40-case red-team fixture,
+ * spread round-robin across all six served collections, and an earlier claim described it as
+ * hadith-only. A figure whose *denominator* a reader has to guess will be guessed as the corpus.
+ * ------------------------------------------------------------------ */
+describe("a coverage figure states what the measurement was drawn over", () => {
+  const FILE = "docs/hallmark-coverage-matrix.md"
+  const withBasis = `# Coverage\n\nMeasured over ${COVERAGE_BASIS_PHRASE}.\n`
+  const withoutBasis = "# Coverage\n\nMeasured 36 of 40 cases across 6 collections.\n"
+
+  test("the planted violation fails: figures present, basis absent", () => {
+    const claims = checkCoverageBasis(withoutBasis, FILE)
+    expect(rules(claims)).toEqual(["coverage-basis-unstated"])
+    expect(details(claims)).toContain(COVERAGE_BASIS_PHRASE)
+  })
+
+  test("the basis phrase passes, which is the only proof the rule is not always-failing", () => {
+    expect(checkCoverageBasis(withBasis, FILE)).toEqual([])
+  })
+
+  test("a file outside the scope list is silent even with figures and no basis", () => {
+    // Deliberately scoped rather than swept: documents that publish figures with their own
+    // provenance machinery must not be failed for not repeating a phrase aimed at two files.
+    expect(checkCoverageBasis(withoutBasis, "docs/specs/measurements.md")).toEqual([])
+  })
+
+  test("a document with no figure to qualify says nothing", () => {
+    expect(checkCoverageBasis("# Notes\n\nNo measurement is claimed here.\n", FILE)).toEqual([])
+  })
+
+  test("both committed in-scope documents carry the phrase today", () => {
+    // The committed-state half: the rule unit-tests green against a fixture either way, and only
+    // this test fails if someone edits one of the two documents and drops the basis sentence.
+    const root = join(import.meta.dir, "..", "..", "..")
+    for (const document of COVERAGE_BASIS_DOCUMENTS) {
+      expect(checkCoverageBasis(readFileSync(join(root, document), "utf8"), document)).toEqual([])
     }
   })
 })

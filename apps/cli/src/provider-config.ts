@@ -53,9 +53,11 @@ export { readTranscript, TRANSCRIPT_RELATIVE } from "./transcript-file.ts"
  *
  * ## The transport is built here, and nowhere else
  *
- * This is the single place in the repository that knows a model API's hostname. The agent
- * package takes a `Transport` and never opens a socket itself, so the allowlist stays one
- * decision in one file rather than being spread across adapters.
+ * This is the single place in the run path that knows a remote model API's hostname: the allowlist
+ * below decides it, and the transport re-checks it before any socket opens. The Ollama adapter in
+ * `@mizan/agent` knows only its loopback default, and the one route to it is the exported
+ * `resolveProviderWithFallback` at the bottom of this file — which no caller in this repository
+ * uses. Every REMOTE model host string lives here, so the allowlist stays one decision in one file.
  */
 
 export const ENV_PROVIDER = "MIZAN_PROVIDER"

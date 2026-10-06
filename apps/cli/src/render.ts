@@ -321,11 +321,11 @@ const returnedOfScanned = (returned: number, scanned: number): string =>
  * ## Why a separate line and not a clause on the scope line
  *
  * `scopeLine` is about the SEARCH — which collections the rows on screen were drawn from. What is
- * measured is the THRESHOLD those rows were filtered by, and the two have genuinely different
- * coverage: the scan reads every served collection, while `data/eval/redteam-fabricated.json` — the
- * set the floor was chosen from — is hadith-only. A quranic record can appear in this list, and the
- * sentence that discloses the coverage gap must therefore be about the floor, or it contradicts the
- * list printed under it.
+ * measured is the THRESHOLD those rows were filtered by, and the two have different bases: the scan
+ * reads every served collection, while `data/eval/redteam-fabricated.json` — the 40-case fixture the
+ * floor was chosen from, drawn round-robin across all six served collections — is a fixture rather
+ * than the corpus. The sentence that discloses the measurement basis must therefore be about the
+ * floor, or it contradicts the list printed under it.
  *
  * Printed on both searched states, and not on `unavailable` at all. On `unavailable` no floor was
  * applied — there was no search to count and no number to qualify — so a coverage disclosure there

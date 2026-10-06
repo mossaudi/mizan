@@ -31,9 +31,13 @@ transcript    LIVE
 
 If it does not read `LIVE`, it was not a live run, whatever else the output says. That is the whole
 point of this step: the label is how you tell, before reading a single claim, whether you are looking
-at a generation or a recording. `apps/cli/src/provider-config.ts` is the only file in the repository
-that knows a model API's hostname, and it will refuse a base URL outside `PROVIDER_ALLOWED_HOSTS`
-rather than silently send your key somewhere you did not name (A10).
+at a generation or a recording. `apps/cli/src/provider-config.ts` is the only file in the run path
+that knows a **remote** model API's hostname, and it will refuse a base URL outside
+`PROVIDER_ALLOWED_HOSTS` rather than silently send your key somewhere you did not name (A10). One
+other model host string exists in the repository — the Ollama adapter's loopback default in
+`packages/mizan-agent/src/providers/ollama.ts` — and no run of this CLI can reach it:
+`MIZAN_PROVIDER` accepts only `hosted` or `scripted`, and the fallback function that would select it
+has no caller. `docs/evidence/demo-header-evidence.md` carries the grep classifying every match.
 
 The question text is what leaves the machine on this route, and nothing else does: no corpus text, no
 ledger, no key beyond the one in the `authorization` header. `DISCLOSURE.md` states the same

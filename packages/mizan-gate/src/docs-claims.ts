@@ -81,6 +81,7 @@ export type DocsRule =
   | "promise-figure-unbacked"
   | "executor-label-blindness"
   | "verdict-polarity-inverted"
+  | "coverage-basis-unstated"
   | "runbook-live-after-replay"
   | "runbook-live-unlabelled"
   | "runbook-replay-unlabelled"

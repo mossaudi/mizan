@@ -12,6 +12,16 @@ Each type has at least one test case that exercises it, and each test case has a
 expected verdict. The matrix is committed to the repository and citable by file path and
 commit hash.
 
+## Scope: which measurement this document's coverage is about
+
+Every count in this document is **type coverage** — how many of the 14 HALLMARK hallucination types
+a fixture exercises. It is not a corpus measurement, and a second coverage figure elsewhere in this
+repository must not be read through it: the suggestion pass's presence measurement was run over
+the 40-case red-team eval set, drawn round-robin across all six served collections, as recorded by
+`SUGGESTION_MEASUREMENT_SCOPE` in `@mizan/core`; its per-collection figures and their conditions
+live in `data/benchmark/vs-search.json` and `docs/specs/measurements.md`. Two denominators, two
+documents, and neither is the other's restatement.
+
 ## Coverage Matrix
 
 | # | HALLMARK Type | mizan Adaptation | Fixture ID | Difficulty Tier | Expected Verdict | Test File |

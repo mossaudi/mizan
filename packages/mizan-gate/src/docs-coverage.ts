@@ -1229,4 +1229,58 @@ export const checkMeasuredSetDigest = (document: string, file: string, artefact:
   ]
 }
 
+/**
+ * The documents that state suggestion-measurement coverage, and therefore must state what the
+ * measurement was drawn over.
+ *
+ * Two, not a walk: the scope note is a property of documents that publish or summarise the
+ * red-team measurement. A walk over every document would fire on `docs/degradation-matrix.md`,
+ * which quotes the latency figure but never claims measurement coverage — a rule that fires where
+ * there is no claim teaches its readers to skip it (the reasoning `checkMeasuredSetDigest` states
+ * for the same silence).
+ */
+export const COVERAGE_BASIS_DOCUMENTS = ["docs/hallmark-coverage-matrix.md", "docs/evidence/quran-tirmidhi-coverage.md"] as const
+
+/**
+ * The sentence that makes a coverage figure honest (SB-005).
+ *
+ * ## Why the phrase names the set and its shape
+ *
+ * The suggestion measurement was run over the 40-case red-team fixture, drawn round-robin across all
+ * six served collections — not over "the hadith corpus", which an earlier claim in this repository
+ * stated and which was false (`SUGGESTION_MEASUREMENT_SCOPE` in `@mizan/core` already says
+ * "all 6 served collections"; `data/benchmark/vs-search.json` records measured 6 / unmeasured 0).
+ * A coverage figure without its basis is the shape of claim a reader will fill in from context, and
+ * the context they fill it in from is the corpus — which would read six measured collections as a
+ * statement about 27,234 records.
+ *
+ * The per-collection counts are deliberately NOT part of the phrase: they live in the artefact
+ * (`data/benchmark/vs-search.json`) and in `docs/value-proof.md`, which is their one owner (AGENTS.md
+ * §17). This phrase is the pointer to the basis, not a second copy of the figures.
+ */
+export const COVERAGE_BASIS_PHRASE = "the 40-case red-team eval set, drawn round-robin across all six served collections"
+
+/**
+ * SB-005: a document in scope that states coverage figures must state the basis they were measured over.
+ *
+ * Three guards before the finding, because each one is a document that makes no claim to judge:
+ * a file outside the scope list, a file that already carries the phrase, and a file carrying
+ * neither a figure nor the word the claim is about. The third guard is what keeps the rule from
+ * failing a future restructuring that removes the figures entirely — a document that states no
+ * coverage claim needs no coverage basis, and requiring one anyway would be decoration.
+ */
+export const checkCoverageBasis = (document: string, file: string): readonly DocsClaim[] => {
+  if (!(COVERAGE_BASIS_DOCUMENTS as readonly string[]).includes(file)) return []
+  if (document.includes(COVERAGE_BASIS_PHRASE)) return []
+  if (!/\d/.test(document)) return []
+  if (!/coverage|presence/i.test(document)) return []
+  return [
+    claim(
+      "coverage-basis-unstated",
+      file,
+      `${file} states coverage figures without naming what the measurement was drawn over; include the basis phrase \`${COVERAGE_BASIS_PHRASE}\`, because a coverage number a reader has to guess the denominator of reads as a claim about the whole corpus`,
+    ),
+  ]
+}
+
 export * as DocsCoverage from "./docs-coverage.ts"

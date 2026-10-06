@@ -37,7 +37,7 @@ export { checkRunbookOrder, KEYED_LIVE_PATH, REPLAY_PATH } from "./docs-runbook.
 export { checkGateCountClaim, extractGateCountClaims, tokenToNumber, GATE_CLAIM_EXCLUDES, GATE_CLAIM_EXTENSIONS, type GateCountClaim } from "./docs-gates.ts"
 export { checkSnapshotArithmetic } from "./docs-snapshot.ts"
 export { checkEvalBreadth, type StatedSet } from "./docs-artifacts.ts"
-export { checkCollectionCoverage, checkCoverageTableRows, checkMeasuredSetDigest, checkPresenceCollectionNamed, checkPresenceCoverageRecorded, collectionCountsOf, coverageCaseKey, coveragePresenceKey, coverageVerdictKey, COVERAGE_KEYS, COVERAGE_SET, FABRICATION_COVERAGE_FLOOR, PROSE_COLUMNS, statesPresenceFigure, statedNumerator, VERDICT_KEY_PREFIX, type CoverageArtefact } from "./docs-coverage.ts"
+export { checkCollectionCoverage, checkCoverageBasis, checkCoverageTableRows, checkMeasuredSetDigest, checkPresenceCollectionNamed, checkPresenceCoverageRecorded, collectionCountsOf, coverageCaseKey, coveragePresenceKey, coverageVerdictKey, COVERAGE_BASIS_DOCUMENTS, COVERAGE_BASIS_PHRASE, COVERAGE_KEYS, COVERAGE_SET, FABRICATION_COVERAGE_FLOOR, PROSE_COLUMNS, statesPresenceFigure, statedNumerator, VERDICT_KEY_PREFIX, type CoverageArtefact } from "./docs-coverage.ts"
 export { checkLiveProviderClaim } from "./docs-egress.ts"
 export { checkLicenceFields, REGISTRY_PATH } from "./gates/g5-licence-fields.ts"
 export { gateNoFalseVerified, assertNoFalseVerified, checkOneConstructionSite, checkOneSchemaSite, checkNoComputedPercent, checkNoAdHocMatchStrength, checkVerdictPathClosure, VERDICT_PATH, VERDICT_PATH_ENTRY, VERDICT_CONSTRUCTION_SITES, PERCENT_OWNERS } from "./gates/g6-no-false-verified.ts"
