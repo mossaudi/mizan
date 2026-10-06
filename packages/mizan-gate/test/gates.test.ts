@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, relative } from "node:path"
 import { isOk, type ClaimVerdict, type EvidenceRef } from "@mizan/core"
@@ -42,6 +42,9 @@ checkNoSimilarity,
   findRoot,
   requireRepositoryRoot,
   GITLEAKS_VERSION,
+  runGitleaks,
+  partitionFindings,
+  type GitleaksFinding,
   VERIFY_PREFIX,
 } from "../src/index.ts"
 
@@ -857,5 +860,74 @@ describe("G-4 the pinned binary and the jobs that spawn it", () => {
     const jobsRunningCi = jobs.filter((job) => job.includes("run: bun run ci"))
     expect(jobsRunningCi.length).toBeGreaterThan(0)
     for (const job of jobsRunningCi) expect(job).toContain("./.github/actions/setup-gitleaks")
+  })
+})
+
+/**
+ * G-4's partition: which findings block, and which git already refuses to accept.
+ *
+ * This is the whole content of the gate's only judgement, so it is tested as a pure function — no
+ * binary, no repository — and then once more end to end against the real gitleaks, because a
+ * partition that is correct in isolation and wired to nothing is still a gate that does not run.
+ */
+describe("G-4 excuses what git refuses and blocks everything else", () => {
+  const finding = (file: string, ruleId = "openai-api-key"): GitleaksFinding => ({ ruleId, file })
+
+  test("a finding in a committable path blocks", () => {
+    expect(partitionFindings([finding("src/keys.ts")], () => false)).toEqual([finding("src/keys.ts")])
+  })
+
+  test("a finding in an ignored path does not block, because git will not accept the file", () => {
+    expect(partitionFindings([finding(".env")], (file) => file === ".env")).toEqual([])
+  })
+
+  test("the excuse is per path, so one ignored file cannot excuse another", () => {
+    const excused = new Set([".env"])
+    expect(partitionFindings([finding("docs/notes.md")], (file) => excused.has(file))).toEqual([
+      finding("docs/notes.md"),
+    ])
+  })
+
+  test("an empty excuse set excuses nothing, which is the reading when git cannot be asked", () => {
+    expect(partitionFindings([finding(".env")], () => false)).toEqual([finding(".env")])
+  })
+
+  test("the planted violation fails: a config carrying only an allowlist scans nothing", async () => {
+    // The defect this gate has to be able to catch is fail-open, and the way to prove a gate is not
+    // fail-open is to plant the thing it must catch and watch it fail. The planted file is a
+    // format-valid OpenAI key in a committable path: gitleaks flags it, and the gate must too.
+    const root = findRepositoryRoot(import.meta.dir)
+    if (root === null) throw new Error("no root")
+    const probe = join(root, "g4-planted-probe.txt")
+    // Assembled from fragments so this source file is not itself a finding — which it was, on the
+    // first run of this test, and which is the gate working rather than the test misbehaving. The
+    // string that has to trip the scanner is the one in the planted file, not the one in a test.
+    const planted = ["sk-proj-", "9d4f7a1c3e5b8d2f6a0c4e7b", "1d9f3a6c8e2b5d7f0a4c6e8b1d", "3f5a7c9e1b3d5f7"].join("")
+    writeFileSync(probe, `MIZAN_PLANTED_NOT_A_REAL_KEY = ${planted}\n`)
+    try {
+      const result = await runGitleaks(root, () => true)
+      expect(result.ok).toBe(false)
+      expect(result.detail).toContain("g4-planted-probe.txt")
+    } finally {
+      rmSync(probe, { force: true })
+    }
+  })
+
+  test("and the same command passes once the planted file is gone, so the probe was the cause", async () => {
+    const root = findRepositoryRoot(import.meta.dir)
+    if (root === null) throw new Error("no root")
+    expect(existsSync(join(root, "g4-planted-probe.txt"))).toBe(false)
+    const result = await runGitleaks(root, () => true)
+    expect(result.ok).toBe(true)
+  })
+
+  test("a real secret in .env is reported as excused, not as a clean tree", async () => {
+    const root = findRepositoryRoot(import.meta.dir)
+    if (root === null) throw new Error("no root")
+    // The developer's own local `.env`, if it exists. This asserts the reason the gate is allowed to
+    // pass at all, so that the pass cannot quietly become "it stopped scanning".
+    if (!existsSync(join(root, ".env"))) return
+    const result = await runGitleaks(root, () => true)
+    expect(result.detail).toContain("git ignores")
   })
 })

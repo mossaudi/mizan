@@ -13,7 +13,16 @@ export { tokenPattern, type TokenPatternOptions } from "./token-pattern.ts"
 export { gateNoSimilarity, checkDependencyIsolation, checkNoSimilarity, checkNoAmbientAuthority, checkContainmentOnly, SIMILARITY_TOKENS, AMBIENT_AUTHORITY_TOKENS, INCLUDES_ALLOWLIST, VERIFY_PREFIX } from "./gates/g1-no-similarity.ts"
 export { gateNoRawHtml, checkNoRawHtml, checkVerdictIsolation, VERIFY_ENTRY } from "./gates/g2-no-raw-html.ts"
 export { gateNoEvasion, checkNoDynamicEval, checkNoObfuscation, checkNoAntiAnalysis, checkNoDonorWorkaround, DONOR_TOKENS } from "./gates/g3-no-evasion.ts"
-export { runGitleaks, GITLEAKS_ARGS, GITLEAKS_MISSING_MESSAGE, GITLEAKS_VERSION, type GitleaksResult } from "./gates/g4-gitleaks.ts"
+export {
+  runGitleaks,
+  partitionFindings,
+  describeFindings,
+  GITLEAKS_ARGS,
+  GITLEAKS_MISSING_MESSAGE,
+  GITLEAKS_VERSION,
+  type GitleaksResult,
+  type GitleaksFinding,
+} from "./gates/g4-gitleaks.ts"
 export {
   checkBacktickedPaths,
   checkDocumentedScripts,

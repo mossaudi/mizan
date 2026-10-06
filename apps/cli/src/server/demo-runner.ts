@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { err, ok, processQuestion, type Result } from "@mizan/core"
-import { ENV_API_KEY } from "../provider-config.ts"
+import { ENV_API_KEY, ENV_PROVIDER } from "../provider-config.ts"
 
 export const DEMO_TIMEOUT_MS = 120_000
 export const ASK_TIMEOUT_MS = 180_000
@@ -77,19 +77,42 @@ export const runDemoSubprocess = async (root: string): Promise<Result<string, Ru
   }
 }
 
-export const liveAskAvailable = (root: string): boolean => {
-  const key = process.env[ENV_API_KEY]
-  if (key === undefined || key.trim().length === 0) return false
-  return existsSync(join(root, CORPUS_RELATIVE))
+export type LiveRouteStatus = {
+  readonly available: boolean
+  readonly hasApiKey: boolean
+  readonly hasCorpus: boolean
+  readonly hasAttestation: boolean
+  readonly providerMode: string | null
 }
+
+export const liveRouteStatus = (root: string): LiveRouteStatus => {
+  const key = process.env[ENV_API_KEY]
+  const hasApiKey = key !== undefined && key.trim().length > 0
+  const hasCorpus = existsSync(join(root, CORPUS_RELATIVE))
+  const hasAttestation = existsSync(join(root, "attestation.json"))
+  const providerMode = process.env[ENV_PROVIDER] ?? null
+  const available = hasApiKey && hasCorpus && hasAttestation && providerMode !== "scripted"
+  return { available, hasApiKey, hasCorpus, hasAttestation, providerMode }
+}
+
+export const liveAskAvailable = (root: string): boolean => liveRouteStatus(root).available
 
 export const runAskForRoot = async (root: string, question: string): Promise<Result<string, RunnerFailure>> => {
   const checked = processQuestion(question)
   if (!checked.ok) {
     return err({ kind: "invalid_question", detail: checked.error })
   }
-  if (!liveAskAvailable(root)) {
-    return err({ kind: "live_route_unavailable", detail: "no live model route is configured on this server." })
+  const status = liveRouteStatus(root)
+  if (!status.available) {
+    const missing: string[] = []
+    if (!status.hasApiKey) missing.push("MIZAN_LLM_API_KEY")
+    if (!status.hasCorpus) missing.push(CORPUS_RELATIVE)
+    if (!status.hasAttestation) missing.push("attestation.json")
+    if (status.providerMode === "scripted") missing.push("MIZAN_PROVIDER=scripted")
+    return err({
+      kind: "live_route_unavailable",
+      detail: `no live model route is configured on this server (missing: ${missing.join(", ")}).`,
+    })
   }
   if (!tryAcquireDemoSlot()) {
     return err({ kind: "busy", detail: "a run is already in progress on this server; wait for it to finish and try again." })

@@ -1,333 +1,548 @@
-import { badgeFor, transcriptLabel, type Verdict, type VerdictReason } from "@mizan/core"
+import { badgeFor, type Verdict } from "@mizan/core"
 import { VERIFICATION_BUDGET_MS } from "../instructions.ts"
 import { badgeHtml, encodeText, note, section } from "./html.ts"
+import { anyVerified, type CandidateResult, type SearchVerifyResult } from "./search-verify.ts"
+import {
+  badgeMeaning as badgeMeaningI18n,
+  dirOf,
+  reasonMeaning as reasonMeaningI18n,
+  strings,
+  type Lang,
+} from "./i18n.ts"
 import { VERIFY_SAMPLES, type PlaygroundResult } from "./playground.ts"
 
-const BADGE_MEANING = {
-  verified: "the quoted span is contained in the record the claim cites, after deterministic folding.",
-  unverifiable: "mizan cannot decide: no citation, an unresolvable identifier, an empty quote, a paraphrase, a timeout or malformed model output.",
-  rejected: "the citation resolved to a real record and that record does not contain the quote.",
-} as const satisfies Readonly<Record<Verdict, string>>
-
-const REASON_MEANING = {
-  exact_containment: "the folded quote is contained in the folded cited record — the only route to VERIFIED.",
-  empty_quote: "the quoted span was empty or diacritics-only; nothing falsifiable to compare.",
-  no_citation: "the claim carried no citation; zero evidence blocks approval.",
-  citation_cap_exceeded: "more citations than the per-claim cap and none survived.",
-  identifier_unresolved: "the cited identifier does not resolve to any record; a negative cannot be proven.",
-  collection_ambiguous: "the number exists in more than one collection and the citation named none.",
-  quote_absent_at_cited_id: "the citation resolved to a real record and that record does not contain the quote — the only route to REJECTED.",
-  no_matching_evidence: "a verified verdict carried no matching evidence and was coerced down to UNVERIFIABLE.",
-  verification_timeout: "the verification budget elapsed; never a cached prior verdict.",
-  decomposition_failed: "claim decomposition produced unusable output.",
-} as const satisfies Readonly<Record<VerdictReason, string>>
-
-const badgeLegend = (): string => {
-  const rows = (Object.keys(BADGE_MEANING) as readonly (keyof typeof BADGE_MEANING)[]).map(
-    (verdict) =>
-      `<li>${badgeHtml(badgeFor(verdict))} <span>${encodeText(BADGE_MEANING[verdict])}</span></li>`,
-  )
-  return [`<ul class="plain">`, ...rows, "</ul>"].join("\n")
-}
-
-const hero = (liveRoute: boolean, corpusAvailable: boolean, corpusDetail: string, recordCount: number, collectionCounts: Readonly<Record<string, number>>, snapshotHash: string): string => {
+const hero = (
+  lang: Lang,
+  liveAvailable: boolean,
+  liveMissing: readonly string[],
+  corpusAvailable: boolean,
+  corpusDetail: string,
+  recordCount: number,
+  collectionCounts: Readonly<Record<string, number>>,
+  snapshotHash: string,
+  corpusKind: "snapshot" | "anchors" | "none",
+): string => {
+  const t = strings(lang)
   const collections = Object.entries(collectionCounts)
     .map(([name, count]) => `${encodeText(name)} ${count}`)
     .join(" · ")
+  const kindNote = corpusKind === "snapshot" ? t.corpusKindSnapshot : corpusKind === "anchors" ? t.corpusKindAnchors : t.corpusIntegrityFailed
   const corpusValue = corpusAvailable
-    ? `${recordCount} attested demo records${collections.length > 0 ? ` (${collections})` : ""}`
-    : `unavailable — ${encodeText(corpusDetail)}`
+    ? `${recordCount} ${t.corpusYesPrefix} — ${kindNote}${collections.length > 0 ? ` (${collections})` : ""}`
+    : `${t.corpusUnavailable} — ${kindNote}. ${encodeText(corpusDetail)}`
+  const liveValue = liveAvailable
+    ? t.liveRouteYes
+    : liveMissing.length > 0
+      ? liveMissing.map(encodeText).join(" · ")
+      : t.liveRouteNo
+  const liveClass = liveAvailable ? "v is-ok" : "v is-missing"
+  const row = (key: string, value: string, cls = "v"): string =>
+    `<div class="status-row"><span class="k">${encodeText(key)}</span><span class="${cls}">${value}</span></div>`
   return [
     `<div class="hero">`,
-    `<h1>mizan <span class="ar" lang="ar" dir="rtl">ميزان</span> — the balance</h1>`,
-    `<p class="lede">Per-claim citation verification for Qur&#39;an and hadith answers. Every badge on this site was computed by strict normalised containment against an attested corpus — never asserted by a model, never a similarity score.</p>`,
-    `<p class="claim">The badge you see was computed, not asserted.</p>`,
-    `<div class="badge-row">${badgeHtml(badgeFor("verified"))}${badgeHtml(badgeFor("rejected"))}${badgeHtml(badgeFor("unverifiable"))}</div>`,
-    `<div class="status-grid">`,
-    `<div class="status-item"><span class="k">Demo corpus</span><span class="v">${corpusValue}</span></div>`,
-    `<div class="status-item"><span class="k">Snapshot hash</span><span class="v">${encodeText(snapshotHash.length > 0 ? snapshotHash : "—")}</span></div>`,
-    `<div class="status-item"><span class="k">Live model route</span><span class="v">${liveRoute ? "configured on this server" : "not configured — replay samples only"}</span></div>`,
-    `<div class="status-item"><span class="k">Verification budget</span><span class="v">${VERIFICATION_BUDGET_MS} ms per claim</span></div>`,
-    `<div class="status-item"><span class="k">Client JavaScript</span><span class="v">none — pages carry no script tags</span></div>`,
+    `<div class="hero-copy">`,
+    `<h1>${encodeText(t.heroTitleEn)}<span class="ar" lang="ar" dir="rtl">${encodeText(t.heroTitleAr)}</span>${encodeText(t.heroTitleTail)}</h1>`,
+    `<p class="lede">${encodeText(t.heroLede)}</p>`,
+    `<p class="claim">${encodeText(t.heroClaim)}</p>`,
+    `<div class="badge-row">${badgeHtml(badgeFor("verified"), lang)}${badgeHtml(badgeFor("rejected"), lang)}${badgeHtml(badgeFor("unverifiable"), lang)}</div>`,
+    `</div>`,
+    `<div class="status-panel">`,
+    row(t.statusCorpus, corpusValue),
+    row(t.statusSnapshotHash, encodeText(snapshotHash.length > 0 ? snapshotHash : "—")),
+    row(t.statusLiveRoute, liveValue, liveClass),
+    row(t.statusBudget, `${VERIFICATION_BUDGET_MS} ms`),
+    row(t.statusClientJs, encodeText(t.clientJsNone)),
     `</div>`,
     `</div>`,
   ].join("\n")
 }
 
-const askSection = (liveRoute: boolean): string => {
-  const liveNote = liveRoute
-    ? "A live model route is configured on this server: typed questions run through the full pipeline."
-    : "This deployment has no live model key. The sample questions replay the committed transcript; the verifier still computes every badge live."
+const askSection = (lang: Lang, liveAvailable: boolean): string => {
+  const t = strings(lang)
+  const liveNote = liveAvailable ? t.askLiveConfigured : t.askLiveNoKey
   const sampleForms = [
-    { id: "ikhlas", label: "Sample: oneness of God (replay)" },
-    { id: "fabricated-hadith", label: "Sample: fabricated hadith (replay)" },
+    { id: "ikhlas", label: t.askSampleIkhlas },
+    { id: "fabricated-hadith", label: t.askSampleFabricated },
   ]
     .map(
       (sample) =>
         `<form method="post" action="/ask"><input type="hidden" name="sample" value="${encodeText(sample.id)}">` +
+        `<input type="hidden" name="lang" value="${lang}">` +
         `<button type="submit" class="secondary">${encodeText(sample.label)}</button></form>`,
     )
     .join("\n")
   return section(
     "ask",
-    "Ask a question",
+    t.askTitle,
     [
-      `<p>The samples run <code>bun run demo</code> on this machine — the same offline demonstration a judge runs from the repository. Answers replay a committed transcript and are labelled PRECOMPUTED on screen; every badge in the output was computed by the verifier on that run.</p>`,
+      `<p class="eyebrow">${encodeText(t.askEyebrow)}</p>`,
+      `<p>${encodeText(t.askBody)}</p>`,
       `<form method="post" action="/ask">`,
-      `<label for="question">Question</label>`,
-      `<textarea id="question" name="question" maxlength="10000" placeholder="What does the Qur&#39;an say about the oneness of God?"></textarea>`,
-      `<button type="submit">Run</button>`,
+      `<input type="hidden" name="lang" value="${lang}">`,
+      `<label for="question">${encodeText(t.askQuestionLabel)}</label>`,
+      `<textarea id="question" name="question" maxlength="10000" placeholder="${encodeText(t.askQuestionPlaceholder)}"></textarea>`,
+      `<div class="actions"><button type="submit">${encodeText(t.askRun)}</button></div>`,
       `</form>`,
-      `<div class="samples">${sampleForms}</div>`,
+      `<div class="chips">${sampleForms}</div>`,
       note(liveNote),
-      note("Run traces carry a hash of the question, never the question text. This server writes no question text to any log."),
+      note(t.askPrivacyNote),
     ].join("\n"),
   )
 }
 
-const verifySection = (verifyReady: boolean, verifyDetail: string): string => {
+const verifySection = (lang: Lang, verifyReady: boolean, verifyDetail: string): string => {
+  const t = strings(lang)
   const sampleButtons = VERIFY_SAMPLES.map(
-    (sample) =>
-      `<form method="post" action="/verify"><input type="hidden" name="sample" value="${encodeText(sample.id)}">` +
-      `<button type="submit" class="secondary">${encodeText(sample.label)}</button></form>`,
+    (sample) => {
+      const label = sample.id === "quran-6222" ? t.verifySampleA : t.verifySampleB
+      return (
+        `<form method="post" action="/verify"><input type="hidden" name="sample" value="${encodeText(sample.id)}">` +
+        `<input type="hidden" name="lang" value="${lang}">` +
+        `<button type="submit" class="secondary">${encodeText(label)}</button></form>`
+      )
+    },
   ).join("\n")
-  const unavailable = verifyReady ? "" : `<p><strong>Unavailable:</strong> ${encodeText(verifyDetail)}</p>`
+  const unavailable = verifyReady ? "" : `<p><strong>${encodeText(t.verifyUnavailable)}:</strong> ${encodeText(verifyDetail)}</p>`
   return section(
     "verify",
-    "Verify a quote",
+    t.verifyTitle,
     [
-      `<p>Build one claim and run the six-step verifier against the demo corpus — the same procedure that gates this repository. The prose field is never verified; only the quoted span is falsifiable.</p>`,
+      `<p class="eyebrow">${encodeText(t.verifyEyebrow)}</p>`,
+      `<p>${encodeText(t.verifyBody)}</p>`,
       unavailable,
       `<form method="post" action="/verify">`,
-      `<label for="claimText">Claim text <span class="hint">prose — never verified</span></label>`,
-      `<textarea id="claimText" name="claimText" maxlength="4000"></textarea>`,
-      `<label for="quote">Quoted span <span class="hint">the falsifiable artefact</span></label>`,
-      `<textarea id="quote" name="quote" dir="rtl" maxlength="4000" required placeholder="قُلْ هُوَ ٱللَّهُ أَحَدٌ"></textarea>`,
-      `<label for="collection">Collection</label>`,
-      `<input type="text" id="collection" name="collection" maxlength="32" required placeholder="quran or abudawud">`,
-      `<label for="number">Number <span class="hint">digits, or empty for an unnumbered row</span></label>`,
-      `<input type="text" id="number" name="number" maxlength="64" placeholder="6222">`,
-      `<button type="submit">Verify</button>`,
+      `<input type="hidden" name="lang" value="${lang}">`,
+      `<label for="text">${encodeText(t.verifyTextLabel)} <span class="hint">${encodeText(t.verifyTextHint)}</span></label>`,
+      `<textarea id="text" name="text" dir="rtl" maxlength="4000" required placeholder="${encodeText(t.verifyTextPlaceholder)}"></textarea>`,
+      `<label for="scope">${encodeText(t.verifyScopeLabel)} <span class="hint">${encodeText(t.verifyScopeHint)}</span></label>`,
+      `<input type="text" id="scope" name="collection" maxlength="32" placeholder="${encodeText(t.verifyScopePlaceholder)}">`,
+      `<div class="actions"><button type="submit">${encodeText(t.verifyRun)}</button></div>`,
       `</form>`,
-      `<div class="samples">${sampleButtons}</div>`,
-      note("Zero evidence blocks approval. A quote that is not contained in the record the citation resolves to is REJECTED; anything that cannot be decided is UNVERIFIABLE. There is no similarity score and no third state."),
+      `<div class="chips">${sampleButtons}</div>`,
+      note(t.verifyNote),
     ].join("\n"),
   )
 }
 
-const badgesSection = (): string =>
-  section(
+/**
+ * The three badges as a compact key rather than a legend.
+ *
+ * A three-cell grid, because the badges are parallel and a reader comparing them is the whole point
+ * of the section. There is no fourth cell, and the layout says so by having room for exactly three.
+ */
+const badgesSection = (lang: Lang): string => {
+  const t = strings(lang)
+  const rows: readonly (readonly [Verdict, string])[] = [
+    ["verified", t.badgeMeaningVerified],
+    ["rejected", t.badgeMeaningRejected],
+    ["unverifiable", t.badgeMeaningUnverifiable],
+  ]
+  const cells = rows
+    .map(([verdict, meaning]) => `<li>${badgeHtml(badgeFor(verdict), lang)}<br><span>${encodeText(meaning)}</span></li>`)
+    .join("\n")
+  return section(
     "badges",
-    "The three badges",
+    t.badgesTitle,
+    [`<p>${encodeText(t.badgesBody)}</p>`, `<ul class="badge-key">`, cells, `</ul>`, note(t.badgesDiagnosticNote)].join("\n"),
+  )
+}
+
+/** A secondary link styled as a button, so it reads as an action without pretending to be a form. */
+const linkHtml = (href: string, label: string, lang: Lang): string =>
+  `<a class="btn btn-secondary" href="${encodeText(href)}" lang="${lang}" dir="${dirOf(lang)}">${encodeText(label)}</a>`
+
+/** Three short reasons to trust the badge, and the route to the full method. */
+const trustSection = (lang: Lang): string => {
+  const t = strings(lang)
+  return section(
+    "trust",
+    t.trustTitle,
     [
-      `<p>These are the only verdicts the verifier can emit. There is no fourth state and no default badge.</p>`,
-      badgeLegend(),
-      note("A display-only longest-run diagnostic exists for human reading; it is not a verdict, and the verifier cannot import it."),
+      `<ul class="trust">`,
+      `<li>${t.trustItem1}</li>`,
+      `<li>${t.trustItem2}</li>`,
+      `<li>${t.trustItem3}</li>`,
+      `</ul>`,
+      `<div class="actions">${linkHtml(`/method?lang=${lang}`, t.trustMethodLink, lang)}</div>`,
     ].join("\n"),
   )
+}
 
-const procedureSection = (): string =>
-  section(
-    "procedure",
-    "How a badge is computed",
-    [
-      `<p>Per claim, in order. Each step fails closed and returns early; the happy path is the last line. The procedure lives in <code>packages/mizan-verify/src/verify.ts</code>.</p>`,
-      `<ol class="steps">`,
-      `<li><strong>the quote.</strong> An empty or diacritics-only quoted span is UNVERIFIABLE. Only a quoted span is falsifiable; the model&#39;s prose is never verified.</li>`,
-      `<li><strong>a citation.</strong> A claim with none is UNVERIFIABLE. Zero evidence blocks approval.</li>`,
-      `<li><strong>the cap.</strong> More than three citations are capped; the cap becomes the recorded reason only when it is the reason.</li>`,
-      `<li><strong>resolution.</strong> If no cited record exists the claim is UNVERIFIABLE; a number that exists in several collections with none named is UNVERIFIABLE as ambiguous.</li>`,
-      `<li><strong>containment.</strong> The folded quote is compared to the folded cited record by strict normalised substring containment. A hit is VERIFIED, with evidence. This is the only route to VERIFIED in the repository.</li>`,
-      `<li><strong>coercion.</strong> A VERIFIED carrying no evidence is coerced down to UNVERIFIABLE, and the evidence is cleared so nothing downstream can render a confident badge with no provenance.</li>`,
-      `</ol>`,
-      note("Between containment and accusation sits the anchor arm: an abridgement that a hand-drawn anchor locates in the cited record yields UNVERIFIABLE — never VERIFIED and never REJECTED. System instructions tell the model to quote verbatim; that hint improves output quality, never the verdict."),
-      `<h3>What the fold is</h3>`,
-      `<p>One table, in <code>packages/mizan-core/src/normalize/fold-table.ts</code>, applied once at ingest. It normalises alef and hamza forms, the wasla, ta-marbuta, diacritics, tatweel, digit forms and punctuation. It never rewrites, adds or removes a letter — which is exactly why a fabrication cannot be folded into a match.</p>`,
-      note("The folded column is a matching key, not a text. Every user surface renders the original; only the verifier compares the key."),
-      `<h3>Grades are never ours</h3>`,
-      `<p>A grade is stored exactly as the source dataset asserts it, together with who published it and on what basis. Rows the dataset declines to grade carry an explicit &#8220;no grade&#8221; state rather than a default. The product never infers, upgrades or presents a grade as its own ruling.</p>`,
-    ].join("\n"),
-  )
 
-const degradationSection = (): string =>
-  section(
+const degradationSection = (lang: Lang): string => {
+  const t = strings(lang)
+  return section(
     "degradation",
-    "Honest degradation",
+    t.degradationTitle,
     [
-      `<p>Each failure has one correct surface. These are the words the product prints; a different spelling of the same absence is a defect, not a style choice.</p>`,
+      `<p>${t.degradationBody}</p>`,
       `<ul class="plain">`,
-      `<li>provider unreachable inside its 30s budget → <code>model unavailable</code> — never a canned answer, never a silent mock.</li>`,
-      `<li>corpus consulted, nothing citable → <code>no sources found</code> — never a guess, never a cached answer.</li>`,
-      `<li>verification timeout or malformed model output → <code>unverifiable</code> — never <code>verified</code>, never a cached prior verdict.</li>`,
-      `<li>attestation mismatch or ledger write failure → loud integrity error, no verdict — never warn-and-proceed.</li>`,
-      `<li>corpus absent or unreadable → the pipeline is not entered; the CLI names the state and exits.</li>`,
-      `<li>not every claim verified → the run action is <code>refer_to_scholar</code>, not a composite yes.</li>`,
+      `<li>${t.degradationItem1}</li>`,
+      `<li>${t.degradationItem2}</li>`,
+      `<li>${t.degradationItem3}</li>`,
+      `<li>${t.degradationItem4}</li>`,
+      `<li>${t.degradationItem5}</li>`,
+      `<li>${t.degradationItem6}</li>`,
       `</ul>`,
-      note("Second-ranker absence is reported in run metadata as semanticRanking: unavailable, never as a silent downgrade presented as full fidelity. Tafsir backends report unavailable rather than fabricating tafsir."),
+      note(t.degradationNote),
     ].join("\n"),
   )
+}
 
-const provenanceSection = (): string =>
-  section(
+const provenanceSection = (lang: Lang): string => {
+  const t = strings(lang)
+  return section(
     "provenance",
-    "Provenance you can check",
+    t.provenanceTitle,
     [
       `<ul class="plain">`,
-      `<li>The corpus snapshot is attested; a mismatch between the database and its attestation aborts the run rather than producing a badge.</li>`,
-      `<li>Every ledger row is hash-chained — each row carries the hash of the row before it. <code>bun run verify:chain</code> re-checks the chain from the committed file.</li>`,
-      `<li>Run traces carry a hash of the question, never the question text.</li>`,
-      `<li>Every badge is computed against a snapshot whose hash is shown beside it in the CLI report and on this site&#39;s verdict pages.</li>`,
-      `<li>Match strength is a constrained type — <code>exact</code> or <code>none</code> — not a percentage we computed.</li>`,
+      `<li>${t.provenanceItem1}</li>`,
+      `<li>${t.provenanceItem2}</li>`,
+      `<li>${t.provenanceItem3}</li>`,
+      `<li>${t.provenanceItem4}</li>`,
+      `<li>${t.provenanceItem5}</li>`,
       `</ul>`,
     ].join("\n"),
   )
+}
 
-const sourcesSection = (): string =>
-  section(
+const sourcesSection = (lang: Lang): string => {
+  const t = strings(lang)
+  return section(
     "sources",
-    "Sources and licences",
+    t.sourcesTitle,
     [
-      `<p>Corpus text is not covered by the code&#39;s Apache-2.0 licence. Per-source terms live in <code>data/registry/sources.json</code>, and gate G-5 fails the build on an empty licence field.</p>`,
+      `<p>${t.sourcesBody}</p>`,
       `<table class="data">`,
-      `<tr><th>Source</th><th>Role</th><th>Terms</th></tr>`,
-      `<tr><td>Tanzil Project</td><td>Qur&#39;an, Uthmani script, 6,236 records</td><td>Distributed unmodified under the Tanzil terms of use (no-derivatives class in the registry).</td></tr>`,
-      `<tr><td>QuranLab</td><td>Hadith and per-row grades, 36,024 records ingested</td><td>Arabic matn public domain per the dataset card. Grades stored exactly as published.</td></tr>`,
+      `<tr><th>${encodeText(t.sourcesThSource)}</th><th>${encodeText(t.sourcesThRole)}</th><th>${encodeText(t.sourcesThTerms)}</th></tr>`,
+      `<tr><td>Tanzil Project</td><td>${encodeText(t.sourcesTanzilRole)}</td><td>${encodeText(t.sourcesTanzilTerms)}</td></tr>`,
+      `<tr><td>QuranLab</td><td>${encodeText(t.sourcesQuranLabRole)}</td><td>${encodeText(t.sourcesQuranLabTerms)}</td></tr>`,
       `</table>`,
-      `<p>Served collections in the full snapshot: the Qur&#39;an, Sunan Abi Dawud, Sunan an-Nasa&#39;i, Sunan Ibn Majah, Jami&#39; at-Tirmidhi, and Malik&#39;s Muwatta — 27,234 rows, as recorded in <code>docs/value-proof.md</code>. Bukhari, Muslim and an-Nawawi are not served; the registry says so rather than implying a wider coverage than the snapshot holds.</p>`,
-      note("This demo server rebuilds a small attested corpus from committed anchors (data/eval/demo-anchors.json) so the playground can compute real verdicts offline. The figures above describe the full snapshot, not this demo corpus."),
+      `<p>${t.sourcesCollections}</p>`,
+      note(t.sourcesNote),
     ].join("\n"),
   )
+}
 
-const runSection = (): string =>
-  section(
+const runSection = (lang: Lang): string => {
+  const t = strings(lang)
+  return section(
     "run",
-    "Where to run it",
+    t.runTitle,
     [
       `<ul class="plain">`,
-      `<li><code>bun run demo</code> — the offline demonstration. No API key, labelled replay, full report with each source&#39;s URL and the snapshot hash beside every badge.</li>`,
-      `<li><code>bun run ask</code> — the CLI question path. With a key set it runs the live model against an allowlisted OpenAI-compatible endpoint; without one it replays the committed transcript and labels every line precomputed.</li>`,
-      `<li><code>bun run demo-server</code> — this server. Server-rendered HTML, no client-side script: an ask form, a verify playground, and <code>GET /health</code> for the platform. Badges are computed in the server process.</li>`,
-      `<li><code>bun run mcp</code> — mizan verification as a read-only MCP tool (server name <code>mizan-verify</code>) for other AI applications, over stdio.</li>`,
-      `<li><code>bun run ci</code> — typecheck, per-package tests, then the structural gates G-1 through G-7.</li>`,
+      `<li>${t.runItemDemo}</li>`,
+      `<li>${t.runItemAsk}</li>`,
+      `<li>${t.runItemServer}</li>`,
+      `<li>${t.runItemMcp}</li>`,
+      `<li>${t.runItemCi}</li>`,
       `</ul>`,
-      note("The repository is at github.com/mossaudi/mizan. Deployment notes for the static exhibit and this hosted demo are in docs/live-demo.md; the offline command walkthrough is docs/demo-runbook.md."),
+      note(t.runNote),
     ].join("\n"),
   )
+}
 
-export const homeBody = (
-  corpusAvailable: boolean,
-  corpusDetail: string,
-  liveRoute: boolean,
-  recordCount: number,
-  collectionCounts: Readonly<Record<string, number>>,
-  snapshotHash: string,
-): string =>
+export type HomeInput = {
+  readonly lang: Lang
+  readonly corpusAvailable: boolean
+  readonly corpusDetail: string
+  /** Which corpus is actually open, so the record count beside it cannot describe another one. */
+  readonly corpusKind: "snapshot" | "anchors" | "none"
+  readonly liveAvailable: boolean
+  readonly liveMissing: readonly string[]
+  readonly recordCount: number
+  readonly collectionCounts: Readonly<Record<string, number>>
+  readonly snapshotHash: string
+}
+
+export const homeBody = (input: HomeInput): string =>
   [
-    hero(liveRoute, corpusAvailable, corpusDetail, recordCount, collectionCounts, snapshotHash),
-    askSection(liveRoute),
-    verifySection(corpusAvailable, corpusDetail),
-    badgesSection(),
-    procedureSection(),
-    degradationSection(),
-    provenanceSection(),
-    sourcesSection(),
-    runSection(),
+    hero(
+      input.lang,
+      input.liveAvailable,
+      input.liveMissing,
+      input.corpusAvailable,
+      input.corpusDetail,
+      input.recordCount,
+      input.collectionCounts,
+      input.snapshotHash,
+      input.corpusKind,
+    ),
+    `<div class="tools">`,
+    askSection(input.lang, input.liveAvailable),
+    verifySection(input.lang, input.corpusAvailable, input.corpusDetail),
+    `</div>`,
+    badgesSection(input.lang),
+    trustSection(input.lang),
   ].join("\n")
 
-export const reasonMeaning = (reason: VerdictReason): string => REASON_MEANING[reason]
+/**
+ * The long-form explanation, on its own page.
+ *
+ * ## Why this is a second page rather than more sections on the first
+ *
+ * The home page exists to be used and the method page exists to be read, and mixing them served
+ * neither: a visitor who wanted to paste a quote had to scroll past four sections of prose, and the
+ * prose itself was competing with the two forms for attention. Splitting them lets the home page
+ * carry exactly what a visitor needs to act — what this is, that the corpus is attested, the two
+ * tools, the three badges — and leaves the reasoning intact one click away instead of deleted.
+ *
+ * Each block is a native `<details>` element rather than a script-driven accordion. That is the only
+ * progressive disclosure available under ADR-C3 (no client JavaScript), and it has one property a
+ * hand-rolled accordion would not: it still opens, prints and deep-links with scripting disabled,
+ * because it is the platform and not this product.
+ *
+ * ## Why the fold table and the grades get their own blocks
+ *
+ * Those two are the two questions a scholar actually asks about this system — what counts as the same
+ * word, and whose judgement a grade is — so they are the first two disclosed rather than trailing
+ * footnotes, and they state the rule rather than linking away to it.
+ */
+export const methodBody = (lang: Lang): string => {
+  const t = strings(lang)
+  const fold = `<p>${t.procedureFoldBody}</p>${note(t.procedureFoldNote)}`
+  const grades = `<p>${t.procedureGradesBody}</p>`
+  const blocks: readonly (readonly [string, string])[] = [
+    [
+      t.procedureTitle,
+      [`<p>${t.procedureBody}</p>`, `<ol class="steps">`, `<li>${t.procedureStep1}</li>`, `<li>${t.procedureStep2}</li>`, `<li>${t.procedureStep3}</li>`, `<li>${t.procedureStep4}</li>`, `<li>${t.procedureStep5}</li>`, `<li>${t.procedureStep6}</li>`, `</ol>`, note(t.procedureAnchorNote)].join("\n"),
+    ],
+    [t.procedureFoldTitle, fold],
+    [t.procedureGradesTitle, grades],
+    [t.degradationTitle, degradationSection(lang)],
+    [t.provenanceTitle, provenanceSection(lang)],
+    [t.sourcesTitle, sourcesSection(lang)],
+    [t.runTitle, runSection(lang)],
+  ]
+  const disclosed = blocks.map(([summary, body], index) => details(summary, body, index === 0)).join("\n")
+  return [
+    `<div class="hero">`,
+    `<div class="hero-copy">`,
+    `<p class="eyebrow">${encodeText(t.methodEyebrow)}</p>`,
+    `<h1>${encodeText(t.methodTitle)}</h1>`,
+    `<p class="lede">${encodeText(t.methodLede)}</p>`,
+    `</div>`,
+    `</div>`,
+    `<div class="method-blocks">`,
+    disclosed,
+    `</div>`,
+    `<div class="actions">${linkHtml(`/?lang=${lang}`, t.methodBackHome, lang)}</div>`,
+  ].join("\n")
+}
 
-export const badgeMeaning = (verdict: Verdict): string => BADGE_MEANING[verdict]
-
-export const askOutputBody = (title: string, output: string, noteText: string): string =>
+/** One native disclosure block. `open` on the first so the page is never a wall of collapsed rows. */
+const details = (summary: string, body: string, open = false): string =>
   [
+    `<details class="disclose"${open ? " open" : ""}>`,
+    `<summary>${encodeText(summary)}</summary>`,
+    `<div class="disclose-body">`,
+    body,
+    `</div>`,
+    `</details>`,
+  ].join("\n")
+
+export const reasonMeaning = (reason: string, lang: Lang): string => reasonMeaningI18n(reason, lang)
+
+export const badgeMeaning = (verdict: string, lang: Lang): string => badgeMeaningI18n(verdict, lang)
+
+export const askOutputBody = (lang: Lang, title: string, output: string, noteText: string): string => {
+  const t = strings(lang)
+  return [
     `<section class="card">`,
     `<h2>${encodeText(title)}</h2>`,
     note(noteText),
-    `<h3>Terminal output</h3>`,
+    `<h3>${encodeText(t.askOutputTerminal)}</h3>`,
     `<pre>${encodeText(output)}</pre>`,
-    `<form method="get" action="/"><button type="submit" class="secondary">Back</button></form>`,
+    `<form method="get" action="/?lang=${lang}"><button type="submit" class="secondary">${encodeText(t.askOutputBack)}</button></form>`,
     `</section>`,
   ].join("\n")
+}
 
-export const verifyResultBody = (result: PlaygroundResult, sampleLabel: string | null): string => {
+export const verifyResultBody = (lang: Lang, result: PlaygroundResult, sampleLabel: string | null): string => {
+  const t = strings(lang)
   const verdict = result.verdict.verdict
   const badge = badgeFor(verdict)
   const evidence = result.verdict.evidence
   const evidenceHtml =
     evidence === null
-      ? `<p class="note">No evidence record: the verdict is not a containment hit. A REJECTED carries no evidence because the quote is absent from the cited record — the absence is the finding.</p>`
+      ? `<p class="note">${encodeText(t.verdictEvidenceNone)}</p>`
       : [
           `<dl class="kv">`,
           `<dt>Record</dt><dd><code>${encodeText(evidence.recordId)}</code></dd>`,
           `<dt>Collection</dt><dd>${encodeText(evidence.collection)}</dd>`,
           `<dt>Number</dt><dd>${encodeText(evidence.number ?? "—")}</dd>`,
-          `<dt>Grade</dt><dd>${encodeText(evidence.grade ?? "this dataset asserts no grade for this row")}</dd>`,
+          `<dt>Grade</dt><dd>${encodeText(evidence.grade ?? t.verdictGradeNone)}</dd>`,
           `<dt>Grade source</dt><dd>${encodeText(evidence.gradeSource)}</dd>`,
           `<dt>Source</dt><dd>${encodeText(evidence.sourceUrl)}</dd>`,
           `<dt>Licence</dt><dd>${encodeText(evidence.license)}</dd>`,
           `<dt>Attribution</dt><dd>${encodeText(evidence.attribution)}</dd>`,
-          `<dt>Folded match</dt><dd>${evidence.matchedChars} / ${evidence.quoteChars} characters</dd>`,
+          `<dt>Folded match</dt><dd>${evidence.matchedChars} / ${evidence.quoteChars}</dd>`,
           `</dl>`,
         ].join("\n")
   const problemsHtml =
     result.problems.length === 0
       ? ""
       : [
-          `<h3>Resolution problems</h3>`,
+          `<h3>${encodeText(t.verdictProblemsTitle)}</h3>`,
           `<pre>${encodeText(result.problems.map((p) => `${p.citation.raw}: ${p.detail}`).join("\n"))}</pre>`,
         ].join("\n")
   const resolvedRows = result.resolved
     .map((entry) => {
       const ids = entry.records.map((record) => record.id).join(", ")
-      const flag = entry.ambiguous ? " — ambiguous: number exists in more than one collection and none was named" : ""
+      const flag = entry.ambiguous ? " — ambiguous" : ""
       return `${entry.citation.raw} → ${ids.length > 0 ? ids : "unresolved"}${flag}`
     })
     .join("\n")
   const sampleLine = sampleLabel === null ? "" : `<p>${encodeText(sampleLabel)}</p>`
+  const exactNote = result.verdict.matchStrength.kind === "exact" ? t.verdictMatchExact : t.verdictMatchNone
   return [
     `<section class="card">`,
-    `<h2>Verdict</h2>`,
+    `<h2>${encodeText(t.verdictTitle)}</h2>`,
     `<div class="verdict-hero">`,
-    badgeHtml(badge),
-    `<p class="verdict-meaning">${encodeText(badgeMeaning(verdict))}</p>`,
+    badgeHtml(badge, lang),
+    `<p class="verdict-meaning">${encodeText(badgeMeaning(verdict, lang))}</p>`,
     `</div>`,
     sampleLine,
     `<dl class="kv">`,
-    `<dt>Reason</dt><dd><code>${encodeText(result.verdict.reason)}</code> — ${encodeText(reasonMeaning(result.verdict.reason))}</dd>`,
-    `<dt>Match strength</dt><dd><code>${encodeText(result.verdict.matchStrength.kind)}</code>${result.verdict.matchStrength.kind === "exact" ? " — a containment hit at 100%; there is no partial credit" : " — no containment match is claimed"}</dd>`,
-    `<dt>Snapshot hash</dt><dd><code>${encodeText(result.snapshotHash)}</code></dd>`,
-    `<dt>Claim text</dt><dd>${encodeText(result.claim.text)} <span class="note">(not verified)</span></dd>`,
-    `<dt>Quoted span</dt><dd dir="rtl">${encodeText(result.claim.quote ?? "")}</dd>`,
+    `<dt>${encodeText(t.verdictReason)}</dt><dd><code>${encodeText(result.verdict.reason)}</code> — ${encodeText(reasonMeaning(result.verdict.reason, lang))}</dd>`,
+    `<dt>${encodeText(t.verdictMatchStrength)}</dt><dd><code>${encodeText(result.verdict.matchStrength.kind)}</code>${encodeText(exactNote)}</dd>`,
+    `<dt>${encodeText(t.verdictSnapshotHash)}</dt><dd><code>${encodeText(result.snapshotHash)}</code></dd>`,
+    `<dt>${encodeText(t.verdictClaimText)}</dt><dd>${encodeText(result.claim.text)} <span class="note">${encodeText(t.verdictNotVerified)}</span></dd>`,
+    `<dt>${encodeText(t.verdictQuotedSpan)}</dt><dd dir="rtl">${encodeText(result.claim.quote ?? "")}</dd>`,
     `</dl>`,
     `<h3>Citation resolution</h3>`,
     `<pre>${encodeText(resolvedRows)}</pre>`,
-    `<h3>Evidence</h3>`,
+    `<h3>${encodeText(t.verdictEvidenceTitle)}</h3>`,
     evidenceHtml,
     problemsHtml,
-    note("Grades shown above are the dataset&#39;s own, never mizan&#39;s. A grade of null means the dataset asserts none for this row."),
-    `<form method="get" action="/"><button type="submit" class="secondary">Back</button></form>`,
+    note(t.verdictGradeNote),
+    `<form method="get" action="/?lang=${lang}"><button type="submit" class="secondary">${encodeText(t.verdictBack)}</button></form>`,
     `</section>`,
   ].join("\n")
 }
 
-export const errorBody = (title: string, detail: string): string =>
-  [
+/**
+ * What the search was allowed to look at, stated in words.
+ *
+ * The widening clause is the one that matters. A reader who asked about one book and is shown rows
+ * from another has been handed an answer to a different question unless the page says the scope
+ * moved, so `widenedFrom` is rendered as a sentence and not as a field.
+ */
+const scopeHtml = (lang: Lang, result: SearchVerifyResult): string => {
+  const t = strings(lang)
+  const scope = result.scope
+  if (scope === null) return ""
+  if (scope.kind === "collection") {
+    return `${encodeText(t.verifyResultScopeCollection)} <code>${encodeText(scope.collection)}</code>`
+  }
+  if (scope.widenedFrom === null) return encodeText(t.verifyResultScopeAll)
+  return `${encodeText(t.verifyResultScopeWidened)} (<code>${encodeText(scope.widenedFrom)}</code>)`
+}
+
+/** The headline sentence, which is one of three and never a fourth. */
+const summaryFor = (lang: Lang, result: SearchVerifyResult): string => {
+  const t = strings(lang)
+  if (result.state === "unavailable") return t.verifyResultSummaryUnavailable
+  if (result.state === "no_candidates") return t.verifyResultSummaryNoCandidates
+  return anyVerified(result) ? t.verifyResultSummaryVerified : t.verifyResultSummaryNone
+}
+
+/**
+ * One row: the record, the badge the verifier computed for it, and the record's own text.
+ *
+ * The shared-run integers are the only near-ness a row carries, and they are labelled display-only
+ * beside every row — two integers in folded characters, never a percentage and never a ratio a
+ * reader could divide (AGENTS.md section 10). `textMatch` is not reachable from this type at all.
+ */
+const candidateRow = (lang: Lang, row: CandidateResult, quoteChars: number): string => {
+  const t = strings(lang)
+  const verdict = row.verdict.verdict
+  const number = row.number ?? "—"
+  return [
+    `<tr>`,
+    `<td>${row.rank}</td>`,
+    `<td>${badgeHtml(badgeFor(verdict), lang)}<br><span class="note">${encodeText(reasonMeaning(row.verdict.reason, lang))}</span></td>`,
+    `<td dir="ltr"><code>${encodeText(row.recordId)}</code><br>${encodeText(row.collection)} ${encodeText(number)}</td>`,
+    `<td>${row.sharedRunChars} / ${quoteChars}</td>`,
+    `<td><blockquote class="prose" dir="rtl">${encodeText(row.textDisplay)}</blockquote><a href="${encodeText(row.sourceUrl)}" rel="noopener noreferrer nofollow">${encodeText(row.sourceUrl)}</a><br><span class="note">${encodeText(row.attribution)} · ${encodeText(row.license)}</span></td>`,
+    `</tr>`,
+  ].join("\n")
+}
+
+/** The search result page: three possible states, each with its own sentence and its own rows. */
+export const searchResultBody = (lang: Lang, result: SearchVerifyResult): string => {
+  const t = strings(lang)
+  const header = [
+    `<dl class="kv">`,
+    `<dt>${encodeText(t.verifyResultConsidered)}</dt><dd>${result.considered}</dd>`,
+    `<dt>${encodeText(t.verifyResultShown)}</dt><dd>${result.rows.length}</dd>`,
+    `<dt>${encodeText(t.verifyResultScope)}</dt><dd>${scopeHtml(lang, result)}</dd>`,
+    `<dt>${encodeText(t.verifyResultQuoteChars)}</dt><dd>${result.quoteChars}</dd>`,
+    `</dl>`,
+  ].join("\n")
+
+  if (result.state !== "candidates") {
+    return [
+      `<section class="card">`,
+      `<h2>${encodeText(t.verifyResultTitle)}</h2>`,
+      `<p class="lede">${encodeText(summaryFor(lang, result))}</p>`,
+      header,
+      result.reason === null ? "" : note(result.reason),
+      `<form method="get" action="/?lang=${lang}"><button type="submit" class="secondary">${encodeText(t.verdictBack)}</button></form>`,
+      `</section>`,
+    ].join("\n")
+  }
+
+  const rows = result.rows.map((row) => candidateRow(lang, row, result.quoteChars)).join("\n")
+  return [
+    `<section class="card">`,
+    `<h2>${encodeText(t.verifyResultTitle)}</h2>`,
+    `<p class="lede">${encodeText(summaryFor(lang, result))}</p>`,
+    header,
+    note(t.verifyResultSharedRunNote),
+    `<table class="data">`,
+    `<tr><th>${encodeText(t.verifyResultRank)}</th><th>${encodeText(t.verifyResultBadge)}</th><th>${encodeText(t.verifyResultRecord)}</th><th>${encodeText(t.verifyResultSharedRun)}</th><th>${encodeText(t.verifyResultText)}</th></tr>`,
+    rows,
+    `</table>`,
+    note(t.verdictGradeNote),
+    `<form method="get" action="/?lang=${lang}"><button type="submit" class="secondary">${encodeText(t.verdictBack)}</button></form>`,
+    `</section>`,
+  ].join("\n")
+}
+
+export const errorBody = (lang: Lang, title: string, detail: string): string => {
+  const t = strings(lang)
+  return [
     `<section class="card">`,
     `<h2>${encodeText(title)}</h2>`,
     `<p>${encodeText(detail)}</p>`,
-    `<form method="get" action="/"><button type="submit" class="secondary">Back</button></form>`,
+    `<form method="get" action="/?lang=${lang}"><button type="submit" class="secondary">${encodeText(t.errorBack)}</button></form>`,
     `</section>`,
   ].join("\n")
+}
 
-export const MODE_PRECOMPUTED_NOTE =
-  "Answers replay the committed transcript and are labelled PRECOMPUTED on screen; every badge was computed by the verifier on this run. The run appends nothing to the committed ledger."
+export const modeNoteFor = (lang: Lang, mode: "precomputed" | "live" | "replay"): string => {
+  const t = strings(lang)
+  if (mode === "live") return t.modeLiveNote
+  if (mode === "replay") return t.modeReplayNote
+  return t.modePrecomputedNote
+}
 
-export const MODE_LIVE_NOTE =
-  "A live run through the full pipeline. The run header states whether the model was LIVE or a PRECOMPUTED replay."
+export type LiveStatus = {
+  readonly hasApiKey: boolean
+  readonly hasCorpus: boolean
+  readonly hasAttestation: boolean
+  readonly providerMode: string | null
+}
 
-export const MODE_REPLAY_NOTE =
-  "A replay run. The run header states whether the model was LIVE or a PRECOMPUTED replay."
-
-export const transcriptModeLabel = (): string => transcriptLabel("precomputed")
+export const liveMissingReasons = (lang: Lang, status: LiveStatus): readonly string[] => {
+  const t = strings(lang)
+  const reasons: string[] = []
+  if (!status.hasApiKey) reasons.push(t.liveMissingKey)
+  if (!status.hasCorpus) reasons.push(t.liveMissingCorpus)
+  if (status.providerMode === "scripted") reasons.push(t.liveProviderScripted)
+  if (!status.hasAttestation) reasons.push(t.liveMissingAttestation)
+  return reasons
+}
 
 export * as Views from "./views.ts"

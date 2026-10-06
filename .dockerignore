@@ -5,6 +5,9 @@ node_modules
 coverage
 dist
 out
+.env
+.env.*
+attestation.json
 data/corpus.db
 data/corpus.db-shm
 data/corpus.db-wal
