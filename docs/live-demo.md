@@ -35,13 +35,17 @@ Two different things share the word, and the page keeps them apart:
 
 ## Deploy
 
-- **Render (primary).** `render.yaml` declares a Docker web service with a `/health`
-  check. Point Render at the repository root; the `Dockerfile` installs the workspace and
-  starts `bun run demo-server`. Set `MIZAN_LLM_API_KEY` in the service's environment
-  (the dashboard, never the repository) to enable the live-model path for typed
-  questions; without it the page states `model unavailable` and offers the samples. The
-  free web service sleeps after inactivity; the first request after sleep waits for the
-  container to boot.
+- **SnapDeploy (interactive demo, no credit card).** Free tier: Docker builds from the
+  repository's `Dockerfile`, four containers, 100 hours a month; containers sleep after
+  about 15 minutes without traffic and wake in roughly a minute on the next browser
+  request. Sign up with an email or a GitHub account — no payment method. Connect the
+  public repository, let it build the root `Dockerfile`, and set no variables: the image
+  already runs `bun run demo-server` with the scripted (replay) provider, so the sample
+  questions and the verify playground compute every badge in the container without a key.
+  Typed questions without a key degrade honestly to `model unavailable`.
+- **Render (needs a payment method).** `render.yaml` still declares the same Docker web
+  service with a `/health` check, but Render's free web services now require a card on
+  the account, so this path is documented rather than used.
 - **GitHub Pages (static exhibit).** `.github/workflows/pages.yml` installs with a frozen
   lockfile, runs `bun run build:web`, and deploys `apps/web` as the Pages artifact. In
   the repository settings, set Pages source to GitHub Actions. The served bytes are a

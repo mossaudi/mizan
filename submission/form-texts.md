@@ -35,14 +35,14 @@ Track 04 — Knowledge & verification tools, confirmed in the portal. The pipeli
 ```
 Presentation: submission/mizan-idea-10slides.pptx (10 slides, includes a continuation-plan slide). PDF mirror generated with Arabic-capable fonts: submission/mizan-idea-10slides.pdf. Arabic deck: submission/mizan-idea-7slides-ar.pptx. Terminal capture for the video: submission/demo-terminal.png. Video script: submission/video-script.md.
 GitHub: https://github.com/mossaudi/mizan (public)
-Live demo: Render free web service via Dockerfile + render.yaml (health-checked at /health, env-var set in the dashboard only); static exhibit on GitHub Pages via .github/workflows/pages.yml, with Cloudflare Pages and Netlify as alternatives (docs/live-demo.md).
+Live demo: static exhibit on GitHub Pages via .github/workflows/pages.yml (computed badges from the committed transcript); interactive playground from the same Dockerfile on SnapDeploy free tier (no credit card) or locally via bun run demo-server (docs/live-demo.md).
 Offline proof for any judge: bun install --frozen-lockfile && bun run demo — no key, no network, ~1s.
 ```
 
 ## 6. Live demo description (portal "Live demo" field)
 
 ```
-A hosted server-rendered HTML form over the same CLI judges run locally. POST /verify builds one claim, resolves its citation against an attested two-record demo corpus, and shows the computed badge with full evidence — including a one-word fabrication (redteam-005) that reaches REJECTED at the cited identifier. POST /ask sample buttons replay the committed transcript labelled PRECOMPUTED (deterministic replay); every badge in that output is computed by the verifier on the run. No client JavaScript runs in the browser. Deployment: Render free tier through Dockerfile + render.yaml, health-checked at GET /health, with the model key set in the service environment only; the static exhibit page is published on GitHub Pages, Cloudflare Pages or Netlify. Degradation is honest: without a configured key the page states model unavailable and offers the samples; there is no canned answer and no guessed one.
+A hosted server-rendered HTML form over the same CLI judges run locally. POST /verify builds one claim, resolves its citation against an attested two-record demo corpus, and shows the computed badge with full evidence — including a one-word fabrication (redteam-005) that reaches REJECTED at the cited identifier. POST /ask sample buttons replay the committed transcript labelled PRECOMPUTED (deterministic replay); every badge in that output is computed by the verifier on the run. No client JavaScript runs in the browser. Deployment: the interactive playground is a Dockerfile on a free container host that needs no credit card, and it also runs locally with bun run demo-server; the static exhibit page is published on GitHub Pages, Cloudflare Pages or Netlify. Degradation is honest: without a configured key the page states model unavailable and offers the samples; there is no canned answer and no guessed one.
 ```
 
 ## 7. Scientific Appendix reconciliation note
@@ -59,6 +59,6 @@ Reliability & scientific safety (15%): fail-closed everywhere — zero evidence 
 Innovation (15%): no similarity path to VERIFIED (shown by feasibility spike); exact|none match strength instead of a fuzzy percentage; machine-checked structural gates that fail CI if a second route to VERIFIED appears.
 Benefit vs track criterion (20%): instant takhrij-check for scholars and du'at with grading provenance and referral for anything unverified; any conversational answer inherits the badges (Track 01 fit).
 UX & communication (10%): evidence beside every badge — quoted text, source row, URL; honest degradation states named on screen; Arabic-first UI in the terminal and the deck.
-Operational realism & continuation (10%): offline demo with no key and no network; hosted demo on a free tier; FTS5 fallback if retrieval degrades; public repo, Apache-2.0 code, per-source corpus licences; continuation plan on slide 10.
+Operational realism & continuation (10%): offline demo with no key and no network; static exhibit on GitHub Pages; interactive playground as a Dockerfile on a free container host (no credit card) or run locally; FTS5 fallback if retrieval degrades; public repo, Apache-2.0 code, per-source corpus licences; continuation plan on slide 10.
 Presentation clarity & verifiability (5%): one command reproduces the money shot; every number in the deck is re-runnable from the repo; the badge is computed, not asserted — stated on every surface.
 ```
