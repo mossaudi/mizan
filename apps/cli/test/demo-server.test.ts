@@ -5,7 +5,8 @@ import { join } from "node:path"
 import { badgeFor, isOk, MAX_QUOTE_CHARS } from "@mizan/core"
 import { buildDemoCorpus, type DemoCorpus } from "../src/demo-corpus.ts"
 import { badgeHtml, encodeText, page, scriptFree } from "../src/server/html.ts"
-import { homeBody } from "../src/server/views.ts"
+import { homeBody, searchResultBody } from "../src/server/views.ts"
+import type { SearchVerifyResult } from "../src/server/search-verify.ts"
 import {
   ar,
   badgeDisplay,
@@ -417,6 +418,58 @@ describe("the verify form asks for one text, not a citation", () => {
     })
     expect(html).toContain(ar.corpusKindSnapshot)
     expect(scriptFree(html)).toBe(true)
+  })
+})
+
+/**
+ * A search over the demo anchors must never read as a search over the corpus.
+ *
+ * This exists because a deployment without `data/corpus.db` shipped a result page reading "the
+ * corpus was searched and nothing was near enough to show" over two records. Every clause of that
+ * sentence is true and the impression is false: the count is printed, so a reader who looked saw it,
+ * but the sentence around it claims a corpus that was not there. The banner restores the fact that
+ * matters — this deployment has no snapshot — at the point where the reader is about to believe the
+ * search was exhaustive.
+ */
+describe("a search over the anchor corpus says so, in the result itself", () => {
+  const result = (considered: number): SearchVerifyResult => ({
+    state: "no_candidates",
+    reason: "nothing in the corpus was near enough to rank",
+    considered,
+    scope: { kind: "snapshot", widenedFrom: null },
+    quoteChars: 0,
+    rows: [],
+  })
+
+  test("the anchors fallback is announced above the result, with the count that was searched", () => {
+    const html = searchResultBody("en", result(2), { kind: "anchors", recordCount: 2 })
+    expect(html).toContain(en.corpusAnchorsWarning)
+    expect(html).toContain("(2)")
+    expect(html.indexOf(en.corpusAnchorsWarning)).toBeLessThan(html.indexOf(en.verifyResultSummaryNoCandidates))
+  })
+
+  test("a real snapshot carries no such banner, because a banner read every time is read never", () => {
+    const html = searchResultBody("en", result(27_234), { kind: "snapshot", recordCount: 27_234 })
+    expect(html).not.toContain(en.corpusAnchorsWarning)
+  })
+
+  test("the Arabic result carries the warning in Arabic, not the English string", () => {
+    const html = searchResultBody("ar", result(2), { kind: "anchors", recordCount: 2 })
+    expect(html).toContain(ar.corpusAnchorsWarning)
+    expect(html).not.toContain(en.corpusAnchorsWarning)
+    expect(scriptFree(html)).toBe(true)
+  })
+
+  test("the headline still distinguishes 'found nothing' from 'had almost nothing to search'", () => {
+    // The banner supplements the state sentence; it does not replace it. A deployment with no corpus
+    // must still say what happened, in the product's own vocabulary.
+    const html = searchResultBody("en", result(2), { kind: "anchors", recordCount: 2 })
+    expect(html).toContain(en.verifyResultSummaryNoCandidates)
+  })
+
+  test("an unusable corpus is announced as an integrity failure, not as an anchor fallback", () => {
+    const html = searchResultBody("en", result(0), { kind: "none", recordCount: 0 })
+    expect(html).toContain(en.corpusIntegrityFailed)
   })
 })
 

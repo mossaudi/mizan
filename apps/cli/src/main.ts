@@ -22,7 +22,7 @@ import { assessRelevance } from "./relevance.ts"
 import { makeRetriever } from "./retriever.ts"
 import { buildDraft, buildTimings } from "./trace-build.ts"
 import { describeDemoQuestions, readDemoQuestionSet } from "./demo-questions.ts"
-import { resolveProvider, ENV_API_KEY, providerKeyConfigured, TRANSCRIPT_RELATIVE } from "./provider-config.ts"
+import { resolveProvider, ENV_API_KEY, ENV_BASE_URL, isRateLimited, PROVIDER_ALLOWED_HOSTS, providerKeyConfigured, TRANSCRIPT_RELATIVE } from "./provider-config.ts"
 import { SYSTEM_INSTRUCTIONS, VERIFICATION_BUDGET_MS } from "./instructions.ts"
 import { EXIT_DEGRADED, EXIT_OK, EXIT_UNTRUSTED, EXIT_USAGE } from "./exit-codes.ts"
 import { describeCliState, type CliRefusal } from "./degradation.ts"
@@ -171,7 +171,9 @@ const readAttestedSnapshot = async (root: string, db: Database): Promise<Result<
   return ok(snapshotHash)
 }
 
-/** The whole pipeline, with the database closed on every path out. */
+/**
+ * The whole pipeline, with the database closed on every path out.
+ */
 const ask = async (
   root: string,
   db: Database,
@@ -190,13 +192,24 @@ const ask = async (
     console.error(`  reason: ${outcome.reason}`)
     console.error(`  detail: ${outcome.detail}`)
     // The one route that never needs a network is OFFERED, never substituted — but only when
-    // offering it is true advice. A keyed run that failed has shown nothing at all, and dropping the
-    // key is a real change of route; a keyless run has no live route to leave, so naming
-    // `MIZAN_LLM_API_KEY` there would be a sentence about a command that changes nothing. The label
-    // is the shared `transcriptLabel`, so the line and the header cannot describe one mode two ways,
-    // and naming the variable is not naming a value: no key material reaches a log line (AGENTS.md
-    // section 13).
-    if (providerKeyConfigured()) {
+    // offering it is true advice, and whether it is depends on WHY the run failed. A rate-limited
+    // or out-of-quota key is not a configuration problem: the key is the one thing that just
+    // worked, and telling an operator to unset it in that state is advice that makes the next run
+    // worse. So the fallback line is chosen from the failure, not from whether a key exists.
+    //
+    // The three cases, in the order they are asked about:
+    //   - the provider rate-limited or ran out of quota → wait, or use the other permitted host
+    //   - the provider was unreachable → the key may be fine; the endpoint did not answer
+    //   - the key is configured and the failure is not one of the above → unsetting it is a real
+    //     change of route, so it is the advice given
+    if (isRateLimited(outcome.detail)) {
+      console.error(`  fallback: the provider rate-limited this key — that is a quota limit, not a wrong key.`)
+      console.error(`           Wait for the quota to reset, or point ${ENV_BASE_URL} at the other permitted host`)
+      console.error(`           (${PROVIDER_ALLOWED_HOSTS.join(" or ")}) to use a second free tier.`)
+    } else if (providerKeyConfigured() && outcome.reason === "provider_unavailable") {
+      console.error(`  fallback: the configured endpoint did not answer. The key may be fine — this reads as an`)
+      console.error(`           outage or a network problem rather than a rejected key.`)
+    } else if (providerKeyConfigured()) {
       console.error(`  fallback: unset ${ENV_API_KEY} and run again; the header will read "${transcriptLabel("precomputed")}"`)
     } else {
       console.error(`  fallback: no key is configured, so there is no live route to switch to; \`bun run ask --list-questions\` lists what this build can answer`)

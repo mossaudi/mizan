@@ -153,6 +153,30 @@ out-of-quota key returns HTTP 429 from the provider. That surfaces as `model una
 the provider's own status in the detail line, which is the honest surface for it, and it clears
 on its own rather than being worked around.
 
+### Two permitted hosts, because one key's quota is not a deployment
+
+`MIZAN_LLM_BASE_URL` may name either `api.openai.com` or
+`generativelanguage.googleapis.com`; both are in the hardcoded
+`PROVIDER_ALLOWED_HOSTS` and both speak OpenAI-compatible `chat/completions`. AI Studio has a
+free tier, so a demo does not have to share one account's quota:
+
+```bash
+# free tier, no OpenAI account needed — the model default follows the host
+MIZAN_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+MIZAN_LLM_API_KEY=<your AI Studio key>
+```
+
+Set only `MIZAN_LLM_BASE_URL`. The model defaults to `gemini-2.0-flash` on that host and
+`gpt-4o-mini` on OpenAI, because the two do not share a model namespace — sending one host's
+model name to the other is a 404 about an unknown model, which reads as a broken deployment
+rather than a missing setting. Name `MIZAN_LLM_MODEL` explicitly to override either.
+
+Permitting a second host is not a claim that a free tier is reliable; AI Studio's free quota can
+be exhausted too, and that degrades to `model unavailable` in exactly the same way. What it buys
+is a second route, not an unlimited one. The egress itself is unchanged and is stated in
+`DISCLOSURE.md` §4: in `hosted` mode the question and the retrieved corpus excerpts in the prompt
+leave the machine, over HTTPS, on your own key.
+
 ## What this deployment does not do
 
 - It writes nothing to the run ledger. A hosted demo that appended to `data/runs.jsonl`

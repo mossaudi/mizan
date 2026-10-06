@@ -71,10 +71,23 @@ What mizan actually ships is two disclosed modes, selected by `MIZAN_PROVIDER`:
 
 * **`hosted`** — the default. A model reached over HTTPS through the `LlmProvider` port in
   `packages/mizan-agent/src/provider.ts`. The endpoint host must be in a hardcoded allowlist
-  (`api.openai.com`) and the scheme must be `https`; redirects are refused rather than followed.
-  The API key is read from `MIZAN_LLM_API_KEY`, passed to the transport in memory, and never
-  written to a trace, a log line or a ledger entry. It is not present in the repository, and
-  `.env` is gitignored.
+  (`api.openai.com` or `generativelanguage.googleapis.com`) and the scheme must be `https`;
+  redirects are refused rather than followed. The API key is read from `MIZAN_LLM_API_KEY`, passed
+  to the transport in memory, and never written to a trace, a log line or a ledger entry. It is not
+  present in the repository, and `.env` is gitignored.
+  - **Why two hosts.** A rate-limited or out-of-quota key makes the hosted route degrade to
+    `model unavailable` for reasons unrelated to this product's correctness, and a demo that dies on
+    someone else's quota is not a demo. Both permitted hosts expose an OpenAI-compatible
+    `chat/completions` surface — OpenAI at `/v1`, Google AI Studio at `/v1beta/openai` — so moving
+    between them is `MIZAN_LLM_BASE_URL` alone; the model default follows the host, because the two
+    do not share a model namespace. AI Studio's free tier is the second route and is also the one
+    most likely to be rate-limited itself: permitting it is not a claim that it is reliable, only
+    that a second route exists.
+  - **Egress, stated plainly.** In `hosted` mode the question text and the retrieved corpus excerpts
+    in the prompt are sent to whichever of the two hosts `MIZAN_LLM_BASE_URL` names, over HTTPS, on
+    the user's own key. Run traces, logs and ledger entries carry a hash of the question and never
+    the question text (AGENTS.md §13), but the prompt itself does leave the machine. Choosing a host
+    outside the allowlist is refused before any socket opens.
 * **`scripted`** — set explicitly. Answers come from the committed, deterministic transcript
   (`data/transcript.json`) and are labelled `PRECOMPUTED (deterministic replay)` on stdout and
   `precomputed` in the trace, so a scripted answer can never be mistaken for a live one. The label

@@ -82,7 +82,7 @@ const verifyResultDocument = (
 const searchDocument = (lang: Lang, corpus: ServerCorpus, parsed: SearchFormInput): string => {
   const result = searchAndVerify(corpus.db, corpus.snapshotHash, parsed)
   const title = lang === "ar" ? "ميزان — نتائج البحث" : "mizan — search results"
-  return page(title, searchResultBody(lang, result), { lang })
+  return page(title, searchResultBody(lang, result, { kind: corpus.kind, recordCount: corpus.recordCount }), { lang })
 }
 
 const methodDocument = (lang: Lang): string => {

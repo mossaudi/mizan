@@ -3,11 +3,17 @@ import { join } from "node:path"
 import { isErr, isOk, type Result } from "@mizan/core"
 import {
   DEFAULT_PROVIDER_BASE,
+  DEFAULT_PROVIDER_MODEL,
   ENV_API_KEY,
   ENV_BASE_URL,
   ENV_MODEL,
   ENV_PROVIDER,
+  GEMINI_HOST,
+  GEMINI_PROVIDER_BASE,
+  isRateLimited,
+  modelForHost,
   PROVIDER_ALLOWED_HOSTS,
+  PROVIDER_HOST_MODELS,
   PROVIDER_MODES,
   PROVIDER_URL,
   resolveProviderEndpoint,
@@ -85,6 +91,47 @@ describe("the hosted endpoint is constrained", () => {
   })
 })
 
+describe("the second permitted host, and why one variable is enough to reach it", () => {
+  test("AI Studio is allowlisted, and resolves to its own path", () => {
+    expect(PROVIDER_ALLOWED_HOSTS).toContain(GEMINI_HOST)
+    expect(url(resolveProviderEndpoint(GEMINI_PROVIDER_BASE))).toBe(`${GEMINI_PROVIDER_BASE}/chat/completions`)
+  })
+
+  test("its base is https on the allowlisted host, like every other entry", () => {
+    expect(GEMINI_PROVIDER_BASE.startsWith("https://")).toBe(true)
+    expect(PROVIDER_ALLOWED_HOSTS).toContain(new URL(GEMINI_PROVIDER_BASE).hostname)
+  })
+
+  test("the model default follows the host, so the two namespaces never get crossed", () => {
+    // OpenAI's model name sent to AI Studio is a 404 about an unknown model, which reads as a broken
+    // deployment rather than a missing setting. The host is the only input that decides the namespace.
+    expect(modelForHost(DEFAULT_PROVIDER_BASE)).toBe("gpt-4o-mini")
+    expect(modelForHost(GEMINI_PROVIDER_BASE)).toBe("gemini-2.0-flash")
+  })
+
+  test("an unknown host resolves to the global default rather than to a guess", () => {
+    expect(modelForHost("https://elsewhere.example/v1")).toBe(DEFAULT_PROVIDER_MODEL)
+    expect(modelForHost("not a url at all")).toBe(DEFAULT_PROVIDER_MODEL)
+  })
+
+  test("the allowlist still refuses lookalikes of the second host too", () => {
+    // The point of an exact-match allowlist is that adding a second entry does not weaken the first.
+    for (const base of [
+      `https://${GEMINI_HOST}.evil.example/v1`,
+      `https://x.${GEMINI_HOST}/v1beta/openai`,
+      `http://${GEMINI_HOST}/v1beta/openai`,
+    ]) {
+      expect(isErr(resolveProviderEndpoint(base))).toBe(true)
+    }
+  })
+
+  test("every permitted host has a model, so none of them inherits the wrong namespace", () => {
+    for (const host of PROVIDER_ALLOWED_HOSTS) {
+      expect(PROVIDER_HOST_MODELS[host]).toBeDefined()
+    }
+  })
+})
+
 describe("provider selection is explicit, never a silent fallback", () => {
   const transcript = "data/transcript.json"
   // The real root: the transcript provider reads a committed file, so a fixture root would hand
@@ -141,5 +188,44 @@ describe("provider selection is explicit, never a silent fallback", () => {
         else process.env[key] = value
       }
     }
+  })
+})
+
+describe("a rate limit is told apart from a broken key", () => {
+  test("HTTP 429 is recognised, because waiting is the only correct response to it", () => {
+    expect(isRateLimited("decomposition failed: HTTP 429 Too Many Requests")).toBe(true)
+  })
+
+  test("out of quota is recognised in the provider's other spelling", () => {
+    // OpenAI reports exhausted credit as a 429 carrying an error type rather than a bare number, and
+    // an operator reading "insufficient_quota" must not be told the key is malformed.
+    expect(isRateLimited("error: insufficient_quota, rate_limit reached")).toBe(true)
+  })
+
+  test("a rejected key is NOT a rate limit, so it does not get wait-advice", () => {
+    for (const detail of [
+      "HTTP 401 Unauthorized",
+      "HTTP 404 model not found",
+      "decomposition failed: HTTP 500",
+      "fetch failed",
+      "response was not JSON",
+    ]) {
+      expect(isRateLimited(detail)).toBe(false)
+    }
+  })
+
+  test("the planted violation fails: the digits 429 inside a longer number are not a status code", () => {
+    // A bare `429` substring match would fire on a record count or a byte offset in a malformed body,
+    // and would then tell an operator to wait out a quota that was never the problem. Word-boundary
+    // matching is what keeps this recogniser reading a status code and nothing else.
+    expect(isRateLimited("read 4290 records in 14290 ms")).toBe(false)
+    expect(isRateLimited("corpus holds 27234 records, query 4291")).toBe(false)
+  })
+
+  test("a standalone 429 token is read as a status code, wherever it appears", () => {
+    // The remaining false positive — a 429 that is not a status — is not worth losing the real case
+    // for. A failure detail containing a bare 429 is a status far more often than it is a count.
+    expect(isRateLimited("upstream said 429 and closed the connection")).toBe(true)
+    expect(isRateLimited("no status at all")).toBe(false)
   })
 })

@@ -84,6 +84,8 @@ export type Strings = {
   readonly corpusKindSnapshot: string
   readonly corpusKindAnchors: string
   readonly corpusIntegrityFailed: string
+  readonly corpusAnchorsWarning: string
+  readonly corpusAnchorsWarningBody: string
   readonly askEyebrow: string
   readonly verifyEyebrow: string
   readonly trustTitle: string
@@ -238,6 +240,9 @@ export const en: Strings = {
   corpusKindSnapshot: "the attested snapshot",
   corpusKindAnchors: "demo anchors only — a handful of records, not the full corpus",
   corpusIntegrityFailed: "attestation failed — no verdict is shown",
+  corpusAnchorsWarning: "NOT THE FULL CORPUS",
+  corpusAnchorsWarningBody:
+    "this deployment has no attested snapshot, so the search ran over the demo anchors only. A quote that is really in the corpus will not be found here. The record count below is the whole of what was searched, not a sample of it.",
   askEyebrow: "Ask",
   verifyEyebrow: "Verify",
   trustTitle: "Why the badge is worth reading",
@@ -565,6 +570,9 @@ export const ar: Strings = {
   corpusKindSnapshot: "اللقط المُسنَد",
   corpusKindAnchors: "مراسي العرض فقط — عدد قليل من السجلات، لا المدونة الكاملة",
   corpusIntegrityFailed: "فشل الإسناد — لا تُطبع أي شارة",
+  corpusAnchorsWarning: "ليست المدونة الكاملة",
+  corpusAnchorsWarningBody:
+    "لا يملك هذا الإصدار لقطةً مُسنَدة، فالبحث جرى على مراسي العرض وحدها. فلن يُعثر هنا على اقتباس هو في المدونة حقًّا. وعدد السجلات أدناه هو كامل ما فُحص، لا عيّنة منه.",
   askEyebrow: "اسأل",
   verifyEyebrow: "تحقّق",
   trustTitle: "لماذا تستحق الشارة القراءة",

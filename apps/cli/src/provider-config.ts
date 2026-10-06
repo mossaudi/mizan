@@ -65,8 +65,37 @@ export const ENV_API_KEY = "MIZAN_LLM_API_KEY"
 export const ENV_BASE_URL = "MIZAN_LLM_BASE_URL"
 export const ENV_MODEL = "MIZAN_LLM_MODEL"
 
-/** The only host that may be called by default. Not a suffix match: `evil-openai.com` must not pass. */
+/** The default host. Not a suffix match: `evil-openai.com` must not pass. */
 export const PROVIDER_HOST = "api.openai.com"
+
+/**
+ * The second permitted host: Google AI Studio's OpenAI-compatible surface.
+ *
+ * ## Why it is here
+ *
+ * It exists because `api.openai.com` rate-limits, and a rate-limited key makes the hosted route
+ * degrade to `model unavailable` for reasons that have nothing to do with this product's
+ * correctness. AI Studio publishes a free tier with an OpenAI-compatible endpoint at a different
+ * path (`/v1beta/openai`), so switching to it is two environment variables and no code change at
+ * the call site — which is the property that makes this a provider swap rather than a fork.
+ *
+ * ## Why adding a host is still a deliberate act
+ *
+ * The allowlist exists because a config-driven client that will POST an API key to whatever URL it
+ * is handed is textbook SSRF, and `MIZAN_LLM_BASE_URL` is attacker-reachable in any deployment that
+ * lets a visitor set environment variables. So each entry names a first-party API endpoint whose
+ * terms, data-residency behaviour and licence are known, and every one of them is recorded in
+ * `DISCLOSURE.md` — which is what the gate that audits egress reads. Adding a host here without
+ * documenting it there fails `bun run check:docs`, and that is the intended friction.
+ *
+ * ## What permitting it does not claim
+ *
+ * Permitting a host is not a claim that the free tier is reliable. AI Studio's free quotas are
+ * lower than a paid key's and can be exhausted; when that happens the run degrades to `model
+ * unavailable` exactly as an OpenAI rate limit does. Two permitted hosts means a fallback exists,
+ * not that a fallback is automatic.
+ */
+export const GEMINI_HOST = "generativelanguage.googleapis.com"
 
 /**
  * Hosts a provider URL may name. Code, not configuration — see the file header.
@@ -74,15 +103,74 @@ export const PROVIDER_HOST = "api.openai.com"
  * An operator who needs a different host adds it here, in a reviewable diff, together with the
  * licence and data-residency reasoning that belongs in `DISCLOSURE.md`.
  */
-export const PROVIDER_ALLOWED_HOSTS: readonly string[] = [PROVIDER_HOST]
+export const PROVIDER_ALLOWED_HOSTS: readonly string[] = [PROVIDER_HOST, GEMINI_HOST]
 
 /** The OpenAI-compatible API base, with no trailing slash. */
 export const DEFAULT_PROVIDER_BASE = `https://${PROVIDER_HOST}/v1`
 
-/** Appended to the base to reach the chat endpoint. */
-export const PROVIDER_CHAT_PATH = "chat/completions"
+/** AI Studio's OpenAI-compatible base. The version prefix differs from OpenAI's `/v1`. */
+export const GEMINI_PROVIDER_BASE = `https://${GEMINI_HOST}/v1beta/openai`
 
+/**
+ * The model to ask for, per permitted host.
+ *
+ * A map rather than one global default because the two hosts do not share a model namespace:
+ * sending OpenAI's `gpt-4o-mini` to AI Studio returns a 404 about an unknown model, which reads as
+ * a broken deployment rather than a missing setting. Resolving the default from the host the
+ * operator actually configured means the common case — change one variable — works.
+ *
+ * `gemini-2.0-flash` is on the free tier and is the model this product's prompts were sized for:
+ * long Arabic quotation with verbatim spans and structured citation output.
+ */
+export const PROVIDER_HOST_MODELS: Readonly<Record<string, string>> = {
+  [PROVIDER_HOST]: "gpt-4o-mini",
+  [GEMINI_HOST]: "gemini-2.0-flash",
+}
+
+/** The default model when the caller names none and the host is not in the map above. */
 export const DEFAULT_PROVIDER_MODEL = "gpt-4o-mini"
+
+/**
+ * The model an operator's configuration implies, given the base URL they set.
+ *
+ * @returns the host's default model, or the global default for an unknown host. Never a guess from
+ *   the model's own name: the host is the only input that decides the namespace.
+ */
+export const modelForHost = (base: string): string => {
+  const parsed = parseUrl(base.trim().replace(/\/+$/, ""))
+  if (isErr(parsed)) return DEFAULT_PROVIDER_MODEL
+  return PROVIDER_HOST_MODELS[parsed.value.hostname] ?? DEFAULT_PROVIDER_MODEL
+}
+
+/**
+ * Whether the provider refused us for quota rather than for a bad request.
+ *
+ * ## Why this needs a recogniser at all
+ *
+ * The provider's status line arrives at the CLI as free text on the failure `detail`, and a rate
+ * limit is the one condition whose correct response is to do nothing and wait. Every other failure
+ * on this path — a 401, a 404, a malformed body, a refused socket — is a different sentence with
+ * different advice. Guessing wrong costs an operator an afternoon: told to unset a key that was
+ * merely rate-limited, they convert a temporary quota problem into a permanent one, and the run that
+ * follows has no live route at all.
+ *
+ * ## Why the match is narrow
+ *
+ * A bare substring search for `429` would also fire on a record count, a byte offset in a malformed
+ * body or a stream id, and would then tell an operator to wait out a quota that was never the
+ * problem. So the digits are matched on word boundaries, and only alongside the two spellings a
+ * provider actually uses for the condition — the `insufficient_quota` error type and the
+ * `rate_limit` marker. The residual false positive is a standalone `429` that is not a status code,
+ * which is accepted: in a failure detail a bare 429 is a status far more often than it is a count,
+ * and losing the real case to avoid it would be the worse error.
+ *
+ * @returns true when the failure is a quota or rate limit, in which case the advice is to wait.
+ */
+export const isRateLimited = (detail: string): boolean =>
+  /\b429\b/.test(detail) || detail.includes("insufficient_quota") || detail.includes("rate_limit")
+
+/** Appended to the base to reach the chat endpoint. Both permitted hosts expose this path. */
+export const PROVIDER_CHAT_PATH = "chat/completions"
 
 /** The only two modes. `scripted` is the committed transcript, labelled `precomputed` everywhere. */
 export const PROVIDER_MODES = ["hosted", "scripted"] as const
@@ -260,11 +348,14 @@ export const resolveProvider = async (root: string, transcriptRelative: string):
   const apiKey = readEnv(ENV_API_KEY)
   if (apiKey === null) return await resolveScripted(root, transcriptRelative)
 
-  const endpoint = resolveProviderEndpoint(readEnv(ENV_BASE_URL) ?? DEFAULT_PROVIDER_BASE)
+  const base = readEnv(ENV_BASE_URL) ?? DEFAULT_PROVIDER_BASE
+  const endpoint = resolveProviderEndpoint(base)
   if (isErr(endpoint)) return unconfiguredProvider(endpoint.error)
 
   return hostedProvider(
-    { url: endpoint.value, apiKey, model: readEnv(ENV_MODEL) ?? DEFAULT_PROVIDER_MODEL, name: "hosted" },
+    // The model default follows the host the operator configured, so pointing the base URL at AI
+    // Studio is a one-variable change rather than a change that also has to name a model.
+    { url: endpoint.value, apiKey, model: readEnv(ENV_MODEL) ?? modelForHost(base), name: "hosted" },
     transportFor(apiKey),
   )
 }

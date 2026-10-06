@@ -469,9 +469,47 @@ const candidateRow = (lang: Lang, row: CandidateResult, quoteChars: number): str
   ].join("\n")
 }
 
-/** The search result page: three possible states, each with its own sentence and its own rows. */
-export const searchResultBody = (lang: Lang, result: SearchVerifyResult): string => {
+/**
+ * Which corpus the search actually ran over, carried to the result page.
+ *
+ * ## Why this travels with the result
+ *
+ * The search page reports `Records examined`, and on a deployment that has no snapshot that number
+ * is 2 — not 27,234. A reader who meets "nothing was near enough to show" beside a small count has
+ * been handed a correct result and a misleading impression, because "nothing matched" and "there
+ * were almost nothing to match" are different facts and only one of them is a statement about the
+ * corpus.
+ *
+ * So the result page states which corpus it ran over. This is not a nicety: it is the difference
+ * between a search that failed to find your quote and a search that never had the book your quote is
+ * in. The home page already says which corpus is open, but a reader who submits a form lands on the
+ * result page and may never scroll back.
+ */
+export type SearchCorpus = {
+  readonly kind: "snapshot" | "anchors" | "none"
+  readonly recordCount: number
+}
+
+/**
+ * The banner shown when the corpus is the anchor fallback.
+ *
+ * Only rendered for `anchors` and `none`: on a real snapshot there is nothing to add, and a banner
+ * that appears unconditionally is a banner readers learn to ignore.
+ */
+const corpusBanner = (lang: Lang, corpus: SearchCorpus): string => {
   const t = strings(lang)
+  if (corpus.kind === "snapshot") return ""
+  const headline = corpus.kind === "anchors" ? t.corpusAnchorsWarning : t.corpusIntegrityFailed
+  return [
+    `<p class="mode-band"><span class="mode-label">${encodeText(headline)}</span>`,
+    `<span class="mode-note">${encodeText(t.corpusAnchorsWarningBody)} (${corpus.recordCount})</span></p>`,
+  ].join("\n")
+}
+
+/** The search result page: three possible states, each with its own sentence and its own rows. */
+export const searchResultBody = (lang: Lang, result: SearchVerifyResult, corpus: SearchCorpus): string => {
+  const t = strings(lang)
+  const banner = corpusBanner(lang, corpus)
   const header = [
     `<dl class="kv">`,
     `<dt>${encodeText(t.verifyResultConsidered)}</dt><dd>${result.considered}</dd>`,
@@ -485,10 +523,11 @@ export const searchResultBody = (lang: Lang, result: SearchVerifyResult): string
     return [
       `<section class="card">`,
       `<h2>${encodeText(t.verifyResultTitle)}</h2>`,
+      banner,
       `<p class="lede">${encodeText(summaryFor(lang, result))}</p>`,
       header,
       result.reason === null ? "" : note(result.reason),
-      `<form method="get" action="/?lang=${lang}"><button type="submit" class="secondary">${encodeText(t.verdictBack)}</button></form>`,
+      `<div class="actions">${linkHtml(`/?lang=${lang}`, t.verdictBack, lang)}</div>`,
       `</section>`,
     ].join("\n")
   }
@@ -497,6 +536,7 @@ export const searchResultBody = (lang: Lang, result: SearchVerifyResult): string
   return [
     `<section class="card">`,
     `<h2>${encodeText(t.verifyResultTitle)}</h2>`,
+    banner,
     `<p class="lede">${encodeText(summaryFor(lang, result))}</p>`,
     header,
     note(t.verifyResultSharedRunNote),
@@ -505,7 +545,7 @@ export const searchResultBody = (lang: Lang, result: SearchVerifyResult): string
     rows,
     `</table>`,
     note(t.verdictGradeNote),
-    `<form method="get" action="/?lang=${lang}"><button type="submit" class="secondary">${encodeText(t.verdictBack)}</button></form>`,
+    `<div class="actions">${linkHtml(`/?lang=${lang}`, t.verdictBack, lang)}</div>`,
     `</section>`,
   ].join("\n")
 }
