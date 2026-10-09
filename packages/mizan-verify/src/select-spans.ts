@@ -101,9 +101,14 @@ const QUOTE_PAIRS: readonly (readonly [string, string])[] = [
 /**
  * Speech verbs, in the two scripts this corpus and its documents are written in.
  *
- * A FIXED list, matched on a word boundary, and never a regex over "words that introduce speech" —
- * a lexical class with no closed membership is a place where a document's own text starts deciding
- * what gets checked, which is the R-1 defect wearing a linguistic costume.
+ * A FIXED list, matched on a word boundary (`isWordBoundary` below, and the reason it exists), and
+ * never a regex over "words that introduce speech" — a lexical class with no closed membership is a
+ * place where a document's own text starts deciding what gets checked, which is the R-1 defect wearing
+ * a linguistic costume.
+ *
+ * The Arabic forms are listed rather than derived, and the two that share a prefix (`قال`, `قالوا`)
+ * are listed as separate entries, because a list is the only place the boundary rule does not have to
+ * be re-argued: both of them are matched whole or not at all.
  */
 const SPEECH_INTRODUCERS: readonly string[] = [
   "he said",
@@ -121,8 +126,57 @@ const SPEECH_INTRODUCERS: readonly string[] = [
   "عن النبي",
 ]
 
-/** Characters that end a span once a speech introducer has been seen. A terminator or end of text. */
-const SPAN_END = /[.!?۔؟،;:]/
+/**
+ * What counts as the inside of a word, for the boundary check.
+ *
+ * `\p{L}` for letters in both scripts, and `\p{M}` for the combining marks Arabic text carries —
+ * without the marks, `قَال` would read as `قال` followed by a boundary and the introducer would be
+ * trimmed out of the middle of a vocalised word. A boundary is therefore a character that is neither,
+ * which includes the end of the segment and every piece of punctuation.
+ *
+ * This is the fix for a defect the comment above used to deny: `indexOf` matched `قال` at index 1 of
+ * `مقالة` and at index 2 of `القالون`, so `speechIntroducedSpan` published `ة جميلة جدا` as the text
+ * the author wrote. In English it published `facts are not evidence` for `unreported facts are not
+ * evidence` — and that one dropped a NEGATION, which is the difference between a quotation and its
+ * opposite. Both cases are pinned in `test/select-spans.test.ts`.
+ */
+const WORD_CHAR = /[\p{L}\p{M}]/u
+
+/** Whether a match of `length` characters at `at` sits between two non-word characters. */
+const isWordBoundary = (lower: string, at: number, length: number): boolean => {
+  const before = at === 0 ? "" : (lower[at - 1] ?? "")
+  const after = lower[at + length] ?? ""
+  if (before.length > 0 && WORD_CHAR.test(before)) return false
+  if (after.length > 0 && WORD_CHAR.test(after)) return false
+  return true
+}
+
+/**
+ * Punctuation that separates an introducer from what it introduces.
+ *
+ * Trimmed from the FRONT of the speech span only. It was a terminator in the middle of a span once,
+ * and that was R-1 arriving through a precision change rather than a selector omission: cutting
+ * `He said, the believing servant is like a mountain, and whoever does not follow it is astray.` at
+ * the first comma emitted one span of 40 characters, discarded the 58 that followed, recorded NO gap
+ * for them, and left the segment reading as fully examined. A rule that drops text silently is the
+ * same defect as a rule that never emits it, so the comma is now only ever a separator — the author's
+ * first one — and everything after it stays inside the span the report will check.
+ */
+const LEADING_SEPARATOR = /^[\s,;:،؛]+/
+
+/**
+ * Sentence punctuation trimmed from the END of a speech span.
+ *
+ * Anchored at the end rather than searched for, which is the whole difference: the delimited rule
+ * already ends a span at its closing quotation mark, and the sentence splitter in `./ssr.ts` has
+ * already decided where sentences end, so a segment carries at most a trailing terminator. Trimming it
+ * keeps the two rules comparable on the same sentence — a span is the words, not the punctuation typed
+ * around them — and it removes the only place where text after the introducer used to vanish.
+ */
+const TRAILING_TERMINATOR = /[.!?۔؟]+$/
+
+/** Where a speech introducer was found, and which verb it was. Needed because the verb is trimmed. */
+type Introducer = { readonly verb: string; readonly at: number }
 
 /** One pass over a segment collecting the delimited spans. Order of appearance, no nesting. */
 const delimitedSpans = (segment: string): readonly string[] => {
@@ -142,27 +196,84 @@ const delimitedSpans = (segment: string): readonly string[] => {
 }
 
 /**
- * The text after the first speech introducer, up to the first terminator. Empty when there is none.
+ * The EARLIEST speech introducer in a segment, or `null` when there is none.
+ *
+ * Earliest position wins because a sentence can carry two ("she said ... and later said ..."), and the
+ * first is the one introducing the span the reader means.
+ *
+ * ## Why the tie-break is now a boundary rather than a length comparison
+ *
+ * It used to be the LONGEST verb on a tie, for a real reason: `قالوا المؤمن` contains both `قال` and
+ * `قالوا` at index 0, and trimming only the shorter would leave a span beginning `وا المؤمن` — an
+ * attribution fragment with "they said" still in it. `isWordBoundary` settles the same case with no
+ * comparison at all: `قال` at index 0 of `قالوا` is followed by the letter `و`, so it is not a
+ * boundary match and never becomes a candidate. `قالوا` is the only match, so the rule that has to be
+ * explained is the boundary rather than a tie-break, and a tie-break that a later edit could get wrong
+ * is one fewer thing to get wrong.
+ */
+const earliestIntroducer = (segment: string): Introducer | null => {
+  const lower = segment.toLowerCase()
+  let best: Introducer | null = null
+  for (const verb of SPEECH_INTRODUCERS) {
+    let at = lower.indexOf(verb)
+    while (at !== -1) {
+      if (!isWordBoundary(lower, at, verb.length)) {
+        at = lower.indexOf(verb, at + 1)
+        continue
+      }
+      if (best === null || at < best.at) best = { verb, at }
+      break
+    }
+  }
+  return best
+}
+
+/**
+ * The text a speech introducer introduces: everything after it, less the punctuation around it.
+ * `null` when there is none.
  *
  * Applied ONLY to a segment that held no delimited quotation. A sentence like `She said, "repeat me"
  * and later said, "repeat me" again` has both shapes, and the speech shape is a SUPERSET of the
  * quotation — emitting both would check the same words twice, once precisely and once as a sentence
  * fragment with the introducer still attached. The delimited rule wins because it is the tighter one,
  * and "take both" is not a defensible middle: it doubles the verification work for a less precise span.
+ *
+ * ## Why the introducer is REMOVED and not merely located
+ *
+ * Because a span that keeps it can never be verified, and an unverifiable span that LOOKS extracted
+ * is the failure this feature exists to prevent. `He said, the believing servant is like a mountain
+ * of faith` cannot be contained in any record, because `He said,` appears in no record — the citation
+ * is about the words AFTER the introducer, and the attribution is the journalist's, not the corpus's.
+ * So the extracted span was structurally unverifiable while still being counted in the NUMERATOR of
+ * the published selection-recall figure, which inflates recall with spans no evidence could ever
+ * clear.
+ *
+ * The same reasoning makes `sharedRunChars` a defect here: it is computed over the span, so counting
+ * attribution words toward "characters shared with a corpus record" credits the corpus with words the
+ * corpus never contained. The introducer and the separating punctuation between it and the quote are
+ * therefore trimmed, and what remains is what the speaker is alleged to have said.
+ *
+ * ## Why the span runs to the END of the segment rather than to the first punctuation
+ *
+ * Because the sentence splitter in `./ssr.ts` has already decided where sentences end, so the text after
+ * the introducer is ONE sentence, and cutting it further is a second splitter disagreeing with the
+ * first. It was disagreeing in the expensive direction: cutting at a comma emitted the prefix, discarded
+ * the rest, recorded no gap for what it discarded, and left a segment that had lost half its quotation
+ * reading as fully examined — which is the R-1 defect reached through precision rather than omission.
+ * A selector may emit a span the verifier will reject; what it may not do is emit part of one and say
+ * nothing about the other part.
+ *
+ * There is no separate length cap here either. `MAX_QUOTE_CHARS` — imported from core, so it is the one
+ * bound the verifier also applies — is enforced by `bounded` below, which REFUSES an over-long span and
+ * lets `gapReasonFor` name it, rather than truncating one into something that looks checked
+ * (AGENTS.md section 3).
  */
 const speechIntroducedSpan = (segment: string): string | null => {
-  const lower = segment.toLowerCase()
-  let best = -1
-  for (const verb of SPEECH_INTRODUCERS) {
-    const at = lower.indexOf(verb)
-    if (at === -1) continue
-    if (best === -1 || at < best) best = at
-  }
-  if (best === -1) return null
-  const tail = segment.slice(best).slice(0, 120).trim()
-  const terminator = tail.slice(1).search(SPAN_END)
-  const candidate = terminator === -1 ? tail : tail.slice(0, terminator + 1)
-  return candidate.trim()
+  const introducer = earliestIntroducer(segment)
+  if (introducer === null) return null
+  const after = segment.slice(introducer.at + introducer.verb.length).replace(LEADING_SEPARATOR, "")
+  const candidate = after.trim().replace(TRAILING_TERMINATOR, "").trim()
+  return candidate.length === 0 ? null : candidate
 }
 
 /**
@@ -187,7 +298,7 @@ const candidatesFor = (segment: string): readonly (string | null)[] => {
  * `MAX_QUOTE_CHARS` is imported from core rather than restated, so the bound a span is measured
  * against and the bound the verifier measures a quote against are one number.
  */
-const bounded = (segment: string, candidates: readonly (string | null)[]): readonly string[] => {
+const bounded = (candidates: readonly (string | null)[]): readonly string[] => {
   const seen = new Set<string>()
   const kept: string[] = []
   for (const candidate of candidates) {
@@ -199,8 +310,7 @@ const bounded = (segment: string, candidates: readonly (string | null)[]): reado
     seen.add(trimmed)
     kept.push(trimmed)
   }
-  if (kept.length > 0) return kept
-  return segment.length > MAX_QUOTE_CHARS ? [] : kept
+  return kept
 }
 
 /** Why a segment with no usable span is a gap. The bound wins, because it is the actionable one. */
@@ -230,7 +340,7 @@ export const selectSpans = (segments: readonly string[], from: number): Selectio
   for (let index = start; index < segments.length; index += 1) {
     const segment = segments[index] ?? ""
     const candidates = candidatesFor(segment)
-    const kept = bounded(segment, candidates)
+    const kept = bounded(candidates)
     if (kept.length > 0) {
       for (const quote of kept) spans.push({ segmentIndex: index, quote })
       continue

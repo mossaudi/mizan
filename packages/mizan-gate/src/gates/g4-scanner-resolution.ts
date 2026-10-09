@@ -150,8 +150,7 @@ export type ScannerResolution =
  */
 const directoriesAtRunTime = (dir: string, cwd: string): readonly string[] => {
   if (isAbsolute(dir)) return [dir]
-  const asTheChildSeesIt = resolvePath(cwd, dir)
-  return asTheChildSeesIt === dir ? [dir] : [dir, asTheChildSeesIt]
+  return [dir, resolvePath(cwd, dir)]
 }
 
 export const resolveScanner = (

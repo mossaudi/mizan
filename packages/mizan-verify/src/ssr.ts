@@ -23,8 +23,15 @@ import type { SsrResult } from "@mizan/core"
  * verdicts, does not re-run verification, and does not have a path to `verified`.
  */
 
-/** Sentence-ending punctuation: ASCII and Arabic. */
-const SENTENCE_END = /[.!?۔؟]/
+/**
+ * Sentence-ending punctuation: ASCII and Arabic.
+ *
+ * Exported, because it is now a fact two modules read rather than a fact `ssr.ts` holds: `select-spans.ts`
+ * trims a trailing one off a speech-introduced span, and restating the character class there would be a
+ * second answer to "what ends a sentence" — the same §17 defect as a second sentence splitter, in a
+ * smaller disguise. The pattern is unchanged; only its owner count went from unstated to one.
+ */
+export const SENTENCE_END = /[.!?۔؟]/
 
 /**
  * Segment a response into sentences.

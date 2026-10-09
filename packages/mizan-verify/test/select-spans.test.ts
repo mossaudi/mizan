@@ -105,6 +105,137 @@ describe("an apostrophe is a contraction, not a quotation mark", () => {
   })
 })
 
+/**
+ * The speech rule emits the words the SPEAKER said, not the words the AUTHOR wrote.
+ *
+ * ## Why this is an integrity rule and not tidying
+ *
+ * Because a span carrying its own introducer is structurally unverifiable while still counting as
+ * extracted. `He said, the believing servant is like a mountain` cannot be contained in any record —
+ * `He said,` appears in no record — so the emitted span could never clear evidence, and it did so in
+ * the NUMERATOR of the published selection-recall figure. It also made `sharedRunChars` credit the
+ * corpus with attribution words the corpus never contained.
+ *
+ * The selection would still have been reported as a gap had it been dropped; it was not dropped, it
+ * was counted. That is the direction R-1 is graded on, so it is the direction that had to change.
+ */
+describe("the attribution is not part of the quote", () => {
+  test("an English introducer and its separating comma are trimmed from the span", () => {
+    // The sentence terminator is excluded too, exactly as the delimited rule excludes the closing
+    // quotation mark's surroundings: a span is the words, not the punctuation the author typed around
+    // them, and both rules agreeing is what keeps one document's two shapes comparable.
+    const result = selectSpans(["He said, the believing servant is like a mountain of faith indeed."], 0)
+    expect(result.spans.map((span) => span.quote)).toEqual(["the believing servant is like a mountain of faith indeed"])
+  })
+
+  test("a speaker name before the verb is trimmed along with the verb", () => {
+    const result = selectSpans(["Ibn Umar reported, the prayer is the pillar of the religion."], 0)
+    expect(result.spans[0]?.quote).toBe("the prayer is the pillar of the religion")
+  })
+
+  test("an Arabic introducer is trimmed, in the same direction as the English one", () => {
+    const result = selectSpans(["قال المؤمن أخي مثل الجبل"], 0)
+    expect(result.spans.map((span) => span.quote)).toEqual(["المؤمن أخي مثل الجبل"])
+  })
+
+  test("قالوا is trimmed whole, so the span does not begin وا", () => {
+    // `قالوا` contains `قال` at the same index, followed by the letter `و` — so the boundary rule rejects
+    // the shorter verb outright and only `قالوا` is ever a candidate. Trimming `قال` instead would emit
+    // `وا المؤمنون`, an attribution fragment with "they said" still in it, which is the defect removed here.
+    const result = selectSpans(["قالوا المؤمنون kamar"], 0)
+    expect(result.spans.map((span) => span.quote)).toEqual(["المؤمنون kamar"])
+  })
+
+  test("a segment that is ONLY an introducer is a named gap, not an empty span", () => {
+    const result = selectSpans(["He said,"], 0)
+    expect(result.spans).toEqual([])
+    expect(result.gaps[0]?.reason).toBe("no_quotation_like_span")
+  })
+
+  test("an internal comma does NOT end a span, because a cut that discards the rest is a silent gap", () => {
+    // The regression this pins: `SPAN_END` once carried `,` and `،`, so this sentence produced the span
+    // `the believing servant is like a mountain` and DROPPED the 58 characters after the comma — with no
+    // `SelectionGap`, so the segment read as fully examined. R-1 arriving through a precision change
+    // rather than a selector omission. A comma is a separator before the quote and nothing inside it.
+    const result = selectSpans(
+      ["He said, the believing servant is like a mountain, and whoever does not follow it is astray."],
+      0,
+    )
+    expect(result.spans.map((span) => span.quote)).toEqual([
+      "the believing servant is like a mountain, and whoever does not follow it is astray",
+    ])
+    expect(result.gaps).toEqual([])
+  })
+
+  test("the discarded text is accounted for: every segment is either emitted or gapped", () => {
+    // The accounting invariant stated over the case that broke it. `spans.length + gaps.length` is not the
+    // right sum — one segment may carry several spans — so this is over DISTINCT segment indices, which is
+    // the number the coverage denominator is built from.
+    const result = selectSpans(
+      [
+        "He said, the believing servant is like a mountain, and whoever does not follow it is astray.",
+        "A sentence with no quotation at all.",
+        'A quoted one, "like this".',
+      ],
+      0,
+    )
+    expect(accounted(result)).toBe(3)
+  })
+
+  test("an Arabic comma is a separator too, so the rule does not depend on which script the author typed", () => {
+    // `،` was a boundary and `,` was not, which made one sentence produce three clauses in one span in
+    // English and one clause per span in Arabic — the same sentence checked differently by keyboard. Now
+    // neither is a boundary, so the two scripts are handled by the same rule rather than by a matched pair
+    // of terminators that could drift apart again.
+    expect(selectSpans(["He said, alpha, beta, gamma"], 0).spans.map((s) => s.quote)).toEqual([
+      "alpha, beta, gamma",
+    ])
+    expect(selectSpans(["قال، ألف، باء"], 0).spans.map((s) => s.quote)).toEqual(["ألف، باء"])
+  })
+
+  test("a verb matched INSIDE a word is not an introducer, in either script", () => {
+    // `indexOf` has no boundary, so `قال` matched at index 1 of `مقالة` and at index 2 of `القالون`,
+    // and the published span was `ة جميلة جدا` — text the author never wrote, cut mid-token. A span that
+    // is not the author's words cannot be contained in a record, so it could only ever be unverifiable
+    // while still counting in the numerator of selection recall.
+    const arabic = ["مقالة جميلة جدا", "القالون كثيرون", "مقاليد البيت"]
+    for (const segment of arabic) {
+      expect(selectSpans([segment], 0).spans).toEqual([])
+    }
+  })
+
+  test("an English prefix of a verb is not a verb, so a negation is never dropped from the span", () => {
+    // `unreported facts are not evidence` matched `reported` at index 2 and published `facts are not
+    // evidence` as the author's text. The difference between the two is a NEGATION, which is the whole
+    // reason a span has to be the author's words rather than a substring that resembles them.
+    const result = selectSpans(["unreported facts are not evidence"], 0)
+    expect(result.spans).toEqual([])
+    expect(result.gaps[0]?.reason).toBe("no_quotation_like_span")
+  })
+
+  test("a real introducer beside a word that merely contains one still yields a span", () => {
+    // The control for the boundary rule: rejecting a mid-word match must not reject the segment. The
+    // asymmetry is the point — a quotation we cannot see becomes a NAMED gap, and a quotation we can
+    // see is checked.
+    const result = selectSpans(['Unreported hearsay. He said, "faith is the belief of the heart".'], 0)
+    expect(result.spans.map((span) => span.quote)).toEqual(["faith is the belief of the heart"])
+  })
+
+  test("a vocalised Arabic verb is matched whole, not through its diacritics", () => {
+    // `\p{M}` counts as a word character, so a combining mark after the verb does not read as a boundary
+    // and the introducer is never trimmed out of the middle of a vocalised word.
+    expect(selectSpans(["قَالَ المؤمنون"], 0).spans).toEqual([])
+    expect(selectSpans(["قال المؤمنون"], 0).spans.map((span) => span.quote)).toEqual(["المؤمنون"])
+  })
+
+  test("a trimmed span is still a span, so the denominator does not reward keeping the attribution", () => {
+    const trimmed = selectSpans(["He said, the believing servant is like a mountain."], 0)
+    const plain = selectSpans(["The believing servant is like a mountain."], 0)
+    expect(trimmed.spans.length).toBe(1)
+    expect(plain.spans.length).toBeLessThanOrEqual(1)
+  })
+})
+
 describe("R-1: a deliberately skipped fabrication is a visible gap", () => {
   test("a segment the selector does not emit comes back as a NAMED gap, never as an absence", () => {
     const segments = ["plain.", "plain.", "plain.", "The record exists but this sentence quotes nothing at all."]

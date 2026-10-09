@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { delimiter, join, relative } from "node:path"
+import { delimiter, join, relative, sep } from "node:path"
 import { isOk, type ClaimVerdict, type EvidenceRef } from "@mizan/core"
 import { stripComments } from "../src/strip-comments.ts"
 import type { SourceFile } from "../src/scan.ts"
@@ -52,6 +52,8 @@ checkNoSimilarity,
   GITLEAKS_BINARY,
   runGitleaks,
   excusedByGit,
+  candidateLabels,
+  UNTRUSTED_SCANNER_MESSAGE,
   resolveScanner,
   isUntrustedScannerPath,
   executableNames,
@@ -1269,8 +1271,10 @@ describe("G-4 excuses what git refuses and blocks everything else", () => {
           neverRun,
         )
         expect(result.ok).toBe(false)
-        expect(result.detail).toContain(join("node_modules", ".bin"))
         expect(result.detail).toContain("did not run")
+        // Named relative to the tree, so the reader can go and look, and without the absolute prefix
+        // that would put the OS account name into a CI log (AGENTS.md section 13).
+        expect(result.detail).toContain(join("node_modules", ".bin", plantedName))
         expect({ spawned }).toEqual({ spawned: 0 })
       } finally {
         rmSync(root, { recursive: true, force: true })
@@ -1384,7 +1388,37 @@ describe("G-4 excuses what git refuses and blocks everything else", () => {
       const result = await runGitleaks(repoRoot(), resolver, clean)
       expect(result.ok).toBe(true)
       expect(result.detail).toContain("refused to run")
-      expect(result.detail).toContain(`${posix}/node_modules/.bin/gitleaks`)
+      expect(result.detail).toContain("gitleaks")
+    })
+
+    test("a green verdict names a refused candidate without printing an absolute path", async () => {
+      // The OS account name is in an absolute path, and a green CI log is the most public surface this
+      // program has. The name is still there — a reader must be able to go and look — but the prefix is not.
+      const clean: GitleaksSpawn = async (_cwd, _binary, reportPath) => {
+        await writeFile(reportPath, "[]")
+        return { code: 0, stdout: "no leaks found", stderr: "" }
+      }
+      const root = repoRoot()
+      const planted = join(root, "node_modules", ".bin", "gitleaks")
+      const resolver: ScannerResolver = () => ({ kind: "resolved", path: "/opt/tools/gitleaks", ignored: [planted] })
+      const result = await runGitleaks(root, resolver, clean)
+      expect(result.ok).toBe(true)
+      expect(result.detail).toContain("gitleaks")
+      expect(result.detail).not.toContain(root)
+    })
+
+    test("an untrusted-only refusal names the candidate relative to the tree, for the same reason", () => {
+      const root = join(tmpdir(), `mizan-g4-label-${crypto.randomUUID()}`)
+      const planted = join(root, "tools", "gitleaks")
+      expect(UNTRUSTED_SCANNER_MESSAGE([planted], root)).toContain(join("tools", "gitleaks"))
+      expect(UNTRUSTED_SCANNER_MESSAGE([planted], root)).not.toContain(root)
+    })
+
+    test("a candidate OUTSIDE the tree is named by its file name only", () => {
+      // Its directory belongs to whatever tool cache supplied it, and its parent directories are exactly
+      // what carries the account name. The name alone is still enough to recognise `gitleaks.exe`.
+      const outside = join(sep, "opt", "hostedtoolcache", "gitleaks", "8.24.3", "gitleaks")
+      expect(candidateLabels([outside], join(sep, "repo"))).toBe("gitleaks")
     })
 
     test("an honest install outside the tree is still used, so the rule is not 'always refuse'", async () => {

@@ -6,6 +6,7 @@ import { Database } from "bun:sqlite"
 import { DISPLAY_CONTRACT_NUMBERS } from "@mizan/gate"
 import { normalizeForMatch, type NearbyRecord, type Suggestion } from "@mizan/core"
 import { buildSnapshot, openSnapshot, toCorpusRecord } from "@mizan/corpus"
+import { MAX_SPANS_PER_CHUNK } from "@mizan/verify"
 import {
   MAX_SPANS_SUGGESTED_PER_CHUNK,
   articleSuggestionWord,
@@ -166,8 +167,12 @@ describe("budget exhaustion has its own surface", () => {
     expect(results[1]?.state).toBe("searched")
   })
 
-  test("the default budget is the chunk's span count, the same unit the request budget is", () => {
-    expect(MAX_SPANS_SUGGESTED_PER_CHUNK).toBe(32)
+  test("the default budget IS the chunk's span count, the same unit the request budget is", () => {
+    // Asserted as an IDENTITY, not as a literal. Pinning `toBe(32)` on both sides is what let the chunk
+    // cap move to 64 while this budget stayed at 32 with a comment claiming they were the same number;
+    // the value now has one declaration and this is a check that the derivation survives an edit.
+    expect(MAX_SPANS_SUGGESTED_PER_CHUNK).toBe(MAX_SPANS_PER_CHUNK)
+    expect(MAX_SPANS_PER_CHUNK).toBe(32)
   })
 })
 

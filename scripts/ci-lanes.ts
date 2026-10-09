@@ -73,7 +73,13 @@ const TEST_FILE = /(\.test|_test|\.spec)\.[cm]?[jt]sx?$/
  * Exported because the lane table is keyed in POSIX spelling and a test that compared against
  * `import.meta.path` verbatim would look for an entry that cannot exist on Windows, then report the
  * corpus lane as undeclared. Two spellings of one path is the defect `ci-lanes.test.ts` exists to
- * catch, so the spelling is one declaration and both callers import it.
+ * catch, so the spelling is ONE declaration and every caller imports it.
+ *
+ * It was exported with a private copy of its own body still sitting in `scripts/benchmark.corpus.test.ts`,
+ * which made this comment — "the spelling is one declaration" — false at the moment it was written: the
+ * declaration existed twice, and the copy was the one no gate can see. Both copies computed the same
+ * string, so nothing was wrong with any assertion; what was wrong was that a reader auditing the
+ * separator had to find two definitions to be sure there was only one. The copy is gone.
  */
 export const posix = (path: string): string => path.replace(/\\/g, "/")
 

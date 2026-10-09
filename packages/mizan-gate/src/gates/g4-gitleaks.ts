@@ -1,6 +1,6 @@
 import { readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { basename, isAbsolute, join, relative } from "node:path"
 import { GITLEAKS_BINARY, resolveScanner, type ScannerResolution } from "./g4-scanner-resolution.ts"
 
 /**
@@ -120,16 +120,44 @@ export const GITLEAKS_MISSING_MESSAGE =
   "and re-run. A gate that does not run is not a gate."
 
 /**
+ * How a refused candidate is NAMED in a gate verdict: relative to the tree under audit when it is
+ * inside it, otherwise by file name alone.
+ *
+ * ## Why the absolute path is not printed
+ *
+ * Because `probeOnDisk` resolves to an absolute path, so printing one writes the OS account name —
+ * `C:\Users\Saudi\...` — into a CI log, and AGENTS.md section 13 forbids PII in a log line whatever
+ * produced it. A green CI run is the most public log surface this program has, and a path is the one
+ * thing in a gate message that is certain to contain a user name.
+ *
+ * ## Why the tree-relative form is kept rather than reducing everything to a basename
+ *
+ * Because the reader's next action is to go and look at the file, and `node_modules/.bin/gitleaks.exe`
+ * is the evidence while `gitleaks.exe` is a word. A candidate under the tree is therefore named by its
+ * path from the tree's root; one outside it keeps only its name, since its directory is the tool cache's
+ * business and its parent directories are exactly what carries the account name. The full absolute paths
+ * stay in `resolution.ignored`, which is the evidence a reader on the machine can print for themselves.
+ */
+export const candidateLabels = (paths: readonly string[], root: string): string =>
+  paths
+    .map((path) => {
+      const inside = relative(root, path)
+      if (inside.length === 0 || inside.startsWith("..") || isAbsolute(inside)) return basename(path)
+      return inside
+    })
+    .join(", ")
+
+/**
  * The candidate scanner came from the tree under audit, so it was never run.
  *
  * A function rather than a constant because the paths are the evidence: a reader who is told only
  * "gitleaks is not installed" will go and install it, and a reader who is told the only candidate
  * is `node_modules/.bin/gitleaks` will go and look at that file, which is the point.
  */
-export const UNTRUSTED_SCANNER_MESSAGE = (paths: readonly string[]): string =>
-  `G-4 did not run: the only ${GITLEAKS_BINARY} on PATH (${paths.join(", ")}) is inside the tree under ` +
-  "audit or in a node_modules/.bin directory, so a file this repository can write supplied the tool " +
-  "that audits it. A planted scanner writes [] and exits 0, which is indistinguishable from a clean " +
+export const UNTRUSTED_SCANNER_MESSAGE = (paths: readonly string[], root: string): string =>
+  `G-4 did not run: the only ${GITLEAKS_BINARY} on PATH (${candidateLabels(paths, root)}) is inside the ` +
+  "tree under audit or in a node_modules/.bin directory, so a file this repository can write supplied the " +
+  "tool that audits it. A planted scanner writes [] and exits 0, which is indistinguishable from a clean " +
   "scan. Remove it, or install gitleaks outside the repository (see .github/actions/setup-gitleaks)."
 
 /** The version CI installs, so a local developer reproduces the scan rather than approximating it. */
@@ -265,10 +293,10 @@ const resolveGitleaks: ScannerResolver = (cwd) => resolveScanner(GITLEAKS_BINARY
  * is already installed is the kind of wrong instruction that costs a half hour, and this is the one
  * branch where the binary is demonstrably present.
  */
-export const UNSTARTABLE_SCANNER_MESSAGE = (binary: string): string =>
-  `G-4 did not run: ${binary} resolved but the process could not be started. A present file that will ` +
-  "not start is not a scanner (wrong architecture, or a shim with no interpreter). Point PATH at a " +
-  "working gitleaks and re-run."
+export const UNSTARTABLE_SCANNER_MESSAGE = (binary: string, root: string): string =>
+  `G-4 did not run: ${candidateLabels([binary], root)} resolved but the process could not be started. A ` +
+  "present file that will not start is not a scanner (wrong architecture, or a shim with no interpreter). " +
+  "Point PATH at a working gitleaks and re-run."
 
 /** The real scan of a resolved executable. */
 const spawnScanner: GitleaksSpawn = async (cwd, binary, reportPath) => {
@@ -314,13 +342,15 @@ export const runGitleaks = async (
 ): Promise<GitleaksResult> => {
   const resolution = resolve(cwd)
   if (resolution.kind === "absent") return { ok: false, detail: GITLEAKS_MISSING_MESSAGE }
-  if (resolution.kind === "untrusted_only") return { ok: false, detail: UNTRUSTED_SCANNER_MESSAGE(resolution.paths) }
+  if (resolution.kind === "untrusted_only") {
+    return { ok: false, detail: UNTRUSTED_SCANNER_MESSAGE(resolution.paths, cwd) }
+  }
 
   const reportPath = join(tmpdir(), `mizan-g4-${crypto.randomUUID()}.json`)
   const scan = await spawn(cwd, resolution.path, reportPath)
   if (scan === null) {
     await rm(reportPath, { force: true })
-    return { ok: false, detail: UNSTARTABLE_SCANNER_MESSAGE(resolution.path) }
+    return { ok: false, detail: UNSTARTABLE_SCANNER_MESSAGE(resolution.path, cwd) }
   }
 
   // `null` covers both "no report file" and "a file that is not a report". Either way nothing was
@@ -357,8 +387,14 @@ export const runGitleaks = async (
     ? `no secret in any committable path (${findings.length} finding(s) were in files git ignores)`
     : scan.stdout.trim() || "no findings"
   // A green run that silently stepped over a planted auditor teaches the next one that the spot is
-  // free, so a squatter that lost the lookup is named here too.
-  return { ok: true, detail: resolution.ignored.length === 0 ? verdict : `${verdict} (refused to run ${resolution.ignored.join(", ")})` }
+  // free, so a squatter that lost the lookup is named here too — by FILE NAME only. `probeOnDisk`
+  // returns absolute paths, so printing one writes the OS account name into a CI log, and AGENTS.md
+  // section 13 forbids PII in a log line whatever produced it. The full paths stay in `resolution.ignored`,
+  // which is the evidence a reader with the machine in front of them can print themselves.
+  return {
+    ok: true,
+    detail: resolution.ignored.length === 0 ? verdict : `${verdict} (refused to run ${candidateLabels(resolution.ignored, cwd)})`,
+  }
 }
 
 export * as G4 from "./g4-gitleaks.ts"

@@ -27,6 +27,7 @@ export { computeSsr, segmentSentences } from "./ssr.ts"
 export {
   DOCUMENT_TOO_LARGE,
   MAX_DOCUMENT_CHARS,
+  MAX_SPANS_PER_CHUNK,
   checkDocumentCap,
   chunkWindow,
   documentDigestOf,

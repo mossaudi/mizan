@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite"
 import type { Suggestion, Verdict } from "@mizan/core"
 import { MAX_TOP_K } from "@mizan/suggest"
+import { MAX_SPANS_PER_CHUNK } from "@mizan/verify"
 import { suggestionFor, type NearbyText } from "./suggestions.ts"
 
 /**
@@ -36,12 +37,23 @@ import { suggestionFor, type NearbyText } from "./suggestions.ts"
 /**
  * How many spans one chunk may search for.
  *
- * The chunk's span count, deliberately: the budget has to be the same unit the request budget is, or
- * "we ran out of budget" is a sentence about two different things. A refusal to raise this needs the
- * same evidence as a refusal to raise the citation caps — a measured cost per span, which Sprint 1
- * does not have, so it is not raised.
+ * ## It IS `MAX_SPANS_PER_CHUNK`, imported rather than restated
+ *
+ * The budget has to be the same unit the request budget is, or "we ran out of budget" is a sentence
+ * about two different things. It was written here as `= 32` with a comment saying it was the chunk's
+ * span count — and the test pinned the literal on both sides, so raising the chunk cap to 64 left this
+ * at 32 while the comment still claimed they were the same number. A reader checking the comment would
+ * have been told something false by the code.
+ *
+ * So the equality is now structural rather than asserted in prose: the chunk size has one declaration,
+ * in `packages/mizan-verify/src/document-segments.ts`, imported here and at the MCP boundary — which
+ * re-exports it so the cap stays visible where it is enforced (AGENTS.md section 17). If the chunk cap
+ * moves, this moves with it.
+ *
+ * A refusal to RAISE it still needs the same evidence as a refusal to raise the citation caps — a
+ * measured cost per span. Sprint 1 has no such measurement, so it is not raised.
  */
-export const MAX_SPANS_SUGGESTED_PER_CHUNK = 32
+export const MAX_SPANS_SUGGESTED_PER_CHUNK = MAX_SPANS_PER_CHUNK
 
 /** The number of candidates a span may be offered. The product asks for the whole short list. */
 export const CANDIDATES_PER_SPAN = MAX_TOP_K

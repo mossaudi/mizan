@@ -17,7 +17,7 @@ import {
   type Result,
   type SpanOutcome,
 } from "@mizan/core"
-import { checkDocumentCap, chunkWindow, documentDigestOf, segmentDocument, selectSpans, type SelectedSpan } from "@mizan/verify"
+import { checkDocumentCap, chunkWindow, documentDigestOf, MAX_SPANS_PER_CHUNK, segmentDocument, selectSpans, type SelectedSpan } from "@mizan/verify"
 import { conditionOfCorpusProblem, describeCorpusProblem, type Verifier } from "./verifier.ts"
 
 /**
@@ -72,19 +72,14 @@ import { conditionOfCorpusProblem, describeCorpusProblem, type Verifier } from "
  */
 
 /**
- * How many spans one chunk may carry.
+ * Re-exported so the boundary's own cap stays visible AT the boundary.
  *
- * ## It is `MAX_CLAIMS_PER_CALL`, and that equality is asserted rather than assumed
- *
- * A chunk's spans BECOME claims at the boundary, so the chunk must refuse exactly the shapes the
- * boundary already refuses, and 33 spans in a chunk has to be refused with the same vocabulary 33 claims
- * are. `MAX_CLAIMS_PER_CALL` is spelled out in `./server.ts` rather than imported from here, so the
- * boundary's cap is visible AT the boundary — the same decision `MAX_CITATIONS_PER_CLAIM` records, and
- * for the same reason. The copy is therefore the point where drift would become invisible, so
- * `test/article-contract.test.ts` asserts the two are equal and this module's number is the one that
- * moves if either is edited.
+ * `MAX_SPANS_PER_CHUNK` is declared once, in `packages/mizan-verify/src/document-segments.ts`, because
+ * `apps/cli` also budgets per chunk and a second copy there would be a second definition of the chunk
+ * size that could disagree with this one (AGENTS.md section 17). The value remains `MAX_CLAIMS_PER_CALL`, and
+ * `test/article-contract.test.ts` asserts the equality rather than assuming it.
  */
-export const MAX_SPANS_PER_CHUNK = 32
+export { MAX_SPANS_PER_CHUNK }
 
 /**
  * The cap on a cursor as a client string, in characters.
@@ -99,11 +94,26 @@ export const MAX_CURSOR_CHARS = 512
  * The refusal reasons this module owns, as a closed set.
  *
  * Each is a fact a caller must be able to act on, and each is distinct from every other: a malformed
- * cursor is a client bug, a mismatch is a wrong document, an out-of-range cursor is a client bug with
- * a different remedy, and an over-cap document is retried in more chunks. Collapsing any two of them
- * sends an integrator round the wrong loop (AGENTS.md section 16).
+ * REQUEST is a client bug in the call itself, a malformed CURSOR is a client bug in the resume token,
+ * a mismatch is a wrong document, an out-of-range cursor is a client bug with a different remedy, and
+ * an over-cap document is retried in more chunks. Collapsing any two of them sends an integrator round
+ * the wrong loop (AGENTS.md section 16).
+ *
+ * ## Why `malformed_request` is separate from `malformed_cursor`, and why it had to be
+ *
+ * Because the remedy is different and the two are different mistakes. A malformed request fails before
+ * a cursor is even looked at — `{document: 42}`, an absent `document`, a `chunkSpans` of `0` — and
+ * retrying the same request, or repairing the cursor and resending, both fail identically forever.
+ * Reporting those as `malformed_cursor` tells an integrator that the resume token is corrupt when the
+ * document field is the problem, which is the one class of bug where the obvious fix (re-encode the
+ * cursor) provably does nothing.
+ *
+ * It was reported as `malformed_cursor` until a reviewer ran four request defects through the boundary
+ * and got the same word for all four, which is what the header's "distinct from every other" claim
+ * made checkable and failed. The split is not cosmetic: the word a client branches on is the contract.
  */
 export const ARTICLE_REFUSALS = {
+  malformedRequest: "malformed_request",
   malformedCursor: "malformed_cursor",
   cursorDocumentMismatch: "cursor_document_mismatch",
   cursorOutOfRange: "cursor_out_of_range",
@@ -121,11 +131,12 @@ export type ArticleRefusal = (typeof ARTICLE_REFUSALS)[keyof typeof ARTICLE_REFU
  * refusal without deciding whether it is a shared condition is a `tsc` error rather than a name one
  * surface invents and another cannot read.
  *
- * Only `document_too_large` has one. The four cursor refusals are about the CALL, not about a run, and
- * `document_empty` is a client bug — reporting `unmeasured` for it would publish "nobody produced this
- * figure" about a document that was never read.
+ * Only `document_too_large` has one. The request and cursor refusals are about the CALL, not about a
+ * run, and `document_empty` is a client bug — reporting `unmeasured` for any of them would publish
+ * "nobody produced this figure" about a document that was never read.
  */
 export const CONDITION_OF_REFUSAL: Readonly<Record<ArticleRefusal, DegradationCondition | null>> = {
+  malformed_request: null,
   malformed_cursor: null,
   cursor_document_mismatch: null,
   cursor_out_of_range: null,
@@ -259,10 +270,13 @@ const cursorStart = (
  * `chunkSpans` is CLAMPED rather than refused above `MAX_SPANS_PER_CHUNK`: a client asking for more
  * spans than a chunk can carry has made an arithmetic request, not a hostile one, and the answer it
  * gets is simply the chunk. Zero is different — it would return nothing forever — so that is a refusal.
+ *
+ * Both refusals below are `malformed_request`, not `malformed_cursor`: neither has read the cursor, so
+ * calling either a cursor defect would send the client to repair the one field that was not the problem.
  */
 export const planArticleChunk = (params: unknown): Result<ArticlePlan, ArticleRefusalResult> => {
   const decoded = decodeOrFail(decodeSync(ArticleChunkRequest), params, "ArticleChunkRequest")
-  if (!decoded.ok) return err(refused(ARTICLE_REFUSALS.malformedCursor, decoded.error.detail))
+  if (!decoded.ok) return err(refused(ARTICLE_REFUSALS.malformedRequest, decoded.error.detail))
   const request = decoded.value
 
   const capped = checkDocumentCap(request.document)
@@ -273,14 +287,18 @@ export const planArticleChunk = (params: unknown): Result<ArticlePlan, ArticleRe
     return err(refused(ARTICLE_REFUSALS.documentEmpty, "the document has no segments, so there is nothing to examine"))
   }
 
-  const from = cursorStart(request.cursor, documentDigestOf(request.document), segments.length)
+  // Hoisted because the cursor binds to it and the plan carries it: two calls over a 145,000-character
+  // document measured 2.2 ms against a 30 s budget, which is immaterial but is still the same hash twice.
+  const digest = documentDigestOf(request.document)
+
+  const from = cursorStart(request.cursor, digest, segments.length)
   if (!from.ok) return err(from.error)
 
   const asked = request.chunkSpans ?? MAX_SPANS_PER_CHUNK
   if (asked <= 0) {
-    return err(refused(ARTICLE_REFUSALS.malformedCursor, `chunkSpans must be at least 1, and ${asked} was requested`))
+    return err(refused(ARTICLE_REFUSALS.malformedRequest, `chunkSpans must be at least 1, and ${asked} was requested`))
   }
-  return ok({ segments, digest: documentDigestOf(request.document), from: from.value, chunkSpans: Math.min(asked, MAX_SPANS_PER_CHUNK) })
+  return ok({ segments, digest, from: from.value, chunkSpans: Math.min(asked, MAX_SPANS_PER_CHUNK) })
 }
 
 /**

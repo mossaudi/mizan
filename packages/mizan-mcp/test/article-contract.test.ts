@@ -255,7 +255,46 @@ describe("the published caps are unchanged and still pinned", () => {
   })
 
   test("a chunk asking for zero spans is refused, because it would return nothing forever", () => {
-    expect(refusalOf(call(stubVerifier, documentOf(4), null, 0)).reason).toBe(ARTICLE_REFUSALS.malformedCursor)
+    expect(refusalOf(call(stubVerifier, documentOf(4), null, 0)).reason).toBe(ARTICLE_REFUSALS.malformedRequest)
+  })
+})
+
+/**
+ * A defect in the REQUEST is not a defect in the CURSOR, and the word a client branches on is the
+ * contract.
+ *
+ * Every case here was reproducible against the previous build returning `malformed_cursor` for all of
+ * them, including a `document` that was a number — which sent the integrator round the cursor-retry loop
+ * forever, repairing the one field that was never the problem. The tests are grouped rather than
+ * parameterised so a failure names the shape that regressed.
+ */
+describe("a malformed request is refused as a request, not as a cursor", () => {
+  const malformed: readonly (readonly [string, unknown])[] = [
+    ["a document that is a number", { document: 42 }],
+    ["a request with no document at all", {}],
+    ["a chunkSpans of zero", { document: "x", chunkSpans: 0 }],
+    ["a cursor that is a number", { document: "x", cursor: 7 }],
+    ["a document that is an array", { document: ["a", "b"] }],
+  ]
+
+  for (const [label, params] of malformed) {
+    test(`${label} is refused as malformed_request`, () => {
+      expect(refusalOf(call(stubVerifier, params as string)).reason).toBe(ARTICLE_REFUSALS.malformedRequest)
+    })
+  }
+
+  test("none of them is reported as a cursor defect, because repairing the cursor cannot fix any of them", () => {
+    for (const [, params] of malformed) {
+      expect(refusalOf(call(stubVerifier, params as string)).reason).not.toBe(ARTICLE_REFUSALS.malformedCursor)
+    }
+  })
+
+  test("a malformed request carries no shared condition, so it is not published as an unmeasured figure", () => {
+    expect(CONDITION_OF_REFUSAL.malformed_request).toBeNull()
+  })
+
+  test("a genuinely malformed CURSOR is still a cursor defect, so the split did not collapse the pair", () => {
+    expect(refusalOf(call(stubVerifier, documentOf(4), "{not json")).reason).toBe(ARTICLE_REFUSALS.malformedCursor)
   })
 })
 
@@ -279,6 +318,7 @@ describe("the document is bounded and refused, never truncated", () => {
 
   test("every refusal has a decision in the condition Record, so none can invent a name", () => {
     const reasons: readonly ArticleRefusal[] = [
+      "malformed_request",
       "malformed_cursor",
       "cursor_document_mismatch",
       "cursor_out_of_range",

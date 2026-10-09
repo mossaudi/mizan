@@ -51,6 +51,33 @@ import { segmentSentences } from "./ssr.ts"
  */
 export const MAX_DOCUMENT_CHARS = 131_072
 
+/**
+ * How many spans one chunk may carry.
+ *
+ * ## It is `MAX_CLAIMS_PER_CALL`, and it lives HERE rather than at the boundary
+ *
+ * A chunk's spans BECOME claims at the MCP boundary, so the chunk must refuse exactly the shapes the
+ * boundary already refuses, and 33 spans in a chunk has to be refused with the same vocabulary 33 claims
+ * are. The number is therefore 32, which is `MAX_CLAIMS_PER_CALL` in `packages/mizan-mcp/src/server.ts`
+ * — and `test/article-contract.test.ts` asserts the two are equal, so the copy cannot drift silently.
+ *
+ * What changed, and why it is not cosmetic: the constant used to be declared in
+ * `packages/mizan-mcp/src/article-contract.ts`, which forced every OTHER user of the chunk size to
+ * restate the literal. `apps/cli/src/article-suggestions.ts` then carried `= 32` of its own for a
+ * budget whose entire stated rationale is "it is the chunk's span count", so raising the chunk cap to
+ * 64 would have left the suggestion budget at 32 with its comment still asserting they were the same
+ * number. Two declarations of one fact, which is the defect AGENTS.md section 17 exists to prevent.
+ *
+ * So it is declared once, here, and imported by every user: `planArticleChunk` in
+ * `packages/mizan-mcp/src/article-contract.ts` (which re-exports it at the boundary) and
+ * `MAX_SPANS_SUGGESTED_PER_CHUNK` in `apps/cli/src/article-suggestions.ts`. `chunkWindow` below does
+ * NOT read it — it takes the span count as a parameter, so a comment claiming otherwise would be
+ * asserting a code-level property the code does not have, which is the defect this round exists to
+ * remove. The boundary copy remains pinned to `MAX_CLAIMS_PER_CALL` by an equality assertion in
+ * `packages/mizan-mcp/test/article-contract.test.ts` rather than by a comment.
+ */
+export const MAX_SPANS_PER_CHUNK = 32
+
 /** The one place a document-size refusal is named, so no caller invents a second word for it. */
 export const DOCUMENT_TOO_LARGE = "document_too_large"
 

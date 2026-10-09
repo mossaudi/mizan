@@ -8,10 +8,7 @@ import { RED_TEAM_FIXTURES } from "@mizan/verify"
 import { requireRepositoryRoot } from "@mizan/gate"
 import { EXIT_FAILURES, EXIT_OK, main, openCorpus, runBenchmark, type BenchmarkPaths } from "./benchmark.ts"
 import { corpusIsPresent, releaseScratchCorpora, repositoryBenchmarkPaths, scratchBenchmarkPaths } from "./benchmark-test-paths.ts"
-import { laneOf } from "./ci-lanes.ts"
-
-/** `\` on Windows, `/` everywhere else, so a path asserted here matches the lane's own spelling. */
-const posix = (path: string): string => path.replace(/\\/g, "/")
+import { laneOf, posix } from "./ci-lanes.ts"
 
 /** This file's path, relative to the repository root, resolved the way `ci-lanes.ts` spells it. */
 const SELF = (): string => {
