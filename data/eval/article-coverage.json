@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "bun run article:report",
+  "corpusFingerprint": "article-harness:corpus-free:no-provider:v1",
+  "totals": {
+    "segments": 7,
+    "extracted": 3,
+    "checked": 3,
+    "verified": 0,
+    "unverifiable": 3,
+    "rejected": 0,
+    "notExtracted": 4
+  },
+  "cases": [
+    {
+      "id": "clean-quote",
+      "documentDigest": "a48d27793f9fa5c3109f8c3fd51f72c4cba91681b4bc40f9855c7eea6a4fed1d",
+      "segments": 3,
+      "extracted": 1,
+      "checked": 1,
+      "verified": 0,
+      "unverifiable": 1,
+      "rejected": 0,
+      "notExtracted": 2
+    },
+    {
+      "id": "adversarial-injection",
+      "documentDigest": "d5e5b4b83c9973364a2109d787c0ea5efbc2acf80a0b844f679cbe2b5f7f3e34",
+      "segments": 1,
+      "extracted": 1,
+      "checked": 1,
+      "verified": 0,
+      "unverifiable": 1,
+      "rejected": 0,
+      "notExtracted": 0
+    },
+    {
+      "id": "plausible-fabrication",
+      "documentDigest": "cc2754acb433dfbc23dc50de6e8e1b247452bcabc2107827c5272e8cc6fdeb46",
+      "segments": 1,
+      "extracted": 1,
+      "checked": 1,
+      "verified": 0,
+      "unverifiable": 1,
+      "rejected": 0,
+      "notExtracted": 0
+    },
+    {
+      "id": "no-quotation-like-span",
+      "documentDigest": "c3101821a2fe1855949aed24c57144e3bd936bbf3fea734f1ffea833e666e5a4",
+      "segments": 2,
+      "extracted": 0,
+      "checked": 0,
+      "verified": 0,
+      "unverifiable": 0,
+      "rejected": 0,
+      "notExtracted": 2
+    }
+  ],
+  "conditions": {
+    "corpus": "none - data/corpus.db is gitignored and this artefact was produced without it, so every span is unverifiable (no_citation) and verified is 0",
+    "provider": "none - no model was called; the selector is deterministic and resolves no citation",
+    "selector": "deterministic delimited-quotation and speech-introduced selection, no model assist",
+    "runsCompared": 10
+  }
+}

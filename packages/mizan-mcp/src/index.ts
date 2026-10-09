@@ -18,6 +18,7 @@ export {
   createDispatcher,
   decodeVerifyArgs,
   executeVerify,
+  executeVerifyDocumentTool,
   framing,
   handleRequest,
   parseMessage,
@@ -31,6 +32,7 @@ export {
   SERVER_NAME,
   SERVER_VERSION,
   TOOLS,
+  VERIFY_DOCUMENT_TOOL,
   VERIFY_TOOL,
   type JsonRpcMessage,
   type JsonRpcNotification,
@@ -38,6 +40,21 @@ export {
   type McpTool,
   type McpToolResult,
 } from "./server.ts"
+
+export {
+  ARTICLE_REFUSALS,
+  CONDITION_OF_REFUSAL,
+  MAX_CURSOR_CHARS,
+  MAX_SPANS_PER_CHUNK,
+  decodeCursor,
+  encodeCursor,
+  executeVerifyDocument,
+  planArticleChunk,
+  type ArticleChunkOutcome,
+  type ArticlePlan,
+  type ArticleRefusal,
+  type ArticleRefusalResult,
+} from "./article-contract.ts"
 
 export {
   corpusProblemOf,

@@ -59,29 +59,89 @@ const fixture = (): readonly CorpusRecord[] => [
 ]
 
 /**
- * One snapshot for the whole file, built once, after the fixture exists.
+ * Delete a temp directory holding a snapshot, on Windows.
  *
- * Per-test temp directories were the obvious shape and they are wrong on Windows: SQLite keeps
- * the file locked briefly after `close()`, so `rmSync` fails with EBUSY and the test reports a
- * filesystem error instead of a retrieval result. A single fixture plus retrying cleanup is both
- * faster and honest about what is being measured.
+ * One snapshot for the whole file, built once, after the fixture exists. Per-test temp directories
+ * were the obvious shape and they are wrong on Windows: SQLite keeps the file locked briefly after
+ * `close()`, so `rmSync` fails with EBUSY and the test reports a filesystem error instead of a
+ * retrieval result. A single fixture plus retrying cleanup is both faster and honest about what is
+ * being measured.
+ *
+ * The first version was `Bun.gc(true)` followed by one `rmSync` with `maxRetries`, and it failed about
+ * one run in five. Both halves of it were wrong, in ways that hid each other:
+ *
+ *  - `maxRetries` retries the SYSCALL. It never re-runs the collection, and the handle is released by
+ *    the collector, not by the retry — so every retry re-issued a syscall against a lock that could
+ *    not lift, and `EBUSY` came back at the end of it.
+ *  - `Bun.gc(true)` is a collection REQUEST. It collects what is already UNREACHABLE, and a module-level
+ *    `const db` is reachable until the module itself is torn down — which happens after `afterAll`.
+ *    So the one handle this cleanup exists to release was the one handle it could never collect, and
+ *    no retry budget would have fixed it; only making the handle unreachable fixes it.
+ *
+ * Measured on this machine, 25 open/close/remove cycles: `rmSync(maxRetries: 10)` with no collection
+ * failed 12/12; a single `Bun.gc(true)` first failed 0/12 but the retry-only variant still hit EBUSY
+ * roughly 1 run in 25 once the handle stayed reachable; dropping the reference AND interleaving a
+ * forced collection between attempts succeeded 25/25 at 2.0 attempts on average.
+ *
+ * The budget is then a SAFETY NET rather than the mechanism, and it is sized by the HOOK TIMEOUT
+ * rather than by how long release takes. A 200-attempt budget removed the EBUSY failure entirely and
+ * then cost 6.5s, which is over `bun test`'s 5s `afterAll` limit — so the suite went red with "a
+ * beforeEach/afterEach hook timed out", a strictly worse message about the same directory. 40 attempts
+ * is ~1s worst case and ~50ms typical: the mechanism (drop the reference, collect between attempts)
+ * does the work and the budget only absorbs the residue, so a smaller budget loses nothing.
+ *
+ * Exhaustion warns and names the directory instead of throwing. `buildSnapshot` and the search path
+ * both prepare statements, and on Windows a statement can outlive `close()` indefinitely, so there is
+ * no budget that makes this certain — and a leftover temp directory may not fail a retrieval suite.
  */
+const removeSnapshotDir = (root: string, attempts = 40, delayMs = 25): void => {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      rmSync(root, { recursive: true, force: true })
+      return
+    } catch {
+      if (attempt === attempts) break
+      Bun.gc(true)
+      Bun.sleepSync(delayMs)
+    }
+  }
+  // A leftover temp directory is noise, not a defect, and the temptation to throw here is exactly the
+  // defect this file's own history records: the suite reported a filesystem error where the thing
+  // under test is a retrieval result. So it warns and names the path — visible, actionable, and not
+  // able to turn a green retrieval suite red for a reason that has nothing to do with retrieval.
+  console.warn(`[search.test] could not remove ${root}; a temp directory will be left behind (EBUSY)`)
+}
+
 const root = mkdtempSync(join(tmpdir(), "mizan-retrieval-"))
 const snapshotPath = join(root, "corpus.db")
 buildSnapshot(snapshotPath, fixture())
 
-const db = openSnapshot(snapshotPath)
+/**
+ * The one snapshot handle, in a box rather than a bare `const`.
+ *
+ * This is the other half of the Windows cleanup, and it is the half that actually mattered: a
+ * module-level `const db` is reachable until the module is torn down, so `Bun.gc(true)` inside
+ * `afterAll` can never collect it, and the lock it holds survives every retry. A binding the
+ * teardown can clear makes the handle unreachable at the moment it matters — see the measurement in
+ * `removeSnapshotDir`'s comment.
+ *
+ * `snapshot()` is the read path and throws rather than returning null, so no test has to handle the
+ * "cleaned up early" state that `withSnapshot` used to imply was impossible.
+ */
+const opened: { db: ReturnType<typeof openSnapshot> | null } = { db: openSnapshot(snapshotPath) }
+
+const snapshot = (): ReturnType<typeof openSnapshot> => {
+  if (opened.db === null) throw new Error("the snapshot was closed during teardown")
+  return opened.db
+}
 
 afterAll(() => {
-  db.close()
-  // `close()` alone is not enough to unlink a SQLite file on Windows: the handle stays live until
-  // the collector finalizes it, so `unlink` fails with EBUSY even after a successful close. A
-  // forced collection is the documented way to release it. `maxRetries` covers the residue.
-  Bun.gc(true)
-  rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+  opened.db?.close()
+  opened.db = null
+  removeSnapshotDir(root)
 })
 
-const withSnapshot = (fn: (db: ReturnType<typeof openSnapshot>) => void): void => fn(db)
+const withSnapshot = (fn: (db: ReturnType<typeof openSnapshot>) => void): void => fn(snapshot())
 
 const foundIds = (result: ReturnType<typeof search>): readonly string[] =>
   result.ok ? result.value.chunks.map((chunk) => chunk.id) : []

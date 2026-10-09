@@ -112,3 +112,33 @@ while never reading a verdict. Nothing is written to stdout that contains `verif
 the reason is also printed once on stderr at startup for an operator who is not an MCP client.
 `scripts/accept-customer.clean-clone.test.ts` is the same claim at the command level, and
 `bun run ci:clean-clone` runs it.
+
+## The article surface's own failure modes
+
+The seven rows above are the failures of a RUN. A document ingested through `verify_document` adds
+five more, and each has exactly one surface and one forbidden alternative. They are a separate table
+rather than rows 8 to 12 of the table above because the seven above are the answer-side contract
+`packages/mizan-core/test/degradation.test.ts` pins by name, and renumbering them would change a
+test that is not about this surface.
+
+| Failure | Correct surface | Forbidden surface | Owner |
+|---|---|---|---|
+| Document longer than the declared cap | `document_too_large`, naming the cap | silent truncation into a partial report presented as complete | `document-segments.ts` |
+| Cursor naming a different document | `cursor_document_mismatch`, naming both digests | restarting at index zero, which labels a partial run a continuation | `article-contract.ts` |
+| Request budget expired mid-chunk | `unverifiable (verification_timeout)` for that chunk's spans, with the chunk named as a gap | `verified`, a cached prior verdict, a clean-looking document | `article-contract.ts` |
+| A span the selector never emitted | a named `not_extracted` gap with its segment index | an empty list, which reads as "there was nothing there to find" | `select-spans.ts` |
+| Per-span suggestion budget spent | `unavailable`, naming the budget | a truncated candidate list shown as the whole search | `article-suggestions.ts` |
+
+Two of these are states a surface reports instead of entering the pipeline, and one is a state inside a
+run that a single verdict cannot express. `document_too_large` is a `DegradationCondition` — it is what
+a caller reads when the run was refused before segmenting — while `cursor_document_mismatch` is a
+boundary refusal with no shared condition, because it is about the CALL rather than about a run and
+reporting a pipeline condition for it would tell a client its document had degraded when its cursor
+was simply wrong. `packages/mizan-core/test/degradation-vocabulary.test.ts` asserts the condition set
+in both directions, so neither can be added in one file.
+
+**The completeness claim is not in this table because it is not a failure.** It is a control: gate
+G-7.13 fails the build when a display module emits a completeness phrase without the
+`extracted`-of-`segments` denominator on the same line, and when `apps/cli/src/coverage-render.ts`
+exports no analysable claim site at all. A rule that could not fail would be the switch, and a switch
+that could be deleted by a refactor is not a control.

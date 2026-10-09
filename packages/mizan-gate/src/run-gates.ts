@@ -61,11 +61,16 @@ const licenceFindings = (registry: { readonly parsed: unknown; readonly present:
         },
       ]
 
+/**
+ * G-4, and nothing else in this file.
+ *
+ * `existsSync(binary) || Bun.which(binary)` used to live here, which made "how do we find gitleaks"
+ * a second declaration of the same fact as the gate's own resolution and answered it a worse way:
+ * it accepted any candidate, including one inside `node_modules/.bin` — which `bun run` puts FIRST on
+ * PATH. The gate now resolves and vets its own scanner, so this caller supplies nothing but the root.
+ */
 const gitleaksFindings = async (context: GateContext): Promise<readonly Finding[]> => {
-  const gitleaks = await runGitleaks(context.root, (binary) => {
-    if (existsSync(binary)) return true
-    return Bun.which(binary) !== null
-  })
+  const gitleaks = await runGitleaks(context.root)
   if (gitleaks.ok) return []
   return [
     {

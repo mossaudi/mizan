@@ -123,3 +123,25 @@ ehthumbs.db
 
 # agent/editor local state written into the project directory
 .opencode/
+
+# requirement/planning notes written by the office workflow, not deliverables of this repository.
+#
+# `packages/mizan-gate/src/docs-gates.ts` already declares `specs/` in GATE_CLAIM_EXCLUDES with the
+# reason: it records what was ASKED FOR at a point in time, so a gate-count claim inside it is a
+# historical note and not a claim about what this repository runs. That declaration and this rule are
+# the same decision stated twice, deliberately (AGENTS.md 17): the gate must not fail the build over
+# planning prose, and git must not ship planning prose as if it were the design record.
+#
+# The workflow writes two revisions of one note under both `specs/` and `specs/adr/`, so committing
+# the directory would also commit two divergent declarations of a single decision — the hazard
+# section 17 exists to prevent. The design records that ARE deliverables live in
+# `docs/specs/adr/`, which is tracked and which `docs-adr.ts` audits.
+#
+# Anchored with a leading slash, and that is load-bearing rather than tidiness. An unanchored
+# `specs/` also matches `docs/specs/`, so the first version of this rule silently un-tracked ADR-19
+# through ADR-23 while `git status` went quiet — four deliverables on disk and absent from the
+# repository, which is precisely the "a rule that names nothing real reads as coverage" failure this
+# file already records about its own earlier entries. The two commands that settle it:
+#   git check-ignore --no-index -v docs/specs/adr/ADR-19.md   # must print nothing (exits 1)
+#   git check-ignore --no-index -v specs/adr/<note>.md        # must print the rule (exits 0)
+/specs/

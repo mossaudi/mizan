@@ -41,6 +41,26 @@ documents, and neither is the other's restatement.
 | 13 | plausible_fabrication | plausible_fabrication | RT-013 | Hard | rejected | `packages/mizan-verify/test/red-team.test.ts` |
 | 14 | arxiv_version_mismatch | version_mismatch | RT-014 | Hard | rejected | `packages/mizan-verify/test/red-team.test.ts` |
 
+## The article surface's own fixtures
+
+The fourteen above are the per-claim taxonomy. The article surface (`verify_document`, segmentation and
+span selection) inherits two of those TYPES rather than extending the taxonomy, so the count stays
+fourteen and this is a second table rather than fifteen more rows.
+
+| Fixture ID | Inherits type | What it attacks | Expected verdict | Test File |
+|---|---|---|---|---|
+| ART-001 | `hybrid_fabrication` (RT-009) | Document text instructing the extractor to mark a span verified | `unverifiable` | `packages/mizan-verify/test/select-spans.test.ts` |
+| ART-002 | `plausible_fabrication` (RT-013) | An invented but plausible hadith, of the kind a nearest-in-words pass puts a real record beside | `unverifiable` | `packages/mizan-verify/test/select-spans.test.ts` |
+
+The fixtures live in `ARTICLE_RED_TEAM_FIXTURES` in `packages/mizan-verify/src/red-team.ts`, a second
+declared set rather than two entries in `RED_TEAM_FIXTURES` — growing that binding to sixteen would make
+the taxonomy, the fixtures and this document three answers to three different questions.
+
+Both carry the `FABRICATED_` marker and both assert **`verified` is unreachable**, which for ART-001 is
+structural rather than behavioural: a span is `{ segmentIndex, quote }` and has no verdict field to
+forge. ART-002's assertion is that the two integers on a suggestion row are characters and not a
+verdict, so the fabrication can be shown next to a real record without ever being able to become one.
+
 ## Difficulty Tier Summary
 
 | Tier | Count | Types |

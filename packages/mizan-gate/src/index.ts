@@ -15,14 +15,30 @@ export { gateNoRawHtml, checkNoRawHtml, checkVerdictIsolation, VERIFY_ENTRY } fr
 export { gateNoEvasion, checkNoDynamicEval, checkNoObfuscation, checkNoAntiAnalysis, checkNoDonorWorkaround, DONOR_TOKENS } from "./gates/g3-no-evasion.ts"
 export {
   runGitleaks,
+  excusedByGit,
   partitionFindings,
   describeFindings,
   GITLEAKS_ARGS,
   GITLEAKS_MISSING_MESSAGE,
+  UNTRUSTED_SCANNER_MESSAGE,
+  UNSTARTABLE_SCANNER_MESSAGE,
   GITLEAKS_VERSION,
   type GitleaksResult,
   type GitleaksFinding,
+  type GitleaksScan,
+  type GitleaksSpawn,
+  type GitOracle,
+  type ScannerResolver,
 } from "./gates/g4-gitleaks.ts"
+export {
+  resolveScanner,
+  isUntrustedScannerPath,
+  executableNames,
+  probeOnDisk,
+  GITLEAKS_BINARY,
+  type BinaryProbe,
+  type ScannerResolution,
+} from "./gates/g4-scanner-resolution.ts"
 export {
   checkBacktickedPaths,
   checkDocumentedScripts,
@@ -50,7 +66,7 @@ export { checkCollectionCoverage, checkCoverageBasis, checkCoverageTableRows, ch
 export { checkLiveProviderClaim } from "./docs-egress.ts"
 export { checkLicenceFields, REGISTRY_PATH } from "./gates/g5-licence-fields.ts"
 export { gateNoFalseVerified, assertNoFalseVerified, checkOneConstructionSite, checkOneSchemaSite, checkNoComputedPercent, checkNoAdHocMatchStrength, checkVerdictPathClosure, VERDICT_PATH, VERDICT_PATH_ENTRY, VERDICT_CONSTRUCTION_SITES, PERCENT_OWNERS } from "./gates/g6-no-false-verified.ts"
-export { gateVerdictPathPurity, checkAnchorModuleHasNoOpinion, checkNoSimilarityOnPath, checkNoAmbientAuthorityOnPath, checkNoPercentKeyOnPath, checkNoAppCodeOnPath, checkDisplayPathPresent, checkRelevanceModuleHasNoOutcome, checkSuggestPackageIsLeaf, checkSuggestPackageNamesNoOutcome, checkSuggestPackageReachesNoVerdictPath, checkSuggestPackageHasNoAmbientAuthority, checkDisplayContractNumbers, ANCHOR_MODULE, ANCHOR_BANNED_WORD, DISPLAY_CONTRACT_NUMBERS, DISPLAY_PATH, DISPLAY_SCHEMA_MODULE, PERCENT_KEY_RULE, PERCENT_KEY_TOKENS, RELEVANCE_BANNED_WORDS, RELEVANCE_MODULE, SUGGEST_ALLOWED_SPECIFIER, SUGGEST_IMPORT_RULE, SUGGEST_PATH } from "./gates/g7-verdict-path-purity.ts"
+export { gateVerdictPathPurity, checkAnchorModuleHasNoOpinion, checkNoSimilarityOnPath, checkNoAmbientAuthorityOnPath, checkNoPercentKeyOnPath, checkNoAppCodeOnPath, checkDisplayPathPresent, checkRelevanceModuleHasNoOutcome, checkSuggestPackageIsLeaf, checkSuggestPackageNamesNoOutcome, checkSuggestPackageReachesNoVerdictPath, checkSuggestPackageHasNoAmbientAuthority, checkDisplayContractNumbers, checkCompletenessClaimCarriesDenominator, ANCHOR_MODULE, ANCHOR_BANNED_WORD, COVERAGE_CLAIM_EXPORT, COVERAGE_RENDER_MODULE, COMPLETENESS_CLAIM_RULE, COMPLETENESS_CLAIM_TOKENS, DENOMINATOR_WORDS, DISPLAY_CONTRACT_NUMBERS, DISPLAY_PATH, DISPLAY_SCHEMA_MODULE, PERCENT_KEY_RULE, PERCENT_KEY_TOKENS, RELEVANCE_BANNED_WORDS, RELEVANCE_MODULE, SUGGEST_ALLOWED_SPECIFIER, SUGGEST_IMPORT_RULE, SUGGEST_PATH } from "./gates/g7-verdict-path-purity.ts"
 export { runGates, summariseOutcomes, GATE_IDS, HIGHEST_GATE_ID, type GateOutcome, type RunGatesOptions } from "./run-gates.ts"
 export {
   CHECK_NAMES,

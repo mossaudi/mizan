@@ -13,8 +13,10 @@
  * observable; what would not work is a second copy of the table here.
  */
 export {
+  ARTICLE_RED_TEAM_FIXTURES,
   HALLMARK_TYPES,
   RED_TEAM_FIXTURES,
+  type ArticleRedTeamFixture,
   type DifficultyTier,
   type HallmarkType,
   type RedTeamFixture,

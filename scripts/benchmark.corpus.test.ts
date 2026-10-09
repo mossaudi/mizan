@@ -7,7 +7,7 @@ import { renderReport } from "@mizan/bench"
 import { RED_TEAM_FIXTURES } from "@mizan/verify"
 import { requireRepositoryRoot } from "@mizan/gate"
 import { EXIT_FAILURES, EXIT_OK, main, openCorpus, runBenchmark, type BenchmarkPaths } from "./benchmark.ts"
-import { releaseScratchCorpora, repositoryBenchmarkPaths, scratchBenchmarkPaths } from "./benchmark-test-paths.ts"
+import { corpusIsPresent, releaseScratchCorpora, repositoryBenchmarkPaths, scratchBenchmarkPaths } from "./benchmark-test-paths.ts"
 import { laneOf } from "./ci-lanes.ts"
 
 /** `\` on Windows, `/` everywhere else, so a path asserted here matches the lane's own spelling. */
@@ -18,6 +18,34 @@ const SELF = (): string => {
   const root = requireRepositoryRoot(import.meta.dir)
   if (isErr(root)) throw new Error(`the test could not locate the repository root: ${root.error}`)
   return `scripts/${posix(import.meta.path).split("/").pop() ?? "benchmark.corpus.test.ts"}`
+}
+
+/**
+ * Whether the committed snapshot is on disk, read once at module load.
+ *
+ * ## Why this file skips rather than fails without a corpus
+ *
+ * This file is in the `corpus` opt-in lane, so `bun run ci` does not collect it — but a root
+ * `bun test` collects every `*.test.ts` by glob, on a judge's fresh clone and with no `data/corpus.db`
+ * to open. Every assertion here then failed on `the corpus could not be opened`, which reports a
+ * green repository as red sixteen times for a file the reader was never meant to receive, and buries
+ * a real failure in sixteen copies of a missing-artefact message.
+ *
+ * So the corpus-requiring tests skip, loudly, exactly as `apps/cli/test/happy-path.test.ts` and
+ * `search-verify.test.ts` already do for the same reason. That is not a weakened assertion: with the
+ * corpus present every one of them runs, and `bun run ci:corpus` is the lane that says so. What it
+ * removes is a shape nobody wanted — a lane that reports a green tick for a corpus it never opened.
+ *
+ * The probe is `existsSync`, so it cannot distinguish "absent" from "corrupt", and therefore cannot
+ * be the only guard. `the probe and the opener agree` below is unskipped precisely so a corpus that
+ * is present but unreadable still FAILS, loudly, instead of turning the whole lane green by skipping.
+ */
+const NEEDS_CORPUS = corpusIsPresent()
+if (!NEEDS_CORPUS) {
+  console.warn(
+    "[benchmark.corpus] data/corpus.db is absent — the published-run tests are SKIPPED. " +
+      "Run `bun run ingest` (or `bun run ci:corpus`) to measure them.",
+  )
 }
 
 /**
@@ -36,7 +64,9 @@ const SELF = (): string => {
  * A corpus-conditioned test is a test whose result depends on something outside the repository. The
  * two honest shapes are "always run it, and require the corpus" or "never run it by default, and say
  * so where a reader will find it". `bun run ci` is the second, and this file is named so that
- * `grep -r '\.test\.ts'` finds it.
+ * `grep -r '\.test\.ts'` finds it. A root `bun test` still collects it by glob though, so the tests
+ * here skip rather than fail when the snapshot is absent — see `NEEDS_CORPUS` below, which is how a
+ * clean clone survives the file being collectible.
  *
  * ## No test writes the committed report
  *
@@ -64,7 +94,7 @@ const measureIntoScratch = (): BenchmarkPaths => ({ ...repositoryBenchmarkPaths(
 
 afterEach(releaseScratchCorpora)
 
-describe("the published run", () => {
+describe.skipIf(!NEEDS_CORPUS)("the published run", () => {
   /** 3 live golden + 200 committed golden + 40 committed fabrications + 14 HALLMARK. The roll-up is derived. */
   const PUBLISHED_CASES = 257
 
@@ -180,7 +210,7 @@ describe("the published run", () => {
   })
 })
 
-describe("the committed report is a record of a run, not a claim about one", () => {
+describe.skipIf(!NEEDS_CORPUS)("the committed report is a record of a run, not a claim about one", () => {
   test("the committed report is byte-identical to a fresh run of the same corpus", () => {
     // The guard that makes the committed report a record. It is the artefact a judge reads without
     // running anything, and before this assertion nothing compared it with a fresh run — while
@@ -219,7 +249,7 @@ describe("the red-team fixtures exercise the corpus they claim to", () => {
   const named = (fixtures: readonly (typeof RED_TEAM_FIXTURES)[number][]): string[] =>
     fixtures.map((fixture) => `${fixture.id} (${fixture.claim.citations[0]?.raw ?? "no citation"})`)
 
-  test("every containment-arm fixture cites an identifier the snapshot actually holds", () => {
+  test.skipIf(!NEEDS_CORPUS)("every containment-arm fixture cites an identifier the snapshot actually holds", () => {
     // A fixture that declares `rejected` earned that verdict because its citation resolved and the
     // record lacks the quote. One that declares `rejected` and cites an identifier the corpus does
     // not hold is not testing the containment arm at all — it measures an identifier refusal while
@@ -233,7 +263,7 @@ describe("the red-team fixtures exercise the corpus they claim to", () => {
     expect(named(unresolved)).toEqual([])
   })
 
-  test("every resolution-arm fixture names an identifier the snapshot does not hold", () => {
+  test.skipIf(!NEEDS_CORPUS)("every resolution-arm fixture names an identifier the snapshot does not hold", () => {
     // The other direction, and it matters for the same reason: a fixture that declares
     // `unverifiable` but cites a record that resolves is no longer measuring resolution, so the
     // benchmark scores it against the wrong expectation.
@@ -263,7 +293,7 @@ describe("the red-team fixtures exercise the corpus they claim to", () => {
   })
 })
 
-describe("an attestation that does not describe the corpus is refused", () => {
+describe.skipIf(!NEEDS_CORPUS)("an attestation that does not describe the corpus is refused", () => {
   // These two use the committed corpus on purpose: the fault under test is the attestation, and a
   // scratch corpus would be refused for the corpus instead — so the assertion would pass against the
   // wrong refusal.
@@ -284,7 +314,7 @@ describe("an attestation that does not describe the corpus is refused", () => {
   })
 })
 
-describe("a suite that fails to load is reported, and the others still run", () => {
+describe.skipIf(!NEEDS_CORPUS)("a suite that fails to load is reported, and the others still run", () => {
   test("an eval directory with no sets breaks only the eval suites", () => {
     // US-12 names this case: "if a suite fails to load, report the error and continue with other
     // suites". Nothing else could observe it — every other degradation test fails at the corpus,
@@ -353,7 +383,19 @@ describe("the corpus lane says out loud that it needs the corpus", () => {
     expect(laneOf(SELF())?.reason).toContain("data/corpus.db")
   })
 
-  test("openCorpus reads the committed corpus's identity, so the seam is not only tested on stubs", () => {
+  test("the probe and the opener agree, so an absent corpus skips and a corrupt one still fails", () => {
+    // Unskipped on purpose. `NEEDS_CORPUS` is an `existsSync`, so it cannot tell "absent" from "not a
+    // database" — and a probe that could would be the one shape worse than a failure: a lane that has
+    // quietly stopped measuring. Asserting the two together means a snapshot that is on disk and
+    // unreadable reports itself here, with its reason, instead of turning sixteen assertions into
+    // sixteen skips that read as a green lane.
+    const probe = corpusIsPresent()
+    const opened = openCorpus(repositoryBenchmarkPaths().corpusPath)
+    if (isOk(opened)) opened.value.db.close()
+    expect(probe).toBe(isOk(opened))
+  })
+
+  test.skipIf(!NEEDS_CORPUS)("openCorpus reads the committed corpus's identity, so the seam is not only tested on stubs", () => {
     // The corpus lane is the only place a real snapshot is opened, so this is the only place the
     // identity read is exercised against a database that has tables in it.
     const opened = openCorpus(repositoryBenchmarkPaths().corpusPath)

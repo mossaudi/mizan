@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { DegradationCondition, conditionOf, decodeCondition, describedConditions, describeCondition } from "@mizan/core"
+import { conditionOf, decodeCondition, describedConditions, describeCondition } from "@mizan/core"
 
 /**
  * The degradation vocabulary as a contract, not as prose.
@@ -38,6 +38,7 @@ const CONDITIONS = [
   "ledger_write_failed",
   "attestation_mismatch",
   "unmeasured",
+  "document_too_large",
 ] as const
 
 describe("DegradationCondition", () => {
@@ -68,13 +69,13 @@ describe("DegradationCondition", () => {
     expect(refused.error._tag).toBe("decode_failed")
   })
 
-  test("the set is exactly the ten declared names, so an eleventh cannot be added in one file", () => {
+  test("the set is exactly the eleven declared names, so a twelfth cannot be added in one file", () => {
     // `schema/degradation.ts` is the authority and this list is its reading; a divergence between
     // the two is what would let a surface report a state nobody adjudicated.
     const source = readFileSync(join(import.meta.dir, "..", "src", "schema", "degradation.ts"), "utf8")
     const declared = [...source.matchAll(/"([a-z_]+)"/g)].map((match) => match[1] ?? "")
     for (const condition of CONDITIONS) expect(declared).toContain(condition)
-    expect(CONDITIONS).toHaveLength(10)
+    expect(CONDITIONS).toHaveLength(11)
   })
 })
 

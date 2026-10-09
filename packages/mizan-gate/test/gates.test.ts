@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, relative } from "node:path"
+import { delimiter, join, relative } from "node:path"
 import { isOk, type ClaimVerdict, type EvidenceRef } from "@mizan/core"
 import { stripComments } from "../src/strip-comments.ts"
 import type { SourceFile } from "../src/scan.ts"
@@ -37,14 +38,30 @@ checkNoSimilarity,
   checkSuggestPackageReachesNoVerdictPath,
   checkSuggestPackageHasNoAmbientAuthority,
   checkDisplayContractNumbers,
+  checkCompletenessClaimCarriesDenominator,
+  probeOnDisk,
+  COMPLETENESS_CLAIM_TOKENS,
+  COVERAGE_CLAIM_EXPORT,
+  COVERAGE_RENDER_MODULE,
+  DENOMINATOR_WORDS,
   DISPLAY_CONTRACT_NUMBERS,
   findRepositoryRoot,
   findRoot,
   requireRepositoryRoot,
   GITLEAKS_VERSION,
+  GITLEAKS_BINARY,
   runGitleaks,
+  excusedByGit,
+  resolveScanner,
+  isUntrustedScannerPath,
+  executableNames,
   partitionFindings,
   type GitleaksFinding,
+  type GitleaksResult,
+  type GitleaksScan,
+  type GitleaksSpawn,
+  type ScannerResolution,
+  type ScannerResolver,
   VERIFY_PREFIX,
 } from "../src/index.ts"
 
@@ -461,6 +478,8 @@ describe("G-7 verdict path purity", () => {
       "apps/cli/src/relevance.ts": "export const relevance = true",
       "apps/cli/src/suggestions.ts": 'import { rankNeighbours } from "@mizan/suggest"\nexport const rank = rankNeighbours',
       "apps/web/src/page.ts": "export const page = true",
+      [COVERAGE_RENDER_MODULE]: `export const ${COVERAGE_CLAIM_EXPORT} = (r: { counts: { segments: number; extracted: number } }) =>\n  \`all verified: \${r.counts.extracted} of \${r.counts.segments} segments extracted\`\n`,
+      "apps/cli/src/article-suggestions.ts": 'import { suggestionFor } from "./suggestions.ts"\nexport const pass = suggestionFor',
       "packages/mizan-suggest/src/suggest.ts": 'import { normalizeForMatch } from "@mizan/core"\nexport const fold = normalizeForMatch',
     }
     const declared = Object.entries(displayDefaults).map(([path, text]) =>
@@ -711,6 +730,85 @@ describe("G-7 verdict path purity", () => {
       expect([...DISPLAY_CONTRACT_NUMBERS]).toEqual(["rank", "considered", "sharedRunChars", "quoteChars"])
     })
   })
+
+  describe("G-7.13 a completeness claim carries its denominator", () => {
+    const rule = "G-7.13 completeness-claim-denominator"
+
+    test("clean: the shipped renderer passes, because it inlines both denominator words on the claim line", () => {
+      expect(rules(checkCompletenessClaimCarriesDenominator(pureTree()))).toEqual([])
+    })
+
+    test("planted: a completeness claim with NO denominator is caught, naming the line", () => {
+      // The exact R-1 failure: a renderer that says "all verified" about a document whose selector
+      // skipped a fabrication, with nothing on screen for the reader to weigh that against.
+      const findings = checkCompletenessClaimCarriesDenominator(
+        pureTree({
+          [COVERAGE_RENDER_MODULE]: `export const ${COVERAGE_CLAIM_EXPORT} = () => "all verified"\n`,
+        }),
+      )
+      expect(rules(findings)).toEqual([rule])
+      expect(findings[0]?.path).toBe(COVERAGE_RENDER_MODULE)
+      expect(findings[0]?.line).toBe(1)
+    })
+
+    test("planted: EVERY declared completeness phrasing is caught, so the list is not one lucky word", () => {
+      for (const phrase of COMPLETENESS_CLAIM_TOKENS) {
+        const findings = checkCompletenessClaimCarriesDenominator(
+          pureTree({ [COVERAGE_RENDER_MODULE]: `export const ${COVERAGE_CLAIM_EXPORT} = () => "${phrase}"\n` }),
+        )
+        expect(rules(findings), `"${phrase}" passed the rule`).toContain(rule)
+      }
+    })
+
+    test("planted: a claim elsewhere in the display path is caught even when it DOES carry the words", () => {
+      // The half that is about placement rather than about the denominator: a second renderer that
+      // knows the words still breaks the one-owner property the rule exists to create.
+      const findings = checkCompletenessClaimCarriesDenominator(
+        pureTree({ "apps/cli/src/render.ts": 'export const line = "all verified: 3 of 4 segments extracted"\n' }),
+      )
+      expect(rules(findings)).toEqual([rule])
+      expect(findings[0]?.path).toBe("apps/cli/src/render.ts")
+    })
+
+    test("planted: an unanalysable renderer FAILS, rather than passing because the rule had nothing to read", () => {
+      // The fail-closed half. A renderer whose sentence moved into a template, or into a constant this
+      // rule cannot see, reports clean — so the ABSENCE of an analysable claim site is itself a finding.
+      const findings = checkCompletenessClaimCarriesDenominator(
+        pureTree({ [COVERAGE_RENDER_MODULE]: "export const renderCoverage = () => 1\n" }),
+      )
+      expect(rules(findings)).toEqual([rule])
+      expect(findings[0]?.excerpt).toContain(COVERAGE_CLAIM_EXPORT)
+    })
+
+    test("one denominator word is not enough: the pair is what distinguishes chose from covered", () => {
+      const findings = checkCompletenessClaimCarriesDenominator(
+        pureTree({
+          [COVERAGE_RENDER_MODULE]: `export const ${COVERAGE_CLAIM_EXPORT} = (s: number) => "all verified: " + s + " segments"\n`,
+        }),
+      )
+      expect(rules(findings)).toEqual([rule])
+    })
+
+    test("a claim with neither word is caught, and a claim with both is not", () => {
+      const withBoth = pureTree({
+        [COVERAGE_RENDER_MODULE]: `export const ${COVERAGE_CLAIM_EXPORT} = () => "all verified: 4 of 4 segments extracted"\n`,
+      })
+      expect(rules(checkCompletenessClaimCarriesDenominator(withBoth))).toEqual([])
+    })
+
+    test("the rule is wired into the gate, so a tree with a violation fails G-7 as a whole", () => {
+      expect(rules(gateVerdictPathPurity(pureTree({ [COVERAGE_RENDER_MODULE]: 'export const coverageSentenceOf = () => "all verified"\n' })))).toContain(rule)
+    })
+
+    test("the required words are the two halves of the denominator, so the rule cannot be reworded around", () => {
+      expect([...DENOMINATOR_WORDS]).toEqual(["segments", "extracted"])
+    })
+
+    test("the rule reads production files only, so a fixture in a test file is not its business", () => {
+      const files = pureTree({ "apps/cli/test/coverage.test.ts": 'const fixture = "all verified"\n' })
+      expect(rules(checkCompletenessClaimCarriesDenominator(files))).toEqual([])
+    })
+  })
 })
 
 describe("G-6 dynamic invariant", () => {
@@ -873,6 +971,58 @@ describe("G-4 the pinned binary and the jobs that spawn it", () => {
 describe("G-4 excuses what git refuses and blocks everything else", () => {
   const finding = (file: string, ruleId = "openai-api-key"): GitleaksFinding => ({ ruleId, file })
 
+  const repoRoot = (): string => {
+    const found = findRepositoryRoot(import.meta.dir)
+    if (found === null) throw new Error("no root")
+    return found
+  }
+
+  /**
+   * Is the gate's OWN resolution going to find a scanner on this machine?
+   *
+   * It used to answer a different question — "is there a file at `node_modules/.bin/gitleaks`?" —
+   * and pass THAT path to the gate as a spawn. `bun run` puts `node_modules/.bin` first on PATH, so
+   * that is precisely where a planted scanner lands and precisely where the gate must refuse to look;
+   * a test that went looking there was asserting a weaker gate than the one that ships, and did it
+   * while reporting green. `gitleaks` is not a dependency of this repository, so a file at that path
+   * is by construction undeclared.
+   *
+   * So the tests below ask the gate's question. Where the answer is no, the two end-to-end tests
+   * SKIP rather than substituting something, and the coverage they would have added is carried by the
+   * binary-free tests in the same file — which is also the only place a planted violation can be
+   * observed on a machine without the binary installed.
+   */
+  const resolutionOf = (): ScannerResolution =>
+    resolveScanner(GITLEAKS_BINARY, repoRoot(), process.env["PATH"] ?? "")
+
+  const gitleaksAvailable = (): boolean => resolutionOf().kind === "resolved"
+
+  /** A resolution that has already been vetted, for tests that inject the scan itself. */
+  const resolved: ScannerResolver = () => ({ kind: "resolved", path: "gitleaks", ignored: [] })
+
+  /** The real scan over the real tree, with the gate resolving the scanner however this machine does. */
+  const scanRealRepo = async (): Promise<GitleaksResult> => runGitleaks(repoRoot())
+
+  /**
+   * Plant a probe, scan, and remove it — or scan with nothing planted when `contents` is null.
+   *
+   * The null case is the control half of the pair: it is what makes "the probe was the cause" a
+   * measurement rather than a claim, and it also asserts the probe is not left behind.
+   */
+  const scanWithProbe = async (contents: string | null): Promise<GitleaksResult> => {
+    const probe = join(repoRoot(), "g4-planted-probe.txt")
+    if (contents === null) {
+      if (existsSync(probe)) throw new Error("a previous run left the planted probe behind")
+      return await scanRealRepo()
+    }
+    writeFileSync(probe, contents)
+    try {
+      return await scanRealRepo()
+    } finally {
+      rmSync(probe, { force: true })
+    }
+  }
+
   test("a finding in a committable path blocks", () => {
     expect(partitionFindings([finding("src/keys.ts")], () => false)).toEqual([finding("src/keys.ts")])
   })
@@ -892,34 +1042,414 @@ describe("G-4 excuses what git refuses and blocks everything else", () => {
     expect(partitionFindings([finding(".env")], () => false)).toEqual([finding(".env")])
   })
 
-  test("the planted violation fails: a config carrying only an allowlist scans nothing", async () => {
-    // The defect this gate has to be able to catch is fail-open, and the way to prove a gate is not
-    // fail-open is to plant the thing it must catch and watch it fail. The planted file is a
-    // format-valid OpenAI key in a committable path: gitleaks flags it, and the gate must too.
-    const root = findRepositoryRoot(import.meta.dir)
-    if (root === null) throw new Error("no root")
-    const probe = join(root, "g4-planted-probe.txt")
-    // Assembled from fragments so this source file is not itself a finding — which it was, on the
-    // first run of this test, and which is the gate working rather than the test misbehaving. The
-    // string that has to trip the scanner is the one in the planted file, not the one in a test.
-    const planted = ["sk-proj-", "9d4f7a1c3e5b8d2f6a0c4e7b", "1d9f3a6c8e2b5d7f0a4c6e8b1d", "3f5a7c9e1b3d5f7"].join("")
-    writeFileSync(probe, `MIZAN_PLANTED_NOT_A_REAL_KEY = ${planted}\n`)
-    try {
-      const result = await runGitleaks(root, () => true)
-      expect(result.ok).toBe(false)
-      expect(result.detail).toContain("g4-planted-probe.txt")
-    } finally {
-      rmSync(probe, { force: true })
+  describe("an unavailable git is an unavailable oracle, not a crash and not an excuse", () => {
+    // The defect these plant: `excusedByGit` spawned `git` unguarded, and `Bun.spawn` throws ENOENT
+    // synchronously when the executable does not resolve. Reached on every path that HAS findings,
+    // it turned the module header's own promise — "if git cannot be asked, the excused set is EMPTY"
+    // — into an unhandled exception out of a function declared to return a verdict. A secret gate
+    // that dies on the input it exists to be honest about is not fail-closed; it is fail-nothing.
+    //
+    // The oracle is injected rather than stubbed through the real subprocess, so this is assertable
+    // on a machine that has git, has it absent, or has a `git` that exits nonzero — the three inputs
+    // the defect is about, none of which a test can otherwise produce on demand.
+    const unavailable = async (): Promise<string> => {
+      throw new Error('Executable not found in $PATH: "git"')
     }
+
+    test("a git that cannot be started returns the empty set rather than throwing", async () => {
+      expect([...(await excusedByGit(".", ["src/keys.ts"], unavailable))]).toEqual([])
+    })
+
+    test("and the empty set BLOCKS every finding, so the gate fails closed instead of crashing", async () => {
+      // The second half, because an empty set is only a safety property once the verdict is derived
+      // from it: this is exactly the line `runGitleaks` runs, so the assertion covers the decision
+      // and not merely the parser.
+      const findings = [finding(".env"), finding("docs/notes.md")]
+      const excused = await excusedByGit(".", findings.map((entry) => entry.file), unavailable)
+      expect(partitionFindings(findings, (file) => excused.has(file))).toEqual(findings)
+    })
+
+    test("an oracle that answers is still honoured, so the guard is not the same as disabling the check", async () => {
+      const answered = await excusedByGit(".", [".env", "src/keys.ts"], async () => ".env\n")
+      expect([...answered]).toEqual([".env"])
+      expect(partitionFindings([finding(".env"), finding("src/keys.ts")], (file) => answered.has(file))).toEqual([
+        finding("src/keys.ts"),
+      ])
+    })
+
+    test("no files means no query, so the empty case never reaches for git at all", async () => {
+      expect([...(await excusedByGit(".", [], unavailable))]).toEqual([])
+    })
+
+    test("THE PLANTED VIOLATION: a git that cannot be started fails the GATE, it does not throw out of it", async () => {
+      // The CR asked for this shape specifically, and the unit tests above cannot supply it: they
+      // assert the parser, not the gate. `runGitleaks` used to throw ENOENT out of itself here —
+      // "THREW OUT OF runGitleaks" — on the one input it exists to be honest about, which is
+      // fail-nothing rather than fail-closed. So: a real scan reporting a real finding, a git that
+      // does not resolve, and one `GitleaksResult` out the other side with nothing blocking it.
+      const probe = join(repoRoot(), "g4-planted-probe.txt")
+      const reporting: GitleaksSpawn = async (_cwd, _binary, reportPath) => {
+        await writeFile(reportPath, JSON.stringify([{ RuleID: "openai-api-key", File: "g4-planted-probe.txt" }]))
+        return { code: 1, stdout: "", stderr: "" }
+      }
+      writeFileSync(probe, "MIZAN_PLANTED_NOT_A_REAL_KEY\n")
+      try {
+        const result = await runGitleaks(repoRoot(), resolved, reporting, unavailable)
+        expect(result.ok).toBe(false)
+        expect(result.detail).toContain("g4-planted-probe.txt")
+      } finally {
+        rmSync(probe, { force: true })
+      }
+    })
   })
 
-  test("and the same command passes once the planted file is gone, so the probe was the cause", async () => {
-    const root = findRepositoryRoot(import.meta.dir)
-    if (root === null) throw new Error("no root")
-    expect(existsSync(join(root, "g4-planted-probe.txt"))).toBe(false)
-    const result = await runGitleaks(root, () => true)
-    expect(result.ok).toBe(true)
+  describe("a scan that did not run is not a clean tree", () => {
+    // The two environmental inputs this gate has to survive, asserted without the binary.
+    //
+    // Both used to end the process instead of returning a verdict: `Bun.spawn` throws ENOENT
+    // *synchronously* when the executable does not resolve, so a resolution that reported the name
+    // present was enough to turn a gate into an unhandled exception. And a stub that exits 0 while
+    // writing no report satisfied `code === 0 && findings.length === 0` — a green G-4 with a real
+    // secret sitting in a committable path, which is the fail-open the module header says it refuses.
+    //
+    // The spawn is injected rather than stubbed through PATH because an absent binary is exactly
+    // what a test calling the real subprocess cannot arrange on demand.
+    const scanOf = (scan: GitleaksScan): GitleaksSpawn => () => Promise.resolve(scan)
+
+    test("a binary that cannot be started returns ok:false rather than throwing", async () => {
+      const result = await runGitleaks(repoRoot(), resolved, () => Promise.resolve(null))
+      expect(result.ok).toBe(false)
+      expect(result.detail).toContain("could not be started")
+    })
+
+    test("an exit-0 scan that wrote no report is a scan that did not happen", async () => {
+      const result = await runGitleaks(repoRoot(), resolved, scanOf({ code: 0, stdout: "no leaks found", stderr: "" }))
+      expect(result.ok).toBe(false)
+      expect(result.detail).toContain("no readable report")
+    })
+
+    test("a genuine clean scan — exit 0 with an empty report — still passes, so the rule is not always-fail", async () => {
+      // The other direction matters as much: a discriminator that rejected real scans would be
+      // replaced by "ignore G-4", which is the same assurance failure wearing a different hat. A real
+      // clean run writes `[]`, so that is what this writes.
+      const wrote: GitleaksSpawn = async (_cwd, _binary, reportPath) => {
+        await writeFile(reportPath, "[]")
+        return { code: 0, stdout: "no leaks found", stderr: "" }
+      }
+      expect((await runGitleaks(repoRoot(), resolved, wrote)).ok).toBe(true)
+    })
+
+    test("a report that is unreadable fails closed rather than reading as zero findings", async () => {
+      const unreadable: GitleaksSpawn = async (_cwd, _binary, reportPath) => {
+        await writeFile(reportPath, "this is not the json report gitleaks writes")
+        return { code: 0, stdout: "no leaks found", stderr: "" }
+      }
+      const result = await runGitleaks(repoRoot(), resolved, unreadable)
+      expect(result.ok).toBe(false)
+      expect(result.detail).toContain("wrote no readable report")
+    })
+
+    test("the planted violation blocks end to end, with no binary required", async () => {
+      // The CR-requested proof, and the reason the binary-dependent test above can be skipped
+      // without losing its coverage: the gate's own verdict for a secret in a committable path,
+      // driven through the real report shape with the real git asked whether it would accept it.
+      const probe = join(repoRoot(), "g4-planted-probe.txt")
+      writeFileSync(probe, "MIZAN_PLANTED_NOT_A_REAL_KEY\n")
+      const reporting: GitleaksSpawn = async (_cwd, _binary, reportPath) => {
+        await writeFile(reportPath, JSON.stringify([{ RuleID: "openai-api-key", File: "g4-planted-probe.txt" }]))
+        return { code: 1, stdout: "", stderr: "" }
+      }
+      try {
+        const result = await runGitleaks(repoRoot(), resolved, reporting)
+        expect(result.ok).toBe(false)
+        expect(result.detail).toContain("g4-planted-probe.txt")
+      } finally {
+        rmSync(probe, { force: true })
+      }
+    })
   })
+
+  /**
+   * The tree under audit may not supply the scanner. This is the second fail-open, and the one the
+   * report-shape rule cannot touch.
+   *
+   * The gate used to spawn the BARE NAME. Under `bun run`, `node_modules/.bin` comes first on PATH,
+   * so a file named `gitleaks` there shadows a real install — and it then chooses both the report
+   * path and the exit code, so `[]` plus exit 0 satisfies every check the gate makes and G-4 reports
+   * a clean tree over a committable secret. `[]` is byte-identical to what a genuine clean run
+   * writes, so no amount of report parsing can tell them apart. The discrimination has to happen one
+   * level earlier, at resolution.
+   *
+   * `gitleaks` is not a dependency here, so a `node_modules/.bin/gitleaks` is by construction
+   * undeclared, and CI installs the real one through `.github/actions/setup-gitleaks` into a
+   * tool-cache directory outside the repository. Refusing the tree therefore costs CI nothing.
+   */
+  describe("a scanner from inside the audited tree is refused, not run", () => {
+    const posix = "/repo" as const
+    const toolCache = "/opt/hostedtoolcache/gitleaks/8.24.3/x64" as const
+
+    test("a node_modules/.bin candidate is untrusted wherever it sits", () => {
+      expect(isUntrustedScannerPath("/elsewhere/node_modules/.bin/gitleaks", posix)).toBe(true)
+      expect(isUntrustedScannerPath(`${posix}/node_modules/.bin/gitleaks`, posix)).toBe(true)
+      expect(isUntrustedScannerPath("/opt/tools/gitleaks", posix)).toBe(false)
+    })
+
+    test("the tree's own subtree is untrusted even without the node_modules marker", () => {
+      // The general form of the same objection: a file this repository can write should not be the
+      // tool that audits the repository. The `node_modules/.bin` rule is where it usually lands.
+      expect(isUntrustedScannerPath(`${posix}/tools/gitleaks`, posix)).toBe(true)
+      expect(isUntrustedScannerPath(`${posix}`, posix)).toBe(true)
+    })
+
+    test("a sibling directory whose name merely starts with the root is NOT inside it", () => {
+      // The half that a `startsWith` implementation gets wrong. A prefix match would both refuse
+      // `/repo-evil/bin/gitleaks` (a real, unrelated install) and, written sloppily to fix that,
+      // invite the traversal in the first place. Segment-wise containment has neither defect.
+      expect(isUntrustedScannerPath("/repo-evil/bin/gitleaks", posix)).toBe(false)
+      expect(isUntrustedScannerPath("/repository/bin/gitleaks", posix)).toBe(false)
+    })
+
+    test("the candidate names are the platform's three, so a PATH entry cannot pick the target", () => {
+      expect(executableNames("gitleaks", "linux")).toEqual(["gitleaks"])
+      expect(executableNames("gitleaks", "win32")).toEqual(["gitleaks.exe", "gitleaks.cmd", "gitleaks.bat"])
+    })
+
+    describe("resolution over an injected PATH", () => {
+      /** A PATH where each listed directory holds one real gitleaks, so no filesystem is touched. */
+      const probeOver = (dirs: readonly string[]): ((dir: string, name: string) => string | null) => {
+        return (dir, name) => (dirs.includes(dir) && name === "gitleaks" ? `${dir}/gitleaks` : null)
+      }
+
+      const overPath = (searchPath: string, dirs: readonly string[], cwd = posix): ScannerResolution =>
+        resolveScanner("gitleaks", cwd, searchPath, probeOver(dirs), "linux")
+
+      test("a squat ahead of a real install is stepped over, and NAMED", () => {
+        const searchPath = [`${posix}/node_modules/.bin`, toolCache].join(delimiter)
+        expect(overPath(searchPath, [`${posix}/node_modules/.bin`, toolCache])).toEqual({
+          kind: "resolved",
+          path: `${toolCache}/gitleaks`,
+          ignored: [`${posix}/node_modules/.bin/gitleaks`],
+        })
+      })
+
+      test("the squat alone is untrusted_only, which is a refusal and not an absence", () => {
+        // Collapsing this into "absent" would send the reader off to install gitleaks, and the
+        // planted file would still be there when they came back.
+        const searchPath = `${posix}/node_modules/.bin`
+        expect(overPath(searchPath, [searchPath])).toEqual({
+          kind: "untrusted_only",
+          paths: [`${posix}/node_modules/.bin/gitleaks`],
+        })
+      })
+
+      test("nothing on PATH at all is absent, which is the ordinary missing-binary case", () => {
+        expect(overPath("/usr/bin:/bin", ["/usr/bin"])).toEqual({ kind: "absent" })
+      })
+    })
+
+    test("THE PLANTED VIOLATION: a squat is never executed, and the gate fails closed", async () => {
+      // The proof the CR asked for, on a machine with or without gitleaks installed: a real file at a
+      // real `node_modules/.bin` path inside a real temp tree, resolved over a real PATH string by
+      // the real filesystem probe. `spawned` is the assertion that matters — the refusal happens
+      // before anything is executed, so the planted auditor never gets to choose a report or a code.
+      const root = join(tmpdir(), `mizan-g4-squat-${crypto.randomUUID()}`)
+      const binDir = join(root, "node_modules", ".bin")
+      const [plantedName = GITLEAKS_BINARY] = executableNames(GITLEAKS_BINARY, process.platform)
+      mkdirSync(binDir, { recursive: true })
+      writeFileSync(join(binDir, plantedName), "#!/bin/sh\nprintf '[]' > \"$8\"\nexit 0\n")
+      let spawned = 0
+      const neverRun: GitleaksSpawn = async () => {
+        spawned += 1
+        return { code: 0, stdout: "no leaks found", stderr: "" }
+      }
+      try {
+        const result = await runGitleaks(
+          root,
+          (cwd) => resolveScanner(GITLEAKS_BINARY, cwd, binDir, undefined, process.platform),
+          neverRun,
+        )
+        expect(result.ok).toBe(false)
+        expect(result.detail).toContain(join("node_modules", ".bin"))
+        expect(result.detail).toContain("did not run")
+        expect({ spawned }).toEqual({ spawned: 0 })
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    })
+
+    test("THE PLANTED VIOLATION: a RELATIVE PATH entry cannot smuggle a planted auditor", async () => {
+      // The second fail-open, and the one that makes the first rule worthless if it is left alone.
+      //
+      // `Bun.spawn` runs the child with `cwd` set to the SCANNED ROOT, so a relative PATH entry names
+      // a different file depending on who is asking: the gate's own directory when it probes, the
+      // child's when the process starts. With a probe that returned the joined path verbatim and a
+      // containment check that resolved against `process.cwd()`, those were two different files —
+      // and the trust check was made about the honest one. Reproduced end to end before the fix:
+      //
+      //   scanned root  <tmp>/g4rel4/root      <- planted auditor under tools/, plus a real secret
+      //   process.cwd() <tmp>/g4rel4/work      <- an honest gitleaks
+      //   PATH entry "tools" -> path="tools\gitleaks.exe" absolute=false trusted=true
+      //
+      // The planted file ran, wrote `[]`, and G-4 reported a clean tree. `executableNames`'s three
+      // names do not help: the defect is in the DIRECTORY, not the filename.
+      //
+      // The fixture therefore puts the planted auditor in a directory that is BOTH a real relative
+      // PATH entry and inside the scanned root, and asserts the refusal happens before any spawn.
+      const base = join(tmpdir(), `mizan-g4-rel-${crypto.randomUUID()}`)
+      const scanRoot = join(base, "root")
+      const plantedDir = join("tools")
+      const [plantedName = GITLEAKS_BINARY] = executableNames(GITLEAKS_BINARY, process.platform)
+      mkdirSync(join(scanRoot, plantedDir), { recursive: true })
+      writeFileSync(join(scanRoot, plantedDir, plantedName), "#!/bin/sh\nprintf '[]' > \"$8\"\nexit 0\n")
+      let spawned = 0
+      const neverRun: GitleaksSpawn = async () => {
+        spawned += 1
+        return { code: 0, stdout: "no leaks found", stderr: "" }
+      }
+      try {
+        // The real filesystem probe, driven by a relative PATH entry, exactly as a developer with
+        // `tools` on PATH would produce. `process.cwd()` does not contain the planted file, so the
+        // probe's own reading is absent and the ONLY candidate the gate can see is the one the
+        // child would open.
+        const resolution = resolveScanner(
+          GITLEAKS_BINARY,
+          scanRoot,
+          plantedDir,
+          undefined,
+          process.platform,
+        )
+        const names = resolution.kind === "untrusted_only" ? resolution.paths : []
+        expect(resolution.kind).toBe("untrusted_only")
+        expect(names.join(";")).toContain(join(plantedDir, plantedName))
+
+        const result = await runGitleaks(
+          scanRoot,
+          (cwd) => resolveScanner(GITLEAKS_BINARY, cwd, plantedDir, undefined, process.platform),
+          neverRun,
+        )
+        expect(result.ok).toBe(false)
+        expect(result.detail).toContain("did not run")
+        expect({ spawned }).toEqual({ spawned: 0 })
+      } finally {
+        rmSync(base, { recursive: true, force: true })
+      }
+    })
+
+    test("a relative PATH entry resolving outside the scanned tree is still honoured", async () => {
+      // The control for the test above, and the reason the fix is a second path rather than a blanket
+      // refusal of every relative entry: refusing those would answer a real install with "ignore
+      // G-4", which is the same assurance failure wearing a different hat. Here the entry is relative
+      // and the file it names lives outside the tree under audit, so it must still run.
+      const base = join(tmpdir(), `mizan-g4-rel-ok-${crypto.randomUUID()}`)
+      const scanRoot = join(base, "tree")
+      const outside = join("..", "toolcache")
+      const [plantedName = GITLEAKS_BINARY] = executableNames(GITLEAKS_BINARY, process.platform)
+      mkdirSync(scanRoot, { recursive: true })
+      mkdirSync(join(base, "toolcache"), { recursive: true })
+      writeFileSync(join(base, "toolcache", plantedName), "#!/bin/sh\nexit 0\n")
+      const clean: GitleaksSpawn = async (_cwd, _binary, reportPath) => {
+        await writeFile(reportPath, "[]")
+        return { code: 0, stdout: "no leaks found", stderr: "" }
+      }
+      try {
+        const result = await runGitleaks(
+          scanRoot,
+          (cwd) => resolveScanner(GITLEAKS_BINARY, cwd, outside, undefined, process.platform),
+          clean,
+        )
+        expect(result.ok).toBe(true)
+      } finally {
+        rmSync(base, { recursive: true, force: true })
+      }
+    })
+
+    test("an unresolved candidate is refused, so the gate fails closed rather than guessing", () => {
+      // Belt and braces for the same hole: `probeOnDisk` answers in absolute paths now, but the
+      // resolver's own contract must refuse anything it still cannot place. A candidate that cannot
+      // be located cannot be cleared.
+      expect(isUntrustedScannerPath(`tools${delimiter}gitleaks`, "/repo")).toBe(true)
+      expect(probeOnDisk(".", "gitleaks")).toBeNull()
+    })
+
+    test("a green run names a squat it stepped over, so the spot is not silently free", async () => {
+      const clean: GitleaksSpawn = async (_cwd, _binary, reportPath) => {
+        await writeFile(reportPath, "[]")
+        return { code: 0, stdout: "no leaks found", stderr: "" }
+      }
+      const resolver: ScannerResolver = () => ({
+        kind: "resolved",
+        path: "/opt/tools/gitleaks",
+        ignored: [`${posix}/node_modules/.bin/gitleaks`],
+      })
+      const result = await runGitleaks(repoRoot(), resolver, clean)
+      expect(result.ok).toBe(true)
+      expect(result.detail).toContain("refused to run")
+      expect(result.detail).toContain(`${posix}/node_modules/.bin/gitleaks`)
+    })
+
+    test("an honest install outside the tree is still used, so the rule is not 'always refuse'", async () => {
+      // A control that rejected real installs would be answered with "ignore G-4", which is the same
+      // assurance failure wearing a different hat. This one goes through the REAL filesystem probe,
+      // because the rule is supposed to hold against a real file and not only against a stub.
+      const base = join(tmpdir(), `mizan-g4-honest-${crypto.randomUUID()}`)
+      const tree = join(base, "tree")
+      const toolCache = join(base, "toolcache")
+      const [plantedName = GITLEAKS_BINARY] = executableNames(GITLEAKS_BINARY, process.platform)
+      mkdirSync(tree, { recursive: true })
+      mkdirSync(toolCache, { recursive: true })
+      writeFileSync(join(toolCache, plantedName), "#!/bin/sh\nprintf '[]' > \"$8\"\nexit 0\n")
+      const clean: GitleaksSpawn = async (_cwd, _binary, reportPath) => {
+        await writeFile(reportPath, "[]")
+        return { code: 0, stdout: "no leaks found", stderr: "" }
+      }
+      try {
+        const result = await runGitleaks(
+          tree,
+          (cwd) => resolveScanner(GITLEAKS_BINARY, cwd, toolCache, undefined, process.platform),
+          clean,
+        )
+        expect(result.ok).toBe(true)
+      } finally {
+        rmSync(base, { recursive: true, force: true })
+      }
+    })
+  })
+
+  /**
+   * The two tests that drive the REAL scanner over the REAL tree.
+   *
+   * They are skipped when the gate's own resolution finds nothing, and they now RUN whenever a real
+   * gitleaks is installed — including on a machine where `node_modules/.bin/gitleaks` exists, which
+   * they deliberately ignore. Each one is a full-tree scan, so the budget is explicit: the default
+   * 5s per test is below a single scan here, and a test that times out looks exactly like a gate that
+   * is broken.
+   */
+  const REAL_SCAN_TIMEOUT_MS = 120_000
+
+  test.skipIf(!gitleaksAvailable())(
+    "the planted violation fails: a config carrying only an allowlist scans nothing",
+    async () => {
+      // The defect this gate has to be able to catch is fail-open, and the way to prove a gate is not
+      // fail-open is to plant the thing it must catch and watch it fail. The planted file is a
+      // format-valid OpenAI key in a committable path: gitleaks flags it, and the gate must too. Only
+      // this half needs gitleaks itself; the gate's verdict for the same finding is asserted above
+      // with an injected scan.
+      const planted = ["sk-proj-", "9d4f7a1c3e5b8d2f6a0c4e7b", "1d9f3a6c8e2b5d7f0a4c6e8b1d", "3f5a7c9e1b3d5f7"].join("")
+      const result = await scanWithProbe(`MIZAN_PLANTED_NOT_A_REAL_KEY = ${planted}\n`)
+      expect(result.ok).toBe(false)
+      expect(result.detail).toContain("g4-planted-probe.txt")
+    },
+    REAL_SCAN_TIMEOUT_MS,
+  )
+
+  test.skipIf(!gitleaksAvailable())(
+    "and the same command passes once the planted file is gone, so the probe was the cause",
+    async () => {
+      const result = await scanWithProbe(null)
+      expect(result.ok).toBe(true)
+    },
+    REAL_SCAN_TIMEOUT_MS,
+  )
 
   test("a real secret in .env is reported as excused, not as a clean tree", async () => {
     const root = findRepositoryRoot(import.meta.dir)
@@ -927,7 +1457,7 @@ describe("G-4 excuses what git refuses and blocks everything else", () => {
     // The developer's own local `.env`, if it exists. This asserts the reason the gate is allowed to
     // pass at all, so that the pass cannot quietly become "it stopped scanning".
     if (!existsSync(join(root, ".env"))) return
-    const result = await runGitleaks(root, () => true)
-    expect(result.detail).toContain("git ignores")
-  })
+    if (!gitleaksAvailable()) return
+    expect((await scanRealRepo()).detail).toContain("git ignores")
+  }, REAL_SCAN_TIMEOUT_MS)
 })

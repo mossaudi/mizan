@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { HALLMARK_TYPES, RED_TEAM_FIXTURES } from "./red-team-fixtures.ts"
+import { HALLMARK_TYPES, RED_TEAM_FIXTURES, ARTICLE_RED_TEAM_FIXTURES } from "./red-team-fixtures.ts"
 
 /**
  * The committed coverage matrix, as an absolute path.
@@ -125,5 +125,52 @@ describe("HALLMARK 14-type coverage", () => {
     // that would let the suite declare its own failure as an expectation.
     const declared = new Set(RED_TEAM_FIXTURES.map((fixture) => fixture.expectedVerdict))
     expect(declared.has("verified" as (typeof RED_TEAM_FIXTURES)[number]["expectedVerdict"])).toBe(false)
+  })
+})
+
+describe("the article surface inherits HALLMARK cases rather than extending the taxonomy", () => {
+  /**
+   * Every article fixture's row in the matrix, by fixture id.
+   *
+   * The matrix is the citable artefact, so a fixture that exists only in code is a fixture a judge
+   * cannot find \u2014 which is the same defect as a red-team suite whose inputs were re-pointed without
+   * disclosure, recorded further down this document.
+   */
+  const rowOf = (id: string): string | undefined =>
+    readFileSync(MATRIX_PATH, "utf8")
+      .split("\n")
+      .find((line) => line.startsWith(`| `) && line.includes(`| ${id} |`))
+
+  test("the article surface has at least one pinned case, so a new feature cannot ship with no red-team coverage", () => {
+    expect(ARTICLE_RED_TEAM_FIXTURES.length).toBeGreaterThan(0)
+  })
+
+  test("every article fixture names a type the fourteen already publish, so the taxonomy stays at fourteen", () => {
+    for (const fixture of ARTICLE_RED_TEAM_FIXTURES) {
+      expect(HALLMARK_TYPES).toContain(fixture.hallmarkType)
+    }
+  })
+
+  test("every article fixture has a row in the committed matrix, named and declared as unreachable", () => {
+    for (const fixture of ARTICLE_RED_TEAM_FIXTURES) {
+      const row = rowOf(fixture.id)
+      expect(row).toBeDefined()
+      expect(row).toContain(fixture.hallmarkType)
+      expect(row).toContain("`unverifiable`")
+    }
+  })
+
+  test("an article fixture id can never collide with a per-claim one, so the two sets cannot be confused", () => {
+    const ids = ARTICLE_RED_TEAM_FIXTURES.map((fixture) => fixture.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    for (const id of ids) expect(RED_TEAM_FIXTURES.map((fixture) => fixture.id)).not.toContain(id)
+  })
+
+  test("both attack shapes the article path adds are covered: injection-to-grant and a plausible fabrication", () => {
+    // The two shapes named by R-6 and R-2 respectively. A new surface that shipped with only one of
+    // them would be covered against one failure and blind to the other.
+    const types = ARTICLE_RED_TEAM_FIXTURES.map((fixture) => fixture.hallmarkType)
+    expect(types).toContain("hybrid_fabrication")
+    expect(types).toContain("plausible_fabrication")
   })
 })

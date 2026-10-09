@@ -34,6 +34,35 @@ export { MAX_QUOTE_CHARS, MAX_RECORD_CHARS } from "./normalize/bounds.ts"
 export { displayWidth, isBareControl, stripTerminalControls, ESC, ZERO_WIDTH } from "./normalize/terminal.ts"
 
 export { decodeOrFail, decodeSync, describeDecodeFailure, type Decodable, type DecodeFailure } from "./schema/decode.ts"
+export {
+  ARTICLE_ARTEFACT_SCHEMA_VERSION,
+  ARTICLE_COVERAGE_SCHEMA_VERSION,
+  ArticleArtefactCase,
+  ArticleCounts,
+  ArticleCoverageArtefact,
+  ArticleCoverageReport,
+  ArticleTotals,
+  CONDITION_OF_GAP,
+  CoverageGap,
+  GapReason,
+  GapStage,
+  SpanOutcome,
+  articleCountViolations,
+  articleCountsOf,
+  conditionOfGap,
+  emptyArticleCounts,
+  falseVerifiedDeltaOf,
+  gapsAt,
+  notCheckedSegments,
+  notExtractedSegments,
+} from "./schema/article-coverage.ts"
+export {
+  ARTICLE_PROTOCOL_VERSION,
+  ArticleChunkCounts,
+  ArticleChunkRequest,
+  ArticleChunkResponse,
+  ArticleCursor,
+} from "./schema/article-protocol.ts"
 export { ANCHOR_PROTOCOL_VERSION, AnchorAdjudication, AnchorAdjudicationSet, AnchorSpan } from "./schema/anchor.ts"
 export { Answer, Citation, Claim, emptyClaim, normalizeQuote } from "./schema/claim.ts"
 export { BaselineDeclaration, BenchmarkOutcome, BenchmarkResult, BENCHMARK_SCHEMA_VERSION, HONEST_BASELINE, PRE_REGISTERED_HYPOTHESIS, METHOD_NOT_PUBLISHED, PEER_REGISTER_VERSION, PeerFigure, PeerMethod, PeerRegister, peerStatesAFigure } from "./schema/benchmark.ts"

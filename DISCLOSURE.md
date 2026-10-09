@@ -19,6 +19,8 @@ The submitted increment is the whole of this repository.
 | QuranLab — Hadith & Sunnah (Ahl al-Sunnah) (`quranlab/hadith`) | Data source. **Enabled**, 36024 records, licence class `content-only` | Text only, with attribution and the dataset's own per-row grades. |
 | Open Hadith Data (`mhashim6/open-hadith-data`) | Data source. **Excluded**, 0 records, licence class `unconfirmed` | **No.** Registered with an exclusion reason and ingested zero rows. |
 | Hadith API (mirror) (`fawazahmed0/hadith-api`) | Data source. **Excluded**, 0 records, licence class `unconfirmed` | **No.** Registered with an exclusion reason and ingested zero rows. |
+| Mawdoo3 — athar (`mawdoo3/athar`) | Data source **considered and excluded** for the companion/athar request, 0 records, licence class `unconfirmed` | **No.** The site publishes **no licence field at all** — no terms page, no dataset card, no redistribution grant. Recorded with the date the terms were checked so a re-check is a diff. |
+| Al-Islam.org — athar (`al-islam.org/athar`) | Data source **considered and excluded** for the companion/athar request, 0 records, licence class `content-only` | **No.** Its terms are published and are **non-commercial only**, which cannot cover a redistributed, competition-entered repository. Excluded as a companion *corpus*; companion attributions appearing as narrators inside a shipped graded collection are unaffected. |
 | `effect` 4.0.0-beta.83 | Runtime dependency for schema decoding at untrusted boundaries | Yes, MIT, pinned exactly |
 | `typescript` 5.6.3, `@types/bun` 1.1.14 | Build-time only | Yes, no runtime code |
 
@@ -130,8 +132,18 @@ carries no grade, mizan stores `null` and says so. **mizan never infers, default
 upgrades or asserts a grade of its own** (ADR-06). The in-product wording is "grade per
 <dataset>, as provided by <source>".
 
-This is deliberate, and it is a correction to the literal form of the requirement. Applied
-literally, "quarantine every record whose grade is not ṣaḥīḥ" would have quarantined all 6236
+### Companion and athar attributions carry no grade at all, and the product says so
+
+A companion statement is not ṣaḥīḥ/ḍaʿīf graded by any dataset examined here, so the concept
+does not apply to it. Both excluded athar rows in `packages/mizan-corpus/src/adapters/source-meta.ts`
+therefore carry `gradeApplicable: false` with `gradeBasis: "none"`, and any companion attribution
+ingested in future would store `grade: null` and be displayed as having no applicable grade rather
+than borrowing a vocabulary that does not describe it. This is **not** a quarantine: the concept
+not applying is a different fact from a dataset asserting no grade where one was required.
+
+### The rule this instantiates, applied literally and then corrected
+
+Applied literally, "quarantine every record whose grade is not ṣaḥīḥ" would have quarantined all 6236
 Tanzil verses, because a Qur'anic verse has no ṣaḥīḥ/ḍa'īf grade at all — the concept does
 not apply to it. mizan quarantines **inconsistency**, never absence: a record is quarantined
 when a grade **is required** (`gradeApplicable: true`) and the dataset **asserted none**. The

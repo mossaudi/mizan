@@ -9,6 +9,7 @@
         "@mizan/core": "workspace:*",
         "@mizan/corpus": "workspace:*",
         "@mizan/gate": "workspace:*",
+        "@mizan/mcp": "workspace:*",
         "@mizan/provenance": "workspace:*",
         "@mizan/suggest": "workspace:*",
         "@mizan/verify": "workspace:*",

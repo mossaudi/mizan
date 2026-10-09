@@ -25,8 +25,20 @@ export { anchorFrom, appearsInOrder, locateAnchor, ANCHOR_MIN_WORDS, ANCHOR_MAX_
 export { verifyAnswer, type VerifyInput } from "./verify.ts"
 export { computeSsr, segmentSentences } from "./ssr.ts"
 export {
+  DOCUMENT_TOO_LARGE,
+  MAX_DOCUMENT_CHARS,
+  checkDocumentCap,
+  chunkWindow,
+  documentDigestOf,
+  segmentDocument,
+  type DocumentRefusal,
+} from "./document-segments.ts"
+export { selectSpans, type SelectedSpan, type SelectionGap, type SelectionResult } from "./select-spans.ts"
+export {
+  ARTICLE_RED_TEAM_FIXTURES,
   HALLMARK_TYPES,
   RED_TEAM_FIXTURES,
+  type ArticleRedTeamFixture,
   type DifficultyTier,
   type HallmarkType,
   type RedTeamFixture,

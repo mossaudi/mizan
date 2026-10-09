@@ -1,11 +1,12 @@
 import { isErr } from "@mizan/core"
-import { mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { repositoryPaths, type BenchmarkPaths } from "./benchmark.ts"
 
 /**
- * The temp-corpus bookkeeping both benchmark test files need, in one place.
+ * The temp-corpus bookkeeping every benchmark test file needs, in one place — plus the one corpus
+ * probe they share (see `corpusIsPresent`).
  *
  * ## Why this is shared rather than duplicated
  *
@@ -57,5 +58,19 @@ export const releaseScratchCorpora = (): void => {
     rmSync(scratch.pop()!, { recursive: true, force: true })
   }
 }
+
+/**
+ * Whether the committed snapshot is on disk. One declaration, because both corpus-lane files gate on
+ * it and two spellings of "do we have the corpus" is two answers to one question (AGENTS.md 17).
+ *
+ * `existsSync` and deliberately NOT `openCorpus`, and the asymmetry is the point. `bun:sqlite` opens a
+ * file lazily, so `existsSync` is satisfied by a file that is not a database — which means this
+ * probe cannot tell "absent" from "corrupt", and the caller must not treat its two answers as one.
+ * So this answers only the question a *skip* is allowed to be built on ("is there nothing here to
+ * measure?"), and each corpus file pairs it with a separate, unskipped assertion that the probe
+ * agrees with the opener. A corpus that is present but unreadable therefore FAILS loudly, where a
+ * probe built on the opener would have skipped the lane silently and reported green forever.
+ */
+export const corpusIsPresent = (): boolean => existsSync(repositoryBenchmarkPaths().corpusPath)
 
 export * as BenchmarkTestPaths from "./benchmark-test-paths.ts"

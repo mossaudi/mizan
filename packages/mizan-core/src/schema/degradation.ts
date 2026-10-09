@@ -67,6 +67,16 @@ export const DegradationCondition = Schema.Union([
   Schema.Literal("ledger_write_failed"),
   Schema.Literal("attestation_mismatch"),
   Schema.Literal("unmeasured"),
+  /**
+   * The document is larger than the declared cap, so the run refused before segmenting it.
+   *
+   * A condition rather than a reason on a verdict, because no span ever reached the verifier: this
+   * is what a surface reports *instead of entering* the pipeline, like `corpus_absent`. It is a
+   * distinct name rather than a reuse of `unmeasured` because the two carry opposite remedies — a
+   * document that was too long is retried in more chunks, whereas an unproduced figure is not
+   * retried at all — and folding them together would send an integrator round the wrong loop.
+   */
+  Schema.Literal("document_too_large"),
 ])
 export type DegradationCondition = Schema.Schema.Type<typeof DegradationCondition>
 
@@ -106,6 +116,8 @@ const CONDITION_SENTENCE: Readonly<Record<DegradationCondition, string>> = {
   ledger_write_failed: "ledger_write_failed: the run could not be recorded, so the run is marked untrusted. Proceeding as if it had been recorded is forbidden.",
   attestation_mismatch: "attestation_mismatch: the corpus on disk is not the corpus attestation.json authorises, so no verdict was computed. Warn-and-proceed is forbidden.",
   unmeasured: "unmeasured: this figure was not produced in this checkout, which is not the same as a figure of zero. No number is published for it.",
+  document_too_large:
+    "document_too_large: the document is longer than the declared cap, so it was refused whole rather than shortened. Silent truncation into a partial report is forbidden; submit it in bounded chunks.",
 }
 
 export const describeCondition = (condition: DegradationCondition): string => CONDITION_SENTENCE[condition]

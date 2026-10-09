@@ -200,9 +200,17 @@ describe("the repository's own ADRs — the acceptance criteria, against the rea
     // this cycle (one era supported; the claim surface artefact-backed), whose alternative reading
     // was rejected for this cycle and is recorded there, not here. ADR-16 also closed the numbering
     // hole the earlier revision of this comment described — the identifier before ADR-17 now
-    // resolves, which is why the citation sweep above passes and why the count below is 28 rather
-    // than 26. Every identifier written literally in this comment resolves to a document.
-    expect(files).toHaveLength(28)
+    // resolves, which is why the citation sweep above passes and the count below is 32 because the article-verification
+    // deal contributed four records: the bounded stateless chunk contract, the document coverage
+    // report as the unit of accountability, the refusal of in-meaning nearest-match, and the
+    // companion licence gate. The numbering continues from ADR-18, so the gap above the last of them
+    // is deliberate rather than lost: the root-coverage measurement that would have occupied it is
+    // NOT executable against this corpus, because `CorpusRecord` carries no root, stem or lemma field
+    // and no stemmer exists anywhere in the tree. Writing a decision record about an artefact nobody
+    // can produce is the over-claiming this suite exists to forbid, so the figure stays unmeasured and
+    // no prose quotes a coverage number for it.
+    // Every identifier written literally in this comment resolves to a document.
+    expect(files).toHaveLength(32)
     const incomplete: string[] = []
     for (const name of files) {
       const claims = checkAdrDocument(readFileSync(join(ADR_ROOT, name), "utf8"), `${ADR_DIRECTORY}/${name}`)

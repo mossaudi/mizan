@@ -1,4 +1,5 @@
-import { err, isErr, normalizeQuote, ok, summariseVerdict, type Claim, type ClaimVerdict, type Result } from "@mizan/core"
+import { err, isErr, normalizeQuote, summariseVerdict, type Claim, type ClaimVerdict, type Result } from "@mizan/core"
+import { executeVerifyDocument, MAX_CURSOR_CHARS, MAX_SPANS_PER_CHUNK } from "./article-contract.ts"
 import { conditionOfCorpusProblem, describeCorpusProblem, type CorpusProblem, type Verifier } from "./verifier.ts"
 import { serve, stdioPort, type Port, type ServeOptions } from "./transport.ts"
 
@@ -173,8 +174,41 @@ export const VERIFY_TOOL: McpTool = {
   },
 }
 
-/** Every tool this server exposes. One, and it is read-only. */
-export const TOOLS: readonly McpTool[] = [VERIFY_TOOL]
+/**
+ * The article tool: a bounded, resumable, stateless chunk of a document (ADR-19).
+ *
+ * ## Why a second tool rather than a wider `verify`
+ *
+ * Three reasons, and the first is the one that decides it. The published caps stay exactly where they
+ * are — `MAX_CLAIMS_PER_CALL` = 32 and `MAX_CITATIONS_PER_CLAIM` = 3, unchanged, with the measured
+ * rationale above them and the equality assertions in `test/server.test.ts` still passing — because
+ * raising a cap whose rationale is a measurement deletes the measurement. Second, article scale needs
+ * a RESUME, and a cursor is meaningless on a stateless per-claim call. Third, the two answer different
+ * questions: `verify` asks about claims a caller already extracted, and `verify_document` publishes how
+ * much of a document was actually examined — the `segments` / `extracted` / `checked` denominator that
+ * makes "we checked and found nothing" distinguishable from "we never looked".
+ *
+ * The cursor names a document digest and a next segment index and nothing else. There is no job id, no
+ * handle and no server-side state of any kind, which is what keeps "no state is leaked between
+ * clients" true by construction rather than by policy.
+ */
+export const VERIFY_DOCUMENT_TOOL: McpTool = {
+  name: "verify_document",
+  description:
+    "Verify a document in bounded chunks. Sends one chunk's spans through the same containment-only verifier and returns the document digest, the whole-document segment count, this chunk's verdict counts, and a gap for every segment the selector did not emit or the verifier could not finish. Stateless: resume by passing the previous response's cursor and the same document.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      document: { type: "string", description: "The document text. Re-sent on every chunk, so the server derives the digest itself." },
+      cursor: { type: ["string", "null"], description: `The previous response's cursor, as canonical JSON. At most ${MAX_CURSOR_CHARS} characters.` },
+      chunkSpans: { type: ["number", "null"], description: `How many segments this chunk may carry, at most ${MAX_SPANS_PER_CHUNK}.` },
+    },
+    required: ["document"],
+  },
+}
+
+/** Every tool this server exposes. Both are read-only, and both are deterministic. */
+export const TOOLS: readonly McpTool[] = [VERIFY_TOOL, VERIFY_DOCUMENT_TOOL]
 
 const PARSE_ERROR = -32700
 const INVALID_REQUEST = -32600
@@ -412,6 +446,30 @@ export const executeVerify = (verifier: Verifier, params: unknown, startedAt: nu
 }
 
 /**
+ * Run the `verify_document` tool.
+ *
+ * A refusal from the contract — an over-cap document, a malformed cursor, a cursor naming a different
+ * document — is answered as a tool error carrying the shared degradation condition when it has one, and
+ * the raw `reason` when it does not. A caller therefore branches on one vocabulary in both directions
+ * rather than learning a second set of words for this tool alone.
+ *
+ * The refusal detail is forwarded for the same reason `describeCorpusProblem` forwards its own: the
+ * message names the cap and the digest, both of which are facts about the call, and neither carries
+ * document text (AGENTS.md section 13).
+ */
+export const executeVerifyDocumentTool = (
+  verifier: Verifier,
+  params: unknown,
+  startedAt: number,
+  budgetMs: number,
+): McpToolResult => {
+  const outcome = executeVerifyDocument(verifier, params, startedAt, budgetMs)
+  if ("refusal" in outcome) return toolError(outcome.refusal.condition ?? outcome.refusal.reason, outcome.refusal.detail)
+  if ("corpusProblem" in outcome) return toolError(outcome.corpusProblem, outcome.detail)
+  return { content: [{ type: "text", text: JSON.stringify(outcome.response) }] }
+}
+
+/**
  * Dispatch one request.
  *
  * Pure: same request in, same response out, on any machine, at any time. The clock reaches it
@@ -439,10 +497,12 @@ export const handleRequest = (request: JsonRpcRequest, verifier: Verifier, start
   if (method === "tools/call") {
     const params = request.params as Record<string, unknown> | undefined
     const name = params?.["name"]
-    if (name !== VERIFY_TOOL.name) {
-      return { jsonrpc: "2.0", id, error: { code: INVALID_PARAMS, message: `unknown tool: ${String(name)}` } }
+    const args = params?.["arguments"]
+    if (name === VERIFY_TOOL.name) return { jsonrpc: "2.0", id, result: executeVerify(verifier, args, startedAt, budgetMs) }
+    if (name === VERIFY_DOCUMENT_TOOL.name) {
+      return { jsonrpc: "2.0", id, result: executeVerifyDocumentTool(verifier, args, startedAt, budgetMs) }
     }
-    return { jsonrpc: "2.0", id, result: executeVerify(verifier, params?.["arguments"], startedAt, budgetMs) }
+    return { jsonrpc: "2.0", id, error: { code: INVALID_PARAMS, message: `unknown tool: ${String(name)}` } }
   }
 
   return { jsonrpc: "2.0", id, error: { code: METHOD_NOT_FOUND, message: `method not found: ${method}` } }

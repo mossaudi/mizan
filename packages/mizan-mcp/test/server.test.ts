@@ -379,10 +379,16 @@ describe("tool discovery", () => {
     expect(new Set(bodies).size).toBe(1)
   })
 
-  test("tools/list returns exactly the verify tool", () => {
+  test("tools/list returns both read-only tools, and neither of them writes", () => {
     const response = handleRequest({ jsonrpc: "2.0", id: 1, method: "tools/list" }, stubVerifier(), 0, 30_000)
     const result = response.result as { tools: readonly { name: string }[] }
-    expect(result.tools.map((tool) => tool.name)).toEqual(["verify"])
+    // The list is no longer one tool: the article chunk contract was added beside it (ADR-19). The
+    // property this test exists for is READ-ONLY, and that is asserted by name rather than by count —
+    // a count would have failed here for a change that removed no capability and added no write path.
+    expect(result.tools.map((tool) => tool.name)).toEqual(["verify", "verify_document"])
+    for (const forbidden of ["write", "ingest", "delete", "append", "update", "modify"]) {
+      expect(result.tools.map((tool) => tool.name)).not.toContain(forbidden)
+    }
   })
 
   test("the published schema marks every citation field required, so a client cannot omit `raw`", () => {
@@ -703,9 +709,12 @@ describe("dispatch", () => {
 })
 
 describe("read-only — the surface has no write path", () => {
-  test("the only tool exposed is `verify`", () => {
+  test("every tool exposed is read-only, by name, and there are two of them", () => {
+    // Stated as "no exposed name is a verb that mutates" rather than as a count. Asserting the count
+    // made this test a tripwire on FEATURE COUNT rather than on the property it is named for, and it
+    // fired the moment the article tool was added — with no write path introduced and none removed.
     const names = TOOLS.map((tool) => tool.name)
-    expect(names).toEqual(["verify"])
+    expect(names).toEqual(["verify", "verify_document"])
     for (const forbidden of ["write", "ingest", "delete", "append", "update", "modify"]) {
       expect(names).not.toContain(forbidden)
     }

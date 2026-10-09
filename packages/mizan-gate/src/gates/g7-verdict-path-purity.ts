@@ -108,6 +108,14 @@ import { PERCENT_OWNERS, VERDICT_PATH, VERDICT_PATH_ENTRY, inAny } from "./g6-no
  *    as a figure of precision. Same shape and reasoning as G-7.4, one level up: G-7.4 forbids
  *    percentage-*shaped keys* on the verdict path, this forbids a third measurement on the display
  *    contract that a renderer could reach.
+ *  - **G-7.13 a completeness claim carries its denominator.** The document coverage path publishes
+ *    `segments`, `extracted` and `checked` because a component that SELECTS which spans get checked
+ *    can hide a fabrication by not emitting it — and a report that printed verdicts alone would let
+ *    every skipped fabrication read as "nothing was there". The claim "these quotes are verified" is
+ *    therefore not printable without the `extracted`-of-`segments` denominator beside it, and this rule
+ *    is the mechanical form of that: a completeness phrase may appear in exactly one display module,
+ *    and on the line it appears on. No new `GateId` — ADR-C11 records that pattern, and `GATE_IDS` is
+ *    the single declaration the documentation check compares against.
  *
  * ## What G-7 does not check, stated rather than discovered
  *
@@ -150,6 +158,8 @@ export const DISPLAY_PATH = [
   "apps/cli/src/relevance.ts",
   "apps/cli/src/suggestions.ts",
   "apps/web/src/page.ts",
+  "apps/cli/src/coverage-render.ts",
+  "apps/cli/src/article-suggestions.ts",
 ] as const
 
 /**
@@ -449,6 +459,118 @@ export const checkDisplayContractNumbers = (files: readonly SourceFile[]): reado
     "code+strings",
   )
 
+/**
+ * The one display module permitted to FORM a completeness claim.
+ *
+ * Named rather than inferred, because the rule needs an owner to point at in its excerpt: a finding
+ * that says "somewhere in the display path" is a finding the next person has to search for, and the
+ * whole point is that the claim has one construction site.
+ */
+export const COVERAGE_RENDER_MODULE = "apps/cli/src/coverage-render.ts"
+
+/**
+ * The export that module must provide, so the rule can tell an analysed renderer from an unread one.
+ *
+ * This is the fail-closed half of G-7.13. A rule that scanned for phrases and reported nothing on a
+ * renderer that had none would report a renderer that REPLACED its sentence with a pre-rendered
+ * template, or moved the wording into a shared constant, as clean — an unanalysed surface passing
+ * because the rule had nothing to read. Requiring the declared export makes the absence of an
+ * analysable claim site a finding in its own right.
+ */
+export const COVERAGE_CLAIM_EXPORT = "coverageSentenceOf"
+
+/**
+ * The phrases that assert completeness.
+ *
+ * ## Why a list and not a pattern
+ *
+ * Because the failure being prevented is a writer choosing a wording the rule does not read. A pattern
+ * for "everything is fine" cannot enumerate every English sentence that claims it, and a rule with a
+ * hole here trains its readers to ignore it. A list is the same shape as G-7.12's, and for the same
+ * reason: the honest phrasings are knowable, so they are written down rather than guessed at.
+ *
+ * The list is deliberately not exhaustive of English — it is exhaustive of the phrasings this
+ * repository would write, and the residual is named in the rule text below rather than implied.
+ */
+export const COMPLETENESS_CLAIM_TOKENS = [
+  "all verified",
+  "all quotes verified",
+  "every quote verified",
+  "fully verified",
+  "completely verified",
+  "fully checked",
+  "no problems found",
+  "nothing was found",
+] as const
+
+/** G-7.13's matcher, built from the declared list so the two cannot disagree. */
+export const COMPLETENESS_CLAIM_RULE = new RegExp(
+  `(?:${COMPLETENESS_CLAIM_TOKENS.map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`,
+  "i",
+)
+
+/**
+ * The words a completeness claim must carry, which are the two halves of the denominator.
+ *
+ * `segments` is the document's size and `extracted` is how much of it was selected, and the pair is
+ * the minimum that distinguishes "we checked everything" from "we checked something we chose". A
+ * claim carrying neither is the fail-open sentence this rule exists to forbid.
+ */
+export const DENOMINATOR_WORDS = ["segments", "extracted"] as const
+
+/** The one rule id these three findings share, so a report groups them. */
+const RULE_ID = "G-7.13 completeness-claim-denominator"
+
+/**
+ * G-7.13 — a completeness claim may be formed in one module, and must carry its denominator.
+ *
+ * ## Why the rule scopes to DISPLAY_PATH and says so
+ *
+ * A phrase in a TEST fixture, a module header or an ADR is not a claim a reader can be shown. The rule
+ * covers production display modules and nothing else, and that limit is stated in the finding text
+ * rather than left for a reader to infer from a scan mode.
+ *
+ * ## The three findings it can produce
+ *
+ *  1. A completeness phrase in a display module OTHER than `COVERAGE_RENDER_MODULE`.
+ *  2. A completeness phrase in `COVERAGE_RENDER_MODULE` whose line does not carry both denominator
+ *     words.
+ *  3. `COVERAGE_RENDER_MODULE` present with no `COVERAGE_CLAIM_EXPORT` — the unanalysed renderer.
+ *
+ * `findMatchingLines` reports against the ORIGINAL line so a finding points at code a human reads, and
+ * `code+strings` keeps string bodies intact because a claim lives inside a template literal.
+ */
+export const checkCompletenessClaimCarriesDenominator = (files: readonly SourceFile[]): readonly Finding[] => {
+  const display = productionFiles(files).filter((file) => inAny(file.path, DISPLAY_PATH))
+  const elsewhere = display.filter((file) => file.path !== COVERAGE_RENDER_MODULE)
+  const claimsElsewhere = findMatchingLines("G-7", RULE_ID, elsewhere, COMPLETENESS_CLAIM_RULE, "code+strings")
+  const misplaced = claimsElsewhere.map((finding) => ({
+    ...finding,
+    excerpt:
+      `${finding.excerpt} — a completeness claim may only be formed in ${COVERAGE_RENDER_MODULE}, where the ` +
+      `${DENOMINATOR_WORDS.join(" and ")} denominator is mandatory. A claim on any other display surface is fail-open by construction.`,
+  }))
+
+  const renderer = display.filter((file) => file.path === COVERAGE_RENDER_MODULE)
+  const unanalysable = renderer
+    .filter((file) => file.text.indexOf(`export const ${COVERAGE_CLAIM_EXPORT}`) === -1)
+    .map((finding) => ({
+      gate: "G-7" as const,
+      rule: RULE_ID,
+      path: finding.path,
+      line: 1,
+      excerpt:
+        `${finding.path} is declared as the coverage renderer but exports no ${COVERAGE_CLAIM_EXPORT}, so this rule ` +
+        "cannot tell what it claims. An unanalysed renderer fails rather than passing silently.",
+    }))
+
+  const bare = findMatchingLines("G-7", RULE_ID, renderer, COMPLETENESS_CLAIM_RULE, "code+strings").filter(
+    (finding) => !DENOMINATOR_WORDS.every((word) => finding.excerpt.toLowerCase().indexOf(word) !== -1),
+  )
+
+  return [...misplaced, ...unanalysable, ...bare]
+}
+
 /** The whole gate. */
 export const gateVerdictPathPurity = (files: readonly SourceFile[]): readonly Finding[] => [
   ...checkAnchorModuleHasNoOpinion(files),
@@ -463,6 +585,7 @@ export const gateVerdictPathPurity = (files: readonly SourceFile[]): readonly Fi
   ...checkSuggestPackageReachesNoVerdictPath(files),
   ...checkSuggestPackageHasNoAmbientAuthority(files),
   ...checkDisplayContractNumbers(files),
+  ...checkCompletenessClaimCarriesDenominator(files),
 ]
 
 /** Re-exported so a caller building an overlay does not have to remember two entry points. */

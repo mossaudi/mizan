@@ -55,7 +55,7 @@ export const OPT_IN_LANES: readonly OptInLane[] = [
   {
     id: "corpus",
     reason: `every test here measures ${CORPUS_RELATIVE}, which is gitignored and therefore absent from a clean clone — the same absence \`bun run ci\` has to survive for \`accept:customer\``,
-    tests: ["scripts/benchmark.corpus.test.ts"],
+    tests: ["scripts/benchmark.corpus.test.ts", "scripts/article-determinism.corpus.test.ts"],
   },
   {
     id: "clean-clone",
@@ -67,8 +67,15 @@ export const OPT_IN_LANES: readonly OptInLane[] = [
 /** Bun's test-file shapes: `*.test.ts`, `*_test.ts`, `*.spec.ts`. Kept literal, per AGENTS.md section 17. */
 const TEST_FILE = /(\.test|_test|\.spec)\.[cm]?[jt]sx?$/
 
-/** `\` on Windows, `/` everywhere else. Bun's recursive `readdirSync` uses the platform separator. */
-const posix = (path: string): string => path.replace(/\\/g, "/")
+/**
+ * `\` on Windows, `/` everywhere else. Bun's recursive `readdirSync` uses the platform separator.
+ *
+ * Exported because the lane table is keyed in POSIX spelling and a test that compared against
+ * `import.meta.path` verbatim would look for an entry that cannot exist on Windows, then report the
+ * corpus lane as undeclared. Two spellings of one path is the defect `ci-lanes.test.ts` exists to
+ * catch, so the spelling is one declaration and both callers import it.
+ */
+export const posix = (path: string): string => path.replace(/\\/g, "/")
 
 /** The lane a test file was excluded into, or `null` when the default lane runs it. */
 export const laneOf = (testFile: string): OptInLane | null =>
