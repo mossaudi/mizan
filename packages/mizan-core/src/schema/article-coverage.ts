@@ -357,6 +357,8 @@ export const ArticleCoverageArtefact = Schema.Struct({
     selector: Schema.String,
     runsCompared: Schema.Number,
   }),
+  /** Optional note clarifying the nature of this artefact (e.g., test-harness-only). */
+  note: Schema.optional(Schema.String),
 })
 export type ArticleCoverageArtefact = Schema.Schema.Type<typeof ArticleCoverageArtefact>
 

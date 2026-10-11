@@ -32,6 +32,13 @@ export type BuildContext = {
 export const toCorpusRecord = (raw: RawRecord, context: BuildContext): CorpusRecord => {
   const { descriptor } = context.meta
   const sourceUrl = raw.sourceUrl ?? descriptor.url
+
+  // Morphology (root/stem/lemma) is NOT extracted during ingestion.
+  // The measurement artefact (bun run eval:roots) computes morphology at query time
+  // using analyzeText() which properly splits text into words. Storing a single
+  // root/stem/lemma per record is not meaningful for multi-word texts (ayahs, hadiths).
+  // These fields remain undefined in the snapshot; the hash excludes them for stability.
+
   return {
     id: raw.id,
     collection: raw.collection,
@@ -47,6 +54,9 @@ export const toCorpusRecord = (raw: RawRecord, context: BuildContext): CorpusRec
     textDisplay: raw.textDisplay,
     textMatch: normalizeForMatch(raw.textDisplay),
     translation: raw.translation ?? undefined,
+    root: undefined,
+    stem: undefined,
+    lemma: undefined,
   }
 }
 
@@ -104,6 +114,9 @@ const SNAPSHOT_HASHED_FIELDS = [
   "gradeApplicable",
   "textDisplay",
   "textMatch",
+  // root, stem, lemma are NOT included: they are not populated during ingestion
+  // (morphology is computed at query time for the measurement artefact only).
+  // Including them would make the hash unstable once we decide on a per-word storage design.
 ] as const
 
 export const computeSnapshotHash = (records: readonly CorpusRecord[]): string => {

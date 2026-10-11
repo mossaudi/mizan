@@ -40,7 +40,7 @@ import { Database } from "bun:sqlite"
 import { decodeOrFail, decodeSync, isOk, AnchorAdjudicationSet, EvalSet as EvalSetSchema, type CollectionCoverageRow } from "@mizan/core"
 import { anchorsOf, anchorProblems, buildGolden, buildRedTeam, finalise, unassigned, validate } from "./eval/build.ts"
 import { indexCorpus, loadFoldedCorpus } from "./eval/anchors.ts"
-import { ADJUDICATION_ROWS, ADJUDICATION_TARGET, redTeamMovement } from "./eval/adjudication.ts"
+import { ADJUDICATION_ROWS, redTeamMovement } from "./eval/adjudication.ts"
 import { adjudicationLookup, buildAdjudicationBody, checkStaleAdjudication, validateAdjudications } from "./eval/adjudication-loader.ts"
 import { anchorCoverageProblems, CLAIM_ANCHOR_TEXTS } from "./eval/anchor-texts.ts"
 import { DIGIT_FACTS, expectedCounts, GOLDEN_TARGET, goldenTotal } from "./eval/plan.ts"
@@ -134,7 +134,7 @@ const buildSet = (
  * a build problem and nothing is written. A set published without an identity is the defect this
  * whole seam exists to remove.
  */
-const identify = (body: Record<string, unknown>, cases: ReturnType<typeof finalise>): Record<string, unknown> => {
+const identify = (body: Record<string, unknown>, _cases: ReturnType<typeof finalise>): Record<string, unknown> => {
   const identity = identityOf(body)
   if (!isOk(identity)) throw new Error(`${String(body["set"])}: content cannot be canonicalised, so it has no identity: ${identity.error.detail}`)
   return { ...body, datasetDigest: identity.value }

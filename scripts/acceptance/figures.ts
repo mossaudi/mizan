@@ -35,7 +35,7 @@
  */
 
 import { EvalSet, decodeOrFail, decodeSync, identityMismatch, isErr, isOk } from "@mizan/core"
-import { BENCHMARK_ARTEFACT, COVERAGE_SET, collectionCountsOf, coverageVerdictKey } from "@mizan/gate"
+import { COVERAGE_SET, collectionCountsOf, coverageVerdictKey } from "@mizan/gate"
 import { ARTEFACT_PATH, LATENCY_BAND_MULTIPLIER, HARNESS_COMMAND } from "../eval/suggest-coverage.ts"
 
 /**

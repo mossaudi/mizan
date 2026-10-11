@@ -47,6 +47,9 @@ const RECORD_COLUMNS = [
   "textDisplay",
   "textMatch",
   "translation",
+  "root",
+  "stem",
+  "lemma",
 ] as const
 
 const SCHEMA = `
@@ -64,7 +67,10 @@ CREATE TABLE records (
   sourceUrl      TEXT NOT NULL,
   textDisplay    TEXT NOT NULL,
   textMatch      TEXT NOT NULL,
-  translation    TEXT
+  translation    TEXT,
+  root           TEXT,
+  stem           TEXT,
+  lemma          TEXT
 );
 CREATE INDEX records_by_collection_number ON records (collection, number);
 CREATE INDEX records_by_number ON records (number);
@@ -96,6 +102,9 @@ const toRow = (record: CorpusRecord): readonly (string | number | null)[] => [
   record.textDisplay,
   record.textMatch,
   record.translation ?? null,
+  record.root ?? null,
+  record.stem ?? null,
+  record.lemma ?? null,
 ]
 
 const countByCollection = (records: readonly CorpusRecord[]): Record<string, number> => {

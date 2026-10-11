@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-10T17:46:45.583Z",
+  "generatedBy": "packages/mizan-bench/src/root-coverage.ts",
+  "corpusFingerprint": "quran-uthmani-tanzil",
+  "method": {
+    "name": "dual-stemmer-cross-check",
+    "stemmers": [
+      {
+        "name": "custom-rule-based",
+        "version": "1.0.0",
+        "description": "Lightweight affix stripping with triliteral root extraction (SIMULATED)"
+      },
+      {
+        "name": "alkhalil-style",
+        "version": "1.0.0",
+        "description": "Pattern-based morphological analyzer simulating AlKhalil approach (SIMULATED)"
+      }
+    ],
+    "description": "Dual-stemmer cross-check over Quranic corpus. No index built or shipped. Both stemmers are rule-based approximations for methodological transparency ONLY.",
+    "limitations": [
+      "Stemmers are rule-based approximations (SIMULATED), not production morphological analyzers",
+      "No validation against gold-standard root dictionary performed",
+      "Does not handle Quranic orthography variants (hamza forms, alif maqsura, etc.)",
+      "Disagreement patterns filtered to exclude morphologically invalid roots (repeated chars, non-Arabic)",
+      "Output is methodological transparency exercise ONLY"
+    ]
+  },
+  "results": {
+    "totalAyat": 6236,
+    "processedAyat": 6236,
+    "skippedAyat": 0,
+    "customStemmer": {
+      "uniqueRoots": 2562
+    },
+    "alkhalilStemmer": {
+      "uniqueRoots": 4075
+    },
+    "crossCheck": {
+      "unionRoots": 4334,
+      "intersectionRoots": 2303,
+      "customOnlyRoots": 259,
+      "alkhalilOnlyRoots": 1772,
+      "delta": 0.4686202122750346,
+      "deltaPercent": "46.86%",
+      "agreementRate": "53.14%"
+    }
+  },
+  "disagreementPatterns": {
+    "customOnly": [
+      "رتم",
+      "نتا",
+      "ستي",
+      "اظت",
+      "مزح",
+      "مكي",
+      "اءر",
+      "نحت",
+      "لسر",
+      "يضت",
+      "افط",
+      "ختف",
+      "اغا",
+      "ستس",
+      "ساع",
+      "يطت",
+      "لجس",
+      "اصا",
+      "يوب",
+      "رلو"
+    ],
+    "alkhalilOnly": [
+      "رحن",
+      "يون",
+      "يقم",
+      "رزن",
+      "ينق",
+      "ميق",
+      "وقم",
+      "ءتن",
+      "امو",
+      "قاو",
+      "ارو",
+      "مون",
+      "بنم",
+      "حجب",
+      "ناو",
+      "يخو",
+      "تقء",
+      "يفن",
+      "عنم",
+      "الء"
+    ]
+  },
+  "indexShipped": false,
+  "indexReference": null,
+  "productionReady": false,
+  "warnings": [
+    "Stemmers are rule-based approximations (SIMULATED), not production morphological analyzers",
+    "46.86% delta (disagreement rate) between stemmers is too high for reliable use",
+    "No validation against gold-standard root dictionary performed",
+    "Does not handle Quranic orthography variants (hamza forms, alif maqsura, etc.)",
+    "Output is methodological transparency exercise ONLY"
+  ],
+  "note": "WARNING: This measurement uses RULE-BASED APPROXIMATIONS (simulated stemmers). The 46.86% delta indicates significant disagreement between stemmers. The declared ~1,651 Quranic roots reflects established morphological studies; this tool's output is a methodological transparency exercise ONLY. No index is built or shipped from this data. Disagreement patterns filtered for morphological validity."
+}

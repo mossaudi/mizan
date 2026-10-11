@@ -30,4 +30,7 @@ export const MAX_QUOTE_CHARS = 4_096
 /** The most folded record characters any consumer will look at. */
 export const MAX_RECORD_CHARS = 65_536
 
+/** Minimum Arabic characters (after folding) for a quote to be verifiable by deterministic containment. */
+export const MIN_VERIFIABLE_QUOTE_CHARS = 15
+
 export * as Bounds from "./bounds.ts"

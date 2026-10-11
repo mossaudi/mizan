@@ -1,5 +1,25 @@
 import { Schema } from "effect"
 
+const ARABIC_LETTERS_ONLY = /^[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+$/
+
+// Arabic root constraints: triliteral (3) or quadriliteral (4) roots, 2-5 letters to allow for extraction artifacts
+export const ArabicRoot = Schema.String.pipe(
+  Schema.check(Schema.isPattern(ARABIC_LETTERS_ONLY)),
+  Schema.check(Schema.isLengthBetween(2, 5))
+)
+
+// Arabic stem constraints: 2-20 Arabic letters
+export const ArabicStem = Schema.String.pipe(
+  Schema.check(Schema.isPattern(ARABIC_LETTERS_ONLY)),
+  Schema.check(Schema.isLengthBetween(2, 20))
+)
+
+// Arabic lemma (dictionary form) constraints: 2-30 Arabic letters
+export const ArabicLemma = Schema.String.pipe(
+  Schema.check(Schema.isPattern(ARABIC_LETTERS_ONLY)),
+  Schema.check(Schema.isLengthBetween(2, 30))
+)
+
 /**
  * `CorpusRecord` — one addressable row of the corpus, and the only thing a
  * verification decision is ever allowed to touch.
@@ -82,6 +102,12 @@ export const CorpusRecord = Schema.Struct({
   textDisplay: Schema.String,
   textMatch: Schema.String,
   translation: Schema.optional(Schema.String),
+  /** Optional Arabic root extracted during morphological analysis. Constrained to 2-5 Arabic letters. NOT YET POPULATED. */
+  root: Schema.optional(ArabicRoot),
+  /** Optional stem extracted during morphological analysis. Constrained to 2-20 Arabic letters. NOT YET POPULATED. */
+  stem: Schema.optional(ArabicStem),
+  /** Optional lemma (dictionary form) extracted during morphological analysis. Constrained to 2-30 Arabic letters. NOT YET POPULATED. */
+  lemma: Schema.optional(ArabicLemma),
 })
 export type CorpusRecord = Schema.Schema.Type<typeof CorpusRecord>
 
@@ -104,6 +130,12 @@ export const CorpusRecordMeta = Schema.Struct({
   sourceUrl: Schema.String,
   /** sha256 of `textDisplay`, so a tampered row is detectable without storing the row. */
   textHash: Schema.String,
+  /** Optional Arabic root extracted during morphological analysis. Constrained to 2-5 Arabic letters. NOT YET POPULATED. */
+  root: Schema.optional(ArabicRoot),
+  /** Optional stem extracted during morphological analysis. Constrained to 2-20 Arabic letters. NOT YET POPULATED. */
+  stem: Schema.optional(ArabicStem),
+  /** Optional lemma (dictionary form) extracted during morphological analysis. Constrained to 2-30 Arabic letters. NOT YET POPULATED. */
+  lemma: Schema.optional(ArabicLemma),
 })
 export type CorpusRecordMeta = Schema.Schema.Type<typeof CorpusRecordMeta>
 
@@ -121,6 +153,9 @@ export const toRecordMeta = (record: CorpusRecord, sha256Hex: (value: string) =>
   licenseUrl: record.licenseUrl,
   sourceUrl: record.sourceUrl,
   textHash: sha256Hex(record.textDisplay),
+  root: record.root,
+  stem: record.stem,
+  lemma: record.lemma,
 })
 
 export * as RecordSchema from "./record.ts"

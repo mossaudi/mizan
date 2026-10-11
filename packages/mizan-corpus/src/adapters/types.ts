@@ -42,6 +42,12 @@ export type RawRecord = {
   readonly gradeBasis: GradeBasis
   /** Optional translation, never used for a verdict. */
   readonly translation: string | null
+  /** Optional Arabic root extracted during morphological analysis. */
+  readonly root?: string
+  /** Optional stem extracted during morphological analysis. */
+  readonly stem?: string
+  /** Optional lemma (dictionary form) extracted during morphological analysis. */
+  readonly lemma?: string
 }
 
 export type AdapterResult = {

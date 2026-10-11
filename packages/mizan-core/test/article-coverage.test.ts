@@ -2,6 +2,9 @@ import { describe, expect, test } from "bun:test"
 import {
   ARTICLE_COVERAGE_SCHEMA_VERSION,
   ArticleCoverageReport,
+  ArticleCoverageArtefact,
+  ArticleArtefactCase,
+  ArticleTotals,
   CONDITION_OF_GAP,
   CoverageGap,
   GapReason,
@@ -207,5 +210,143 @@ describe("every gap reason is adjudicated into the shared vocabulary", () => {
     expect(CONDITION_OF_GAP.verification_timeout).toBe("unverifiable")
     expect(CONDITION_OF_GAP.model_unavailable).toBe("model_unavailable")
     expect(CONDITION_OF_GAP.no_sources_found).toBe("no_sources_found")
+  })
+})
+
+describe("ArticleCoverageArtefact schema — the committed selection-recall artefact", () => {
+  const validArtefact = {
+    schemaVersion: 1,
+    generatedBy: "bun run article:report",
+    corpusFingerprint: "article-harness:corpus-free:no-provider:v1",
+    totals: {
+      segments: 7,
+      extracted: 3,
+      checked: 3,
+      verified: 0,
+      unverifiable: 3,
+      rejected: 0,
+      notExtracted: 4,
+    },
+    cases: [
+      {
+        id: "clean-quote",
+        documentDigest: "a".repeat(64),
+        segments: 3,
+        extracted: 1,
+        checked: 1,
+        verified: 0,
+        unverifiable: 1,
+        rejected: 0,
+        notExtracted: 2,
+      },
+    ],
+    conditions: {
+      corpus: "none",
+      provider: "none",
+      selector: "deterministic",
+      runsCompared: 10,
+    },
+    note: "TEST ARTEFACT ONLY",
+  }
+
+  const decodeArtefact = (payload: unknown) =>
+    decodeOrFail(decodeSync(ArticleCoverageArtefact), payload, "ArticleCoverageArtefact")
+
+  test("a well-formed artefact with note field decodes", () => {
+    const decoded = decodeArtefact(validArtefact)
+    expect(decoded.ok).toBe(true)
+    if (decoded.ok) {
+      expect(decoded.value.note).toBe("TEST ARTEFACT ONLY")
+    }
+  })
+
+  test("an artefact without optional note field decodes", () => {
+    const { note, ...withoutNote } = validArtefact
+    const decoded = decodeArtefact(withoutNote)
+    expect(decoded.ok).toBe(true)
+    if (decoded.ok) {
+      expect(decoded.value.note).toBeUndefined()
+    }
+  })
+
+  test("a missing required field (totals) is a decode failure", () => {
+    const { totals, ...withoutTotals } = validArtefact
+    const decoded = decodeArtefact(withoutTotals)
+    expect(decoded.ok).toBe(false)
+    if (!decoded.ok) {
+      expect(decoded.error.schema).toBe("ArticleCoverageArtefact")
+    }
+  })
+
+  test("an invalid totals shape is a decode failure", () => {
+    const invalid = {
+      ...validArtefact,
+      totals: {
+        ...validArtefact.totals,
+        segments: "not-a-number",
+      },
+    }
+    const decoded = decodeArtefact(invalid)
+    expect(decoded.ok).toBe(false)
+  })
+
+  test("an invalid case in cases array is a decode failure", () => {
+    const invalid = {
+      ...validArtefact,
+      cases: [
+        {
+          ...validArtefact.cases[0],
+          segments: "not-a-number",
+        },
+      ],
+    }
+    const decoded = decodeArtefact(invalid)
+    expect(decoded.ok).toBe(false)
+  })
+
+  test("an invalid conditions block is a decode failure", () => {
+    const invalid = {
+      ...validArtefact,
+      conditions: {
+        ...validArtefact.conditions,
+        runsCompared: "not-a-number",
+      },
+    }
+    const decoded = decodeArtefact(invalid)
+    expect(decoded.ok).toBe(false)
+  })
+
+  test("the note field accepts any string including empty", () => {
+    const withEmptyNote = { ...validArtefact, note: "" }
+    const decoded = decodeArtefact(withEmptyNote)
+    expect(decoded.ok).toBe(true)
+    if (decoded.ok) {
+      expect(decoded.value.note).toBe("")
+    }
+  })
+
+  test("ArticleArtefactCase schema validates correctly", () => {
+    const decodeCase = (payload: unknown) =>
+      decodeOrFail(decodeSync(ArticleArtefactCase), payload, "ArticleArtefactCase")
+
+    const validCase = validArtefact.cases[0]
+    const decoded = decodeCase(validCase)
+    expect(decoded.ok).toBe(true)
+  })
+
+  test("ArticleTotals schema validates correctly", () => {
+    const decodeTotals = (payload: unknown) =>
+      decodeOrFail(decodeSync(ArticleTotals), payload, "ArticleTotals")
+
+    const decoded = decodeTotals(validArtefact.totals)
+    expect(decoded.ok).toBe(true)
+  })
+
+  test("the failure never echoes the payload, which is untrusted and may be enormous", () => {
+    const decoded = decodeArtefact("x".repeat(50_000))
+    expect(decoded.ok).toBe(false)
+    if (!decoded.ok) {
+      expect(decoded.error.detail.length).toBeLessThanOrEqual(220)
+    }
   })
 })

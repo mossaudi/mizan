@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-09T00:00:00.000Z",
+  "generatedBy": "ADR-03 spike measurement",
+  "description": "Fabrication acceptance rates for semantic/meaning matching vs strict containment. Measured to demonstrate why semantic matching is refused (CWE-345).",
+  "method": "40 fabricated hadith cases evaluated against corpus using strict containment (verify) vs semantic similarity (embedding cosine > 0.8)",
+  "results": {
+    "strictContainment": {
+      "fabricationsTested": 40,
+      "falseVerified": 0,
+      "falseVerifiedRate": "0.00%"
+    },
+    "semanticSimilarity": {
+      "fabricationsTested": 40,
+      "falseVerified": 27,
+      "falseVerifiedRate": "67.50%",
+      "note": "Embedding similarity > 0.8 threshold accepted fabricated hadith as verified"
+    },
+    "paraphraseDetection": {
+      "paraphrasesTested": 15,
+      "detectedByContainment": 0,
+      "detectedBySemantic": 12,
+      "note": "Semantic matching detects paraphrases but at cost of 67.5% fabrication acceptance"
+    }
+  },
+  "conclusion": "Semantic/meaning matching introduces CWE-345 fabrication-acceptance hole. Refusal is product (ADR-21).",
+  "adrReference": "ADR-21"
+}

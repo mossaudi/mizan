@@ -45,3 +45,4 @@ export {
 } from "./build.ts"
 
 export * as Bench from "./build.ts"
+export * as RootCoverage from "./root-coverage.ts"

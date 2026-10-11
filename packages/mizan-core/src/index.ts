@@ -30,7 +30,7 @@ export { elapsedMs, isExpired, nowIso, startDeadline, withDeadline, withDeadline
 
 export { matchesExactly, normalize, normalizeForMatch, normalizeForRender, normalizeForTerminal, isNonBlank } from "./normalize/normalize.ts"
 export { BIDI_CONTROL_MARKS, COMBINING_MARKS, FOLD_PIPELINE, FOLD_STAGE_NOTES, type FoldStage } from "./normalize/fold-table.ts"
-export { MAX_QUOTE_CHARS, MAX_RECORD_CHARS } from "./normalize/bounds.ts"
+export { MAX_QUOTE_CHARS, MAX_RECORD_CHARS, MIN_VERIFIABLE_QUOTE_CHARS } from "./normalize/bounds.ts"
 export { displayWidth, isBareControl, stripTerminalControls, ESC, ZERO_WIDTH } from "./normalize/terminal.ts"
 
 export { decodeOrFail, decodeSync, describeDecodeFailure, type Decodable, type DecodeFailure } from "./schema/decode.ts"
@@ -56,6 +56,7 @@ export {
   notCheckedSegments,
   notExtractedSegments,
 } from "./schema/article-coverage.ts"
+export { isQuoteTooShort, renderRefusalBlock, renderRefusalBlocks } from "./render/refusal-block.ts"
 export {
   ARTICLE_PROTOCOL_VERSION,
   ArticleChunkCounts,
@@ -73,7 +74,7 @@ export { CollectionCoverageRow, DivergenceResolution, EvalAnchor, EvalCase, Eval
 export { DegradationCondition, conditionOf, decodeCondition, describedConditions, describeCondition } from "./schema/degradation.ts"
 export { ResolvedCitation, unresolved } from "./schema/resolved.ts"
 export { SSR_SCHEMA_VERSION, SsrResult } from "./schema/ssr.ts"
-export { CorpusRecord, CorpusRecordMeta, GradeBasis, QURAN_COLLECTION, toRecordMeta } from "./schema/record.ts"
+export { CorpusRecord, CorpusRecordMeta, GradeBasis, QURAN_COLLECTION, toRecordMeta, ArabicRoot, ArabicStem, ArabicLemma } from "./schema/record.ts"
 export {
   LicenceClass,
   SourceDescriptor,

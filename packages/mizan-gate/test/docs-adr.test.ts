@@ -186,31 +186,26 @@ describe("the repository's own ADRs — the acceptance criteria, against the rea
     const files = readdirSync(ADR_ROOT)
       .filter((name) => name.startsWith("ADR" + "-") && name.endsWith(".md"))
       .sort()
-    // Six legacy identifiers and the thirteen recorded since — ADR-C1 through ADR-C9, then ADR-07
-    // through ADR-10 for the nearest-quote suggestions — plus ADR-C10 and ADR-C11 from the Sprint 1
-    // precision cycle (measurement conditions; the pinned Effect beta), ADR-12 through ADR-14 (the
-    // display floor; the published-latency claim rule; the Effect deferral seam), and ADR-15 and
-    // ADR-17 (per-collection anchor derivation and the fabrication coverage floor; recall as a
-    // precondition before any index). The count is asserted rather
-    // than left open because a new decision that does not land here is a decision no citation can
-    // resolve, and that is exactly what rule twelve exists to prevent. It is the one count in this
-    // file that stays typed, deliberately: rule twelve above proves every citation resolves, so what is
-    // left for this to catch is a file added to the directory without anyone reading it. ADR-16 and
-    // ADR-18 are the Sprint 1 dispositions of the v7 milestone reviews: each records a decision made
-    // this cycle (one era supported; the claim surface artefact-backed), whose alternative reading
-    // was rejected for this cycle and is recorded there, not here. ADR-16 also closed the numbering
-    // hole the earlier revision of this comment described — the identifier before ADR-17 now
-    // resolves, which is why the citation sweep above passes and the count below is 32 because the article-verification
-    // deal contributed four records: the bounded stateless chunk contract, the document coverage
-    // report as the unit of accountability, the refusal of in-meaning nearest-match, and the
-    // companion licence gate. The numbering continues from ADR-18, so the gap above the last of them
-    // is deliberate rather than lost: the root-coverage measurement that would have occupied it is
-    // NOT executable against this corpus, because `CorpusRecord` carries no root, stem or lemma field
-    // and no stemmer exists anywhere in the tree. Writing a decision record about an artefact nobody
-    // can produce is the over-claiming this suite exists to forbid, so the figure stays unmeasured and
-    // no prose quotes a coverage number for it.
-    // Every identifier written literally in this comment resolves to a document.
-    expect(files).toHaveLength(32)
+// Six legacy identifiers and the thirteen recorded since — ADR-C1 through ADR-C9, then ADR-07
+// through ADR-10 for the nearest-quote suggestions — plus ADR-C10 and ADR-C11 from the Sprint 1
+// precision cycle (measurement conditions; the pinned Effect beta), ADR-12 through ADR-14 (the
+// display floor; the published-latency claim rule; the Effect deferral seam), and ADR-15 and
+// ADR-17 (per-collection anchor derivation and the fabrication coverage floor; recall as a
+// precondition before any index). The count is asserted rather
+// than left open because a new decision that does not land here is a decision no citation can
+// resolve, and that is exactly what rule twelve exists to prevent. It is the one count in this
+// file that stays typed, deliberately: rule twelve above proves every citation resolves, so what is
+// left for this to catch is a file added to the directory without anyone reading it. ADR-16 and
+// ADR-18 are the Sprint 1 dispositions of the v7 milestone reviews: each records a decision made
+// this cycle (one era supported; the claim surface artefact-backed), whose alternative reading
+// was rejected for this cycle and is recorded there, not here. ADR-16 also closed the numbering
+// hole the earlier revision of this comment described — the identifier before ADR-17 now
+// resolves, which is why the citation sweep above passes and the count below is 33 because the article-verification
+// deal contributed five records: the bounded stateless chunk contract (ADR-19), the document coverage
+// report as the unit of accountability (ADR-20), the refusal of in-meaning nearest-match (ADR-21),
+// the root-coverage measurement artefact (ADR-22), and the companion licence gate (ADR-23).
+// Every identifier written literally in this comment resolves to a document.
+    expect(files).toHaveLength(33)
     const incomplete: string[] = []
     for (const name of files) {
       const claims = checkAdrDocument(readFileSync(join(ADR_ROOT, name), "utf8"), `${ADR_DIRECTORY}/${name}`)

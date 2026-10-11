@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "test",
+  "corpusFingerprint": "abc123",
+  "declaredRootCount": 272,
+  "rootsFound": 3,
+  "coveragePercent": "1.1%",
+  "dualStemmer": {
+    "totalWords": 100,
+    "agreed": 80,
+    "disagreed": 10,
+    "agreementRate": "80.0%"
+  },
+  "conditions": {
+    "corpus": "abc123",
+    "stemmerVersion": "v1",
+    "dictionaryVersion": "v1"
+  },
+  "note": "test"
+}

@@ -571,6 +571,27 @@ describe("reading the committed artefacts back — decoded, never cast", () => {
     expect(snapshotHashedFields()).toContain("textDisplay")
   })
 
+  test("snapshot hash does NOT change when root field changes (not in hash)", () => {
+    const base = record()
+    const changed = { ...base, root: "ك ت ب" }
+    // root is not in SNAPSHOT_HASHED_FIELDS, so hash should be stable
+    expect(computeSnapshotHash([changed])).toBe(computeSnapshotHash([base]))
+  })
+
+  test("snapshot hash does NOT change when stem field changes (not in hash)", () => {
+    const base = record()
+    const changed = { ...base, stem: "ك ت ب" }
+    // stem is not in SNAPSHOT_HASHED_FIELDS, so hash should be stable
+    expect(computeSnapshotHash([changed])).toBe(computeSnapshotHash([base]))
+  })
+
+  test("snapshot hash does NOT change when lemma field changes (not in hash)", () => {
+    const base = record()
+    const changed = { ...base, lemma: "ك ت ب" }
+    // lemma is not in SNAPSHOT_HASHED_FIELDS, so hash should be stable
+    expect(computeSnapshotHash([changed])).toBe(computeSnapshotHash([base]))
+  })
+
   const good = appendEntry("0".repeat(64), 1, {
     source: "tanzil/quran-uthmani",
     rows: 6236,
@@ -785,5 +806,79 @@ describe("the tanzil adapter refuses a changed format", () => {
 
   test("the expected ayah count is the real count of the real artefact", () => {
     expect(EXPECTED_AYAH_COUNT).toBe(6236)
+  })
+})
+
+describe("morphology fields exist in schema but are not populated during ingestion", () => {
+  test("ingested records have root, stem, lemma fields present but undefined", async () => {
+    // Provide a valid Tanzil format with enough lines to pass the format check
+    const ayahs = Array(6236).fill("إِنَّمَا الْأَعْمَالُ بِالنِّيَّاتِ").join("\n")
+    const fetcher: Fetcher = async () => ({
+      ok: true,
+      value: `#====\n${ayahs}\n#====`
+    })
+
+    // Use a unique temp dir to avoid EBUSY on Windows
+    const uniqueTmp = join(tmpdir(), `mizan-morph-test-${Date.now()}`)
+    const result = await runIngest({
+      root: uniqueTmp,
+      now: "2026-01-01T00:00:00.000Z",
+      fetcher,
+      only: ["tanzil/quran-uthmani"],
+      limit: 1,
+    })
+
+    if (!isOk(result)) throw new Error(`ingest failed: ${result.error.detail}`)
+    const records = result.value.records
+    expect(records.length).toBe(1)
+    const record = records[0]
+    if (record === undefined) throw new Error("record is undefined")
+    // Morphology fields exist in schema but are not populated during ingestion
+    // (morphology is computed at query time for the measurement artefact only)
+    expect("root" in record).toBe(true)
+    expect("stem" in record).toBe(true)
+    expect("lemma" in record).toBe(true)
+    // They should be undefined since we don't populate them during ingestion
+    expect(record.root).toBeUndefined()
+    expect(record.stem).toBeUndefined()
+    expect(record.lemma).toBeUndefined()
+  })
+
+  test("snapshot hash does NOT change when morphology fields change (not in hash)", () => {
+    const baseRecord = toCorpusRecord(raw({ id: "test:1", textDisplay: "العالمين" }), { meta: meta(), gradeSource: "test" })
+    const withRoot = { ...baseRecord, root: "عالم" }
+    const withStem = { ...baseRecord, stem: "عالمين" }
+    const withLemma = { ...baseRecord, lemma: "عالم" }
+
+    const hashBase = computeSnapshotHash([baseRecord])
+    const hashRoot = computeSnapshotHash([withRoot])
+    const hashStem = computeSnapshotHash([withStem])
+    const hashLemma = computeSnapshotHash([withLemma])
+
+    // Morphology fields are not in SNAPSHOT_HASHED_FIELDS, so hash should be stable
+    expect(hashRoot).toBe(hashBase)
+    expect(hashStem).toBe(hashBase)
+    expect(hashLemma).toBe(hashBase)
+  })
+
+  test("database schema includes root, stem, lemma columns", () => {
+    const records = [
+      toCorpusRecord(raw({ id: "test:1", textDisplay: "العالمين" }), { meta: meta(), gradeSource: "test" }),
+    ]
+    const path = join(tmpdir(), "mizan-schema-test.db")
+    const snapshot = buildSnapshot(path, records)
+    const db = openSnapshot(path)
+    const row = db.query<{ root: string | null; stem: string | null; lemma: string | null }, []>(
+      "SELECT root, stem, lemma FROM records WHERE id = 'test:1'"
+    ).get()
+    db.close()
+    expect(row).toBeDefined()
+    // Columns exist (values are null since not populated during ingestion)
+    expect("root" in row!).toBe(true)
+    expect("stem" in row!).toBe(true)
+    expect("lemma" in row!).toBe(true)
+    expect(row!.root).toBeNull()
+    expect(row!.stem).toBeNull()
+    expect(row!.lemma).toBeNull()
   })
 })

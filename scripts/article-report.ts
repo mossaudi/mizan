@@ -100,6 +100,7 @@ export const articleArtefactOf = (): ArticleCoverageArtefact => {
       selector: "deterministic delimited-quotation and speech-introduced selection, no model assist",
       runsCompared: RUNS_COMPARED,
     },
+    note: "THIS IS A TEST-HARNESS-ONLY ARTEFACT. It was produced without a corpus database and without a model provider. The coverage report reflects the extractor's behavior on synthetic fixtures, NOT a validation of the verification pipeline. Do not cite as evidence of pipeline correctness.",
   }
 }
 

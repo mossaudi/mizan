@@ -21,7 +21,7 @@ import { CorpusRecord, decodeOrFail, decodeSync, type DecodeFailure, type Result
 
 /** Every column a full record needs, in the order `CorpusRecord` declares them. */
 export const RECORD_COLUMNS =
-  "id, collection, number, grade, gradeApplicable, gradeSource, gradeBasis, attribution, license, licenseUrl, sourceUrl, textDisplay, textMatch, translation"
+  "id, collection, number, grade, gradeApplicable, gradeSource, gradeBasis, attribution, license, licenseUrl, sourceUrl, textDisplay, textMatch, translation, root, stem, lemma"
 
 /**
  * The three columns a nearest-quote scan needs, and nothing more.
@@ -53,6 +53,9 @@ export type RawRow = {
   readonly textDisplay: string
   readonly textMatch: string
   readonly translation: string | null
+  readonly root: string | null
+  readonly stem: string | null
+  readonly lemma: string | null
 }
 
 /** A candidate row: what the nearest-quote scan reads, and nothing else. */
@@ -78,6 +81,9 @@ export const toRecord = (row: RawRow): unknown => ({
   textDisplay: row.textDisplay,
   textMatch: row.textMatch,
   translation: row.translation ?? undefined,
+  root: row.root ?? undefined,
+  stem: row.stem ?? undefined,
+  lemma: row.lemma ?? undefined,
 })
 
 /**

@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
-import { existsSync } from "node:fs"
+import { existsSync, readFileSync, realpathSync } from "node:fs"
 import { readFile } from "node:fs/promises"
+import { resolve } from "node:path"
 import { Database } from "bun:sqlite"
 import {
   err,
@@ -11,6 +12,7 @@ import {
   type Result,
   type RunTraceDraft,
 } from "@mizan/core"
+import { isQuoteTooShort, renderRefusalBlocks } from "./render/refusal-block.ts"
 import { attestSnapshot, describeAttestationProblem, openSnapshot, readSnapshotMeta, resolveCitations } from "@mizan/corpus"
 import { verifyAnswer } from "@mizan/verify"
 import type { Provider } from "@mizan/agent"
@@ -329,10 +331,78 @@ const listQuestions = async (root: string): Promise<number> => {
   return EXIT_OK
 }
 
+/**
+ * Demo document processing for refusal block testing (MS2-4).
+ * Reads a markdown document, extracts quoted spans using regex-based extraction
+ * (for offline demo without a configured model), and renders refusal blocks for
+ * quotes that are too short for deterministic verification.
+ */
+const processDemoDocument = async (root: string, docPath: string): Promise<number> => {
+  // Prevent path traversal: resolve the path, resolve symlinks, and ensure it's within the project root
+  const fullPath = resolve(root, docPath)
+  let realPath: string
+  try {
+    realPath = realpathSync(fullPath)
+  } catch {
+    console.error("Demo document path cannot be resolved")
+    return EXIT_USAGE
+  }
+  if (!realPath.startsWith(root)) {
+    console.error("Demo document path escapes project boundary")
+    return EXIT_USAGE
+  }
+  if (!existsSync(realPath)) {
+    console.error(`Demo document not found: ${realPath}`)
+    return EXIT_USAGE
+  }
+
+  const content = readFileSync(realPath, "utf8")
+
+  // Extract quotes using regex (for demo without model)
+  // Matches both 「...」 and "..." quote styles
+  const quotePattern = /[「"]([^」"]+)[」"]/g
+  const quotes: { quote: string; segmentIndex: number }[] = []
+
+  const sections = content.split(/^##\s+/m)
+  for (let i = 0; i < sections.length; i++) {
+    const section = sections[i]
+    if (section === undefined) continue
+    const sectionQuotes = section.match(quotePattern) || []
+    for (const q of sectionQuotes) {
+      const cleanQuote = q.slice(1, -1)
+      quotes.push({ quote: cleanQuote, segmentIndex: i })
+    }
+  }
+
+  console.log(`Processing demo document: ${docPath}`)
+  console.log(`Found ${sections.length - 1} sections (excluding title)`)
+  console.log(`Extracted ${quotes.length} quote candidates\n`)
+
+  const refusalLines = await renderRefusalBlocks(quotes)
+  if (refusalLines.length > 0) {
+    console.log(refusalLines.join("\n"))
+  } else {
+    console.log("No refusal blocks — all quotes meet minimum length threshold.")
+  }
+
+  return EXIT_OK
+}
+
 const main = async (): Promise<number> => {
   const root = process.cwd()
   const argv = process.argv.slice(2)
   if (argv.includes("--list-questions")) return await listQuestions(root)
+
+  // MS2-4: Demo document processing for refusal blocks
+  const demoFlagIndex = argv.indexOf("--demo")
+  if (demoFlagIndex !== -1 && demoFlagIndex + 1 < argv.length) {
+    const docPath = argv[demoFlagIndex + 1]
+    if (docPath === undefined) {
+      console.error("--demo flag requires a document path")
+      return EXIT_USAGE
+    }
+    return await processDemoDocument(root, docPath)
+  }
 
   const question = questionOf(argv)
   if (question === null) {
