@@ -17,6 +17,7 @@
   "dependencies": {
     "@mizan/core": "workspace:*",
     "@mizan/corpus": "workspace:*",
+    "@mizan/retrieval": "workspace:*",
     "@mizan/verify": "workspace:*"
   },
   "devDependencies": {

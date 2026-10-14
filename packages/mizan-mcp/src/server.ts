@@ -1,7 +1,48 @@
-import { err, isErr, normalizeQuote, summariseVerdict, type Claim, type ClaimVerdict, type Result } from "@mizan/core"
+import { err, isErr, normalizeQuote, sha256Hex, summariseVerdict, type Claim, type ClaimVerdict, type Result } from "@mizan/core"
 import { executeVerifyDocument, MAX_CURSOR_CHARS, MAX_SPANS_PER_CHUNK } from "./article-contract.ts"
 import { conditionOfCorpusProblem, describeCorpusProblem, type CorpusProblem, type Verifier } from "./verifier.ts"
 import { serve, stdioPort, type Port, type ServeOptions } from "./transport.ts"
+import { executeSearchShamela, executeReadShamelaPage } from "./tools/shamela-tools.ts"
+import type { Database } from "bun:sqlite"
+
+/**
+ * Simple in-memory rate limiter for MCP tools.
+ * Uses a sliding window per tool to prevent abuse.
+ */
+const RATE_LIMIT_WINDOW_MS = 60_000 // 1 minute window
+const RATE_LIMIT_MAX_REQUESTS = 100 // max requests per window per tool
+
+interface RateLimitEntry {
+  timestamps: number[]
+}
+
+const rateLimitStore = new Map<string, RateLimitEntry>()
+
+/**
+ * Check and record a request for rate limiting.
+ * Returns true if allowed, false if rate limited.
+ */
+const checkRateLimit = (toolName: string): boolean => {
+  const now = Date.now()
+  const windowStart = now - RATE_LIMIT_WINDOW_MS
+
+  const entry = rateLimitStore.get(toolName) ?? { timestamps: [] }
+  // Remove timestamps outside the window
+  entry.timestamps = entry.timestamps.filter((ts) => ts > windowStart)
+
+  if (entry.timestamps.length >= RATE_LIMIT_MAX_REQUESTS) {
+    return false
+  }
+
+  entry.timestamps.push(now)
+  rateLimitStore.set(toolName, entry)
+  return true
+}
+
+/** Reset rate limit state (for testing). */
+export const resetRateLimit = (): void => {
+  rateLimitStore.clear()
+}
 
 /**
  * MCP (Model Context Protocol) server for mizan verification.
@@ -51,6 +92,9 @@ export const REQUEST_TIMEOUT_MS = 30_000
 
 /** The cap on any single client-supplied string field. A question longer than this is not a question. */
 export const MAX_QUESTION_LENGTH = 10_000
+
+/** Deterministic request counter for questionHash generation (no Math.random). */
+let requestCounter = 0
 
 /** How many claims one `tools/call` may carry. Mirrors the verifier's own per-answer work bound. */
 export const MAX_CLAIMS_PER_CALL = 32
@@ -207,8 +251,10 @@ export const VERIFY_DOCUMENT_TOOL: McpTool = {
   },
 }
 
-/** Every tool this server exposes. Both are read-only, and both are deterministic. */
-export const TOOLS: readonly McpTool[] = [VERIFY_TOOL, VERIFY_DOCUMENT_TOOL]
+import { SHAMELA_TOOLS } from "./tools/shamela-tools.ts"
+
+/** Every tool this server exposes. All are read-only and deterministic. */
+export const TOOLS: readonly McpTool[] = [VERIFY_TOOL, VERIFY_DOCUMENT_TOOL, ...SHAMELA_TOOLS]
 
 const PARSE_ERROR = -32700
 const INVALID_REQUEST = -32600
@@ -476,7 +522,13 @@ export const executeVerifyDocumentTool = (
  * only as the timestamp it was given, which is why `Date.now()` appears at the call site in
  * `createServer` rather than here.
  */
-export const handleRequest = (request: JsonRpcRequest, verifier: Verifier, startedAt: number, budgetMs: number): JsonRpcResponse => {
+export const handleRequest = (
+  request: JsonRpcRequest,
+  verifier: Verifier,
+  startedAt: number,
+  budgetMs: number,
+  db: Database | null = null
+): JsonRpcResponse => {
   const { id, method } = request
 
   if (method === "initialize") {
@@ -498,9 +550,28 @@ export const handleRequest = (request: JsonRpcRequest, verifier: Verifier, start
     const params = request.params as Record<string, unknown> | undefined
     const name = params?.["name"]
     const args = params?.["arguments"]
+    const questionHash = sha256Hex(`${startedAt}-${id}-${requestCounter++}`)
+
+    // Rate limiting: check before executing any tool
+    if (typeof name === "string" && !checkRateLimit(name)) {
+      return { jsonrpc: "2.0", id, result: toolError("rate_limited", `rate limit exceeded for tool: ${name}`) }
+    }
+
     if (name === VERIFY_TOOL.name) return { jsonrpc: "2.0", id, result: executeVerify(verifier, args, startedAt, budgetMs) }
     if (name === VERIFY_DOCUMENT_TOOL.name) {
       return { jsonrpc: "2.0", id, result: executeVerifyDocumentTool(verifier, args, startedAt, budgetMs) }
+    }
+    if (name === "search_shamela") {
+      if (db === null) {
+        return { jsonrpc: "2.0", id, error: { code: INVALID_PARAMS, message: "search_shamela requires database access" } }
+      }
+      return { jsonrpc: "2.0", id, result: executeSearchShamela(db, args, questionHash) }
+    }
+    if (name === "read_shamela_page") {
+      if (db === null) {
+        return { jsonrpc: "2.0", id, error: { code: INVALID_PARAMS, message: "read_shamela_page requires database access" } }
+      }
+      return { jsonrpc: "2.0", id, result: executeReadShamelaPage(db, args, questionHash) }
     }
     return { jsonrpc: "2.0", id, error: { code: INVALID_PARAMS, message: `unknown tool: ${String(name)}` } }
   }
@@ -526,12 +597,12 @@ const errorResponse = (id: string | number | null, code: number, message: string
  * parse error.
  */
 export const createDispatcher =
-  (verifier: Verifier, budgetMs: number = REQUEST_TIMEOUT_MS) =>
+  (verifier: Verifier, db: Database | null = null, budgetMs: number = REQUEST_TIMEOUT_MS) =>
   (line: string): string | null => {
     const message = parseMessage(line)
     if (message === null) return errorResponse(null, PARSE_ERROR, "Parse error")
     if (!("id" in message)) return null
-    return JSON.stringify(handleRequest(message, verifier, Date.now(), budgetMs))
+    return JSON.stringify(handleRequest(message, verifier, Date.now(), budgetMs, db))
   }
 
 /**
@@ -577,7 +648,7 @@ export const framing = (cancelled: () => boolean): ServeOptions => ({
  * and its own `dispatch`, so there is nothing here for two clients to interleave on — which is what
  * "no state is leaked between clients" means when the answer is "there is no shared state to leak".
  */
-export const createServer = (verifier: Verifier, budgetMs: number = REQUEST_TIMEOUT_MS) => {
+export const createServer = (verifier: Verifier, db: Database | null = null, budgetMs: number = REQUEST_TIMEOUT_MS) => {
   let running = false
   let stopping = false
   let active: Port | null = null
@@ -587,13 +658,13 @@ export const createServer = (verifier: Verifier, budgetMs: number = REQUEST_TIME
       return running
     },
     /** Answer one request, without a transport. The same path `start` uses. `null` means write nothing. */
-    dispatch: createDispatcher(verifier, budgetMs),
+    dispatch: createDispatcher(verifier, db, budgetMs),
     start: async (port: Port = stdioPort()): Promise<number> => {
       running = true
       stopping = false
       active = port
       try {
-        return await serve(port, createDispatcher(verifier, budgetMs), framing(() => stopping))
+        return await serve(port, createDispatcher(verifier, db, budgetMs), framing(() => stopping))
       } finally {
         running = false
         active = null

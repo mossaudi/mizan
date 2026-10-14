@@ -44,5 +44,15 @@ export {
 } from "./query.ts"
 
 export { Search, search } from "./search.ts"
+export { ShamelaSearch, searchShamela, searchAllCollections, type ShamelaSearchResult, type ShamelaSearchRow } from "./shamela-search.ts"
+export {
+  fuseWithWeights,
+  toShamelaChunks,
+  toRecordChunks,
+  getHitMetadata,
+  type UnifiedSearchResult,
+  type RetrievalWeights,
+  DEFAULT_RETRIEVAL_WEIGHTS,
+} from "./fusion.ts"
 
 export { TOOL_BUDGET_MS, Tools, hadithSearch, quranSearch, tafsirLookup } from "./tools.ts"

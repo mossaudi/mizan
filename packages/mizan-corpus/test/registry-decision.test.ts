@@ -125,7 +125,7 @@ describe("the companion / athar decision is recorded either way", () => {
     }
   })
 
-  test("the ADAPTERS table registers only the two enabled sources", () => {
+  test("the ADAPTERS table registers only the enabled sources", () => {
     // Asserted through the table itself rather than through the text that names it, so a future adapter
     // for an excluded source fails here instead of being noticed in a review of a licence decision.
     expect(ADAPTERS.map((adapter) => adapter.slug)).toEqual([

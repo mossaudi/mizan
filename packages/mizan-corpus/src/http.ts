@@ -31,13 +31,18 @@ import { err, isErr, isOk, ok, sha256Hex, type Result } from "@mizan/core"
  * provenance question to answer deliberately, not something to follow automatically.
  */
 
-export const ALLOWED_HOSTS = ["tanzil.net", "huggingface.co", "datasets-server.huggingface.co"] as const
+export const ALLOWED_HOSTS = [
+  "tanzil.net",
+  "huggingface.co",
+  "datasets-server.huggingface.co",
+  "api.shamela.ws",
+] as const
 
 export const REQUEST_TIMEOUT_MS = 60_000
 
 export type FetchFailure = {
   readonly _tag: "fetch_failed"
-  readonly reason: "url_not_allowed" | "network_error" | "http_status" | "too_large"
+  readonly reason: "url_not_allowed" | "network_error" | "http_status" | "too_large" | "misconfigured"
   readonly detail: string
 }
 
@@ -78,7 +83,7 @@ export const MAX_BACKOFF_MS = 120_000
  * gets a schedule sized to the actual ceiling (5, 15, 30, 60, 120 s) and 503 gets the ordinary
  * exponential one. Waiting is the correct response to a throttle; it is not an error path.
  */
-const THROTTLE_BACKOFF_MS = [5_000, 15_000, 30_000, 60_000, 120_000] as const
+export const THROTTLE_BACKOFF_MS = [5_000, 15_000, 30_000, 60_000, 120_000] as const
 
 /**
  * Statuses worth waiting out.
@@ -96,12 +101,15 @@ const THROTTLE_BACKOFF_MS = [5_000, 15_000, 30_000, 60_000, 120_000] as const
  * later on the identical URL. Treating "not now" as "no" is what turns a transient blip into a
  * failed build, and a corpus that fails closed on a blip is a corpus nobody will re-run.
  */
-const isWorthRetrying = (status: number): boolean => RETRYABLE_STATUSES.has(status)
+export const isWorthRetrying = (status: number): boolean => RETRYABLE_STATUSES.has(status)
 
 /** Kept as data so the policy is reviewable in one place and testable without a network. */
 export const RETRYABLE_STATUSES: ReadonlySet<number> = new Set([429, 500, 502, 503, 504])
 
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+/**
+ * Sleep utility for backoff. Exported so adapters can reuse the retry logic.
+ */
+export const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
 /**
  * Backoff for `attempt` (1-based) against a `429` or a `503`.
@@ -150,7 +158,8 @@ const attemptFetch = async (url: string): Promise<Result<string, FetchFailure>> 
   }
 }
 
-const statusOf = (failure: FetchFailure): number | null => {
+/** Extract HTTP status from fetch failure. Exported for adapter reuse. */
+export const statusOf = (failure: FetchFailure): number | null => {
   if (failure.reason !== "http_status") return null
   const parsed = Number.parseInt(failure.detail.split(" ")[0] ?? "", 10)
   return Number.isNaN(parsed) ? null : parsed

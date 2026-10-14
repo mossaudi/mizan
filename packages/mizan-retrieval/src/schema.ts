@@ -75,6 +75,8 @@ export const RankedChunk = Schema.Struct({
   attribution: Schema.String,
   license: Schema.String,
   sourceUrl: Schema.String,
+  /** SHA-256 of the record content, for attestation and integrity verification. */
+  sourceHash: Schema.String,
 })
 export type RankedChunk = Schema.Schema.Type<typeof RankedChunk>
 
@@ -105,3 +107,19 @@ export const SearchResult = Schema.Struct({
 export type SearchResult = Schema.Schema.Type<typeof SearchResult>
 
 export * as RetrievalSchema from "./schema.ts"
+
+export const RetrievalWeights = Schema.Struct({
+  quran: Schema.Number,
+  hadith: Schema.Number,
+  shamela: Schema.Number,
+})
+export type RetrievalWeights = Schema.Schema.Type<typeof RetrievalWeights>
+
+export const UnifiedSearchResult = Schema.Struct({
+  collection: Schema.Union([Schema.Literal("quran"), Schema.Literal("hadith"), Schema.Literal("shamela")]),
+  ref: Schema.String,
+  score: Schema.Number,
+  snippet: Schema.String,
+  sourceHash: Schema.String,
+})
+export type UnifiedSearchResult = Schema.Schema.Type<typeof UnifiedSearchResult>

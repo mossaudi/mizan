@@ -39,6 +39,7 @@ const CONDITIONS = [
   "attestation_mismatch",
   "unmeasured",
   "document_too_large",
+  "shamela_unavailable",
 ] as const
 
 describe("DegradationCondition", () => {
@@ -75,7 +76,7 @@ describe("DegradationCondition", () => {
     const source = readFileSync(join(import.meta.dir, "..", "src", "schema", "degradation.ts"), "utf8")
     const declared = [...source.matchAll(/"([a-z_]+)"/g)].map((match) => match[1] ?? "")
     for (const condition of CONDITIONS) expect(declared).toContain(condition)
-    expect(CONDITIONS).toHaveLength(11)
+    expect(CONDITIONS).toHaveLength(12)
   })
 })
 

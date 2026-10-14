@@ -1,5 +1,22 @@
 import { REQUIRED_LICENCE_FIELDS, decodeOrFail, decodeSync, isOk, SourceRegistry } from "@mizan/core"
 import type { Finding } from "../scan.ts"
+import * as fs from "fs"
+import * as path from "path"
+
+/** Find the shamela license registry by walking up from cwd. */
+const findShamelaLicenseRegistry = (): string | null => {
+  let currentDir = process.cwd()
+  for (let i = 0; i < 5; i++) {
+    const candidate = path.join(currentDir, "data", "registry", "shamela-licenses.json")
+    if (fs.existsSync(candidate)) {
+      return candidate
+    }
+    const parent = path.dirname(currentDir)
+    if (parent === currentDir) break
+    currentDir = parent
+  }
+  return null
+}
 
 /**
  * G-5 — no empty licence fields, and no unconfirmed licence on an enabled source.
@@ -105,6 +122,29 @@ export const checkLicenceFields = (parsed: unknown, path: string = REGISTRY_PATH
       )
     }
   })
+
+  // G-5.6: Validate per-book license registry for Shamela
+  if (registry.sources.some((s) => s.source === "shamela/ws" && s.enabled)) {
+    const registryPath = findShamelaLicenseRegistry()
+    if (!registryPath) {
+      findings.push(finding(path, 0, "G-5.6 shamela-license-registry-missing", "shamela/ws is enabled but per-book license registry not found"))
+    } else {
+      try {
+        const text = fs.readFileSync(registryPath, "utf8")
+        const parsed = JSON.parse(text)
+        if (typeof parsed !== "object" || parsed === null || !Array.isArray(parsed.books)) {
+          findings.push(finding(path, 0, "G-5.6 shamela-license-registry-invalid", "shamela license registry missing books array"))
+        } else {
+          const clearedCount = parsed.books.filter((b: { licenseStatus: string }) => b.licenseStatus === "cleared").length
+          if (clearedCount === 0) {
+            findings.push(finding(path, 0, "G-5.6 shamela-no-cleared-books", "shamela license registry has no cleared books"))
+          }
+        }
+      } catch {
+        findings.push(finding(path, 0, "G-5.6 shamela-license-registry-unreadable", "shamela license registry cannot be read or parsed"))
+      }
+    }
+  }
 
   return findings
 }

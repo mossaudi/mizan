@@ -1,8 +1,17 @@
 import type { Database } from "bun:sqlite"
 import { isOk, ok, QURAN_COLLECTION, type Result, type RetrievalError } from "@mizan/core"
 import { fuse, type FusedHit, type RankedList } from "./rrf.ts"
-import { broadExpression, phraseExpression, prefixExpression, prepareQuery } from "./query.ts"
+import { broadExpression, phraseExpression, prefixExpression, prepareQuery, expressionsFor, cleanLimit, RECENT, scopeSql, DEFAULT_LIMIT, MAX_LIMIT } from "./search-common.ts"
 import type { CorpusScope, Query, RankedChunk, SearchResult } from "./schema.ts"
+import { searchShamela } from "./shamela-search.ts"
+import {
+  fuseWithWeights,
+  getHitMetadata,
+  toRecordChunks,
+  type UnifiedSearchResult,
+  type RetrievalWeights,
+  DEFAULT_RETRIEVAL_WEIGHTS,
+} from "./fusion.ts"
 
 /**
  * The two lexical rankers and their fusion.
@@ -17,83 +26,6 @@ import type { CorpusScope, Query, RankedChunk, SearchResult } from "./schema.ts"
  * simply not asked here. It is asked once, later, by the verifier, and the verifier only accepts
  * exact containment.
  */
-
-/** Ranks a document that no ranker returned must not outrank one that did. */
-const DEFAULT_LIMIT = 8
-const MAX_LIMIT = 32
-
-const RECENT = 1_000
-
-const cleanLimit = (limit: number | undefined): number => {
-  if (limit === undefined) return DEFAULT_LIMIT
-  if (!Number.isFinite(limit)) return DEFAULT_LIMIT
-  return Math.min(Math.max(Math.trunc(limit), 1), MAX_LIMIT)
-}
-
-/**
- * The scope predicate, in one place.
- *
- * `bm25Order` interpolates this SQL, so the string is assembled from a closed union and never
- * from caller input — the only bound value is `QURAN_COLLECTION`, which is a constant from
- * `@mizan/core`. `hadith` is written as an exclusion rather than a list of slugs so that a
- * hadith collection added tomorrow is searchable without a code change, and so the two scopes
- * cannot drift apart: they are the same comparison, read in opposite directions.
- */
-const scopeSql = (scope: CorpusScope): { readonly predicate: string; readonly bindings: readonly string[] } => {
-  if (scope === "any") return { predicate: "1 = 1", bindings: [] }
-  if (scope === "quran") return { predicate: "r.collection = ?", bindings: [QURAN_COLLECTION] }
-  return { predicate: "r.collection <> ?", bindings: [QURAN_COLLECTION] }
-}
-
-/**
- * The recall pass: the OR of the query tokens, ranked by FTS5's BM25.
- *
- * `bm25()` returns NEGATIVE numbers, more negative meaning a better match, so ascending order is
- * best-first. Only the ordering is consumed — the magnitude is never compared across rankers.
- */
-export const bm25Order = (db: Database, expression: string, scope: CorpusScope | undefined, take: number): readonly string[] => {
-  const filter = scopeSql(scope ?? "any")
-  const sql = `SELECT f.recordId AS id FROM records_fts f JOIN records r ON r.id = f.recordId
-     WHERE records_fts MATCH ? AND (${filter.predicate})
-     ORDER BY bm25(records_fts) ASC, f.recordId ASC LIMIT ?`
-  const bindings: [string, ...string[], number] = [expression, ...filter.bindings, take]
-  return db
-    .query<FtsRow, (string | number)[]>(sql)
-    .all(...bindings)
-    .map((row) => row.id)
-}
-
-/**
- * The distinct rank passes a query of this shape actually produces.
- *
- * Passes are deduplicated on their EXPRESSION, and the prefix pass is always included.
- *
- * Dropping the prefix pass for a single-token query is the tempting micro-optimisation, and it is
- * backwards: a one-word question is the case that needs it most. Arabic inflection means "مسجد"
- * has to reach the token in "مسجدا", and only the prefix pass can do that — the OR and phrase
- * passes both fail on it. The prefix pass is the sole recall mechanism for single words.
- *
- * Deduplication is the other half. With one token the OR and phrase expressions are byte-identical,
- * so fusing them as if they were two independent rankers would double-count a single opinion and
- * inflate every score, making a weak match look like a strong one. RRF is only meaningful over
- * genuinely different opinions.
- *
- * Exported for the test that pins both properties, because both are invisible from the outside:
- * a doubled pass and a missing one both look like "results came back".
- */
-export const expressionsFor = (tokens: readonly string[]): readonly { readonly name: string; readonly expression: string }[] => {
-  const candidates = [
-    { name: "bm25_or", expression: broadExpression(tokens) },
-    { name: "phrase", expression: phraseExpression(tokens) },
-    { name: "prefix", expression: prefixExpression(tokens) },
-  ]
-  const seen = new Set<string>()
-  return candidates.filter((pass) => {
-    if (seen.has(pass.expression)) return false
-    seen.add(pass.expression)
-    return true
-  })
-}
 
 /** One row of `records`, as the FTS join needs it. */
 type FtsRow = { readonly id: string }
@@ -114,36 +46,22 @@ type ChunkRow = {
 
 const CHUNK_COLUMNS = "id, collection, number, grade, gradeApplicable, gradeSource, attribution, license, sourceUrl"
 
-/** Attach the metadata a citation needs, and never anything the ranker has no business carrying. */
-const toChunks = (db: Database, hits: readonly FusedHit[]): readonly RankedChunk[] => {
-  // An empty `IN ()` is a SQL syntax error, so the empty case returns before a query is built.
-  if (hits.length === 0) return []
-  const ids = hits.map((hit) => hit.id)
-  const placeholders = ids.map(() => "?").join(", ")
-  const rows = db.query<ChunkRow, string[]>(`SELECT ${CHUNK_COLUMNS} FROM records WHERE id IN (${placeholders})`).all(...ids)
-  const byId = new Map(rows.map((row) => [row.id, row]))
-
-  return hits.flatMap((hit, index) => {
-    const row = byId.get(hit.id)
-    if (row === undefined) return []
-    return [
-      {
-        id: row.id,
-        collection: row.collection,
-        number: row.number,
-        rank: index,
-        score: hit.score,
-        grade: row.grade,
-        // `=== 1` rather than `Boolean(...)`: a corrupt row would otherwise silently read as
-        // "applicable" by way of being truthy, which is a grade we did not earn.
-        gradeApplicable: row.gradeApplicable === 1,
-        gradeSource: row.gradeSource,
-        attribution: row.attribution,
-        license: row.license,
-        sourceUrl: row.sourceUrl,
-      },
-    ]
-  })
+/**
+ * The recall pass: the OR of the query tokens, ranked by FTS5's BM25.
+ *
+ * `bm25()` returns NEGATIVE numbers, more negative meaning a better match, so ascending order is
+ * best-first. Only the ordering is consumed — the magnitude is never compared across rankers.
+ */
+export const bm25Order = (db: Database, expression: string, scope: CorpusScope | undefined, take: number): readonly string[] => {
+  const filter = scopeSql(scope ?? "any")
+  const sql = `SELECT f.recordId AS id FROM records_fts f JOIN records r ON r.id = f.recordId
+     WHERE records_fts MATCH ? AND (${filter.predicate})
+     ORDER BY bm25(records_fts) ASC, f.recordId ASC LIMIT ?`
+  const bindings: [string, ...string[], number] = [expression, ...filter.bindings, take]
+  return db
+    .query<FtsRow, (string | number)[]>(sql)
+    .all(...bindings)
+    .map((row) => row.id)
 }
 
 /**
@@ -156,7 +74,7 @@ export const search = (db: Database, query: Query): Result<SearchResult, Retriev
   const prepared = prepareQuery(query.text)
   if (!isOk(prepared)) return prepared
   const take = cleanLimit(query.limit)
-  const passes = expressionsFor(prepared.value)
+  const passes = expressionsFor(prepared.value, "bm25")
 
   const lists: RankedList[] = []
   for (const pass of passes) {
@@ -167,10 +85,13 @@ export const search = (db: Database, query: Query): Result<SearchResult, Retriev
   const hits = fuse(lists)
   const top = hits.slice(0, take)
   return ok({
-    chunks: toChunks(db, top),
+    chunks: toRecordChunks(db, top),
     count: Math.min(hits.length, take),
     ranking: lists.length > 1 ? "fused" : "unavailable",
   })
 }
+
+/** Exported for the test that pins the distinct pass count. */
+export { expressionsFor } from "./search-common.ts"
 
 export * as Search from "./search.ts"

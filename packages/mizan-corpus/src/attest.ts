@@ -1,5 +1,7 @@
 import { isErr, type Result, err, ok } from "@mizan/core"
 import { decodeAttestationText, describeReadFailure, type Attestation, type CommittedReadFailure } from "./ledger.ts"
+import type { Database } from "bun:sqlite"
+import { sha256Hex } from "@mizan/core"
 
 /**
  * The QUERY path's attestation check: is the snapshot on disk the one we said we would serve?
@@ -191,6 +193,47 @@ export const attestSnapshotUnchanged = (
   }
 
   return ok(before)
+}
+
+/**
+ * Shamela-specific attestation verification.
+ *
+ * Verifies that the Shamela corpus on disk matches the Shamela attestation.
+ * Uses the same pattern as the main corpus attestSnapshot but reads from
+ * the Shamela-specific ledger entries and database tables.
+ */
+export const verifyShamelaAttestation = (
+  db: Database,
+  committedText: string,
+): Result<Attestation, AttestationProblem> => {
+  // Read the Shamela attestation from the committed text
+  const decoded = decodeAttestationText(committedText)
+  if (isErr(decoded)) return err(readProblem(decoded.error))
+  const committed = decoded.value
+
+  // Compute the snapshot hash from the actual Shamela data
+  const pageRows = db.query<{ readonly source_hash: string }, []>(
+    `SELECT source_hash FROM shamela_pages ORDER BY rowid`
+  ).all()
+  const contentHashes = pageRows.map((r) => r.source_hash).sort().join("|")
+  const totalPages = pageRows.length
+  const snapshotHash = sha256Hex(`${contentHashes}|${totalPages}|shamela`)
+
+  if (committed.snapshotHash !== snapshotHash) {
+    return err({
+      _tag: "attestation_mismatch",
+      detail: `shamela attestation attests snapshotHash ${committed.snapshotHash.slice(0, 12)}…, the open database is ${snapshotHash.slice(0, 12)}…`,
+    })
+  }
+
+  if (committed.recordCount !== totalPages) {
+    return err({
+      _tag: "attestation_mismatch",
+      detail: `shamela attestation attests recordCount ${committed.recordCount}, the open database holds ${totalPages}`,
+    })
+  }
+
+  return ok(committed)
 }
 
 export * as Attest from "./attest.ts"

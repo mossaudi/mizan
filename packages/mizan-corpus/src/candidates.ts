@@ -235,3 +235,82 @@ export const fetchSuggestionRecords = (db: Database, recordIds: readonly string[
 }
 
 export * as Candidates from "./candidates.ts"
+
+/**
+ * Shamela record shape — the columns from shamela_pages FTS5 table.
+ */
+export type ShamelaRecord = {
+  readonly id: string
+  readonly collection: "shamela"
+  readonly number: string
+  readonly grade: null
+  readonly gradeApplicable: false
+  readonly gradeSource: "shamela/ws"
+  readonly gradeBasis: "none"
+  readonly attribution: string
+  readonly license: string
+  readonly sourceUrl: string
+  readonly textDisplay: string
+  readonly textMatch: string
+  readonly translation: undefined
+  readonly root: undefined
+  readonly stem: undefined
+  readonly lemma: undefined
+}
+
+/** Columns needed for Shamela record fetch. */
+const SHAMELA_RECORD_COLUMNS = "rowid, book_id, page_number, book_title, author, category, content, source_hash"
+
+/** Decode a Shamela row from the database. */
+const decodeShamelaRow = (row: { readonly rowid: number; readonly book_id: number; readonly page_number: number; readonly book_title: string; readonly author: string; readonly category: string; readonly content: string; readonly source_hash: string }): ShamelaRecord => ({
+  id: String(row.rowid),
+  collection: "shamela",
+  number: `${row.book_id}:${row.page_number}`,
+  grade: null,
+  gradeApplicable: false,
+  gradeSource: "shamela/ws",
+  gradeBasis: "none",
+  attribution: `${row.book_title} — ${row.author} (${row.category})`,
+  license: "content-only (verified per-book)",
+  sourceUrl: `https://shamela.ws/book/${row.book_id}/${row.page_number}`,
+  textDisplay: row.content,
+  textMatch: row.content, // Shamela FTS5 stores folded content (normalized at ingest via normalizeForMatch)
+  translation: undefined,
+  root: undefined,
+  stem: undefined,
+  lemma: undefined,
+})
+
+/**
+ * Fetch Shamela records by their rowid IDs.
+ *
+ * Same contract as fetchSuggestionRecords: all IDs must be found, max MAX_TOP_K,
+ * decode failure on any row fails the whole call.
+ */
+export const fetchShamelaRecords = (db: Database, recordIds: readonly string[]): Result<readonly ShamelaRecord[], CorpusError> => {
+  if (recordIds.length === 0) return ok([])
+  if (recordIds.length > MAX_TOP_K) {
+    return err({ _tag: "parse_failed", source: "suggestions", detail: `at most ${MAX_TOP_K} records may be fetched` })
+  }
+
+  const placeholders = recordIds.map(() => "?").join(", ")
+  let rows: Array<{ readonly rowid: number; readonly book_id: number; readonly page_number: number; readonly book_title: string; readonly author: string; readonly category: string; readonly content: string; readonly source_hash: string }>
+  try {
+    rows = db.query<{ readonly rowid: number; readonly book_id: number; readonly page_number: number; readonly book_title: string; readonly author: string; readonly category: string; readonly content: string; readonly source_hash: string }, string[]>(
+      `SELECT ${SHAMELA_RECORD_COLUMNS} FROM shamela_pages WHERE rowid IN (${placeholders}) ORDER BY rowid`
+    ).all(...recordIds)
+  } catch {
+    return err({ _tag: "parse_failed", source: "suggestions", detail: "the Shamela records behind the suggestions could not be re-read from the snapshot" })
+  }
+
+  const records: ShamelaRecord[] = []
+  for (const row of rows) {
+    records.push(decodeShamelaRow(row))
+  }
+
+  const found = new Set(records.map((record) => record.id))
+  const missing = recordIds.find((id) => !found.has(id))
+  if (missing !== undefined) return err({ _tag: "row_undecodable", recordId: missing, detail: "Shamela record vanished between the scan and the read" })
+
+  return ok(records)
+}

@@ -181,7 +181,7 @@ describe("search against a real FTS5 index", () => {
       // `ranking` must not claim a fusion of three.
       const tokens = prepareQuery("مسجد")
       if (!isOk(tokens)) throw new Error("expected tokens")
-      expect(expressionsFor(tokens.value).length).toBe(2)
+      expect(expressionsFor(tokens.value, "bm25").length).toBe(2)
     })
   })
 

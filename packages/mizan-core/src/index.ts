@@ -75,6 +75,7 @@ export { DegradationCondition, conditionOf, decodeCondition, describedConditions
 export { ResolvedCitation, unresolved } from "./schema/resolved.ts"
 export { SSR_SCHEMA_VERSION, SsrResult } from "./schema/ssr.ts"
 export { CorpusRecord, CorpusRecordMeta, GradeBasis, QURAN_COLLECTION, toRecordMeta, ArabicRoot, ArabicStem, ArabicLemma } from "./schema/record.ts"
+export { RootCoverageArtefact } from "./schema/root-coverage.ts"
 export {
   LicenceClass,
   SourceDescriptor,

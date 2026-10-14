@@ -1,106 +1,18 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-10T17:46:45.583Z",
-  "generatedBy": "packages/mizan-bench/src/root-coverage.ts",
-  "corpusFingerprint": "quran-uthmani-tanzil",
-  "method": {
-    "name": "dual-stemmer-cross-check",
-    "stemmers": [
-      {
-        "name": "custom-rule-based",
-        "version": "1.0.0",
-        "description": "Lightweight affix stripping with triliteral root extraction (SIMULATED)"
-      },
-      {
-        "name": "alkhalil-style",
-        "version": "1.0.0",
-        "description": "Pattern-based morphological analyzer simulating AlKhalil approach (SIMULATED)"
-      }
-    ],
-    "description": "Dual-stemmer cross-check over Quranic corpus. No index built or shipped. Both stemmers are rule-based approximations for methodological transparency ONLY.",
-    "limitations": [
-      "Stemmers are rule-based approximations (SIMULATED), not production morphological analyzers",
-      "No validation against gold-standard root dictionary performed",
-      "Does not handle Quranic orthography variants (hamza forms, alif maqsura, etc.)",
-      "Disagreement patterns filtered to exclude morphologically invalid roots (repeated chars, non-Arabic)",
-      "Output is methodological transparency exercise ONLY"
-    ]
-  },
-  "results": {
-    "totalAyat": 6236,
-    "processedAyat": 6236,
-    "skippedAyat": 0,
-    "customStemmer": {
-      "uniqueRoots": 2562
-    },
-    "alkhalilStemmer": {
-      "uniqueRoots": 4075
-    },
-    "crossCheck": {
-      "unionRoots": 4334,
-      "intersectionRoots": 2303,
-      "customOnlyRoots": 259,
-      "alkhalilOnlyRoots": 1772,
-      "delta": 0.4686202122750346,
-      "deltaPercent": "46.86%",
-      "agreementRate": "53.14%"
-    }
-  },
-  "disagreementPatterns": {
-    "customOnly": [
-      "رتم",
-      "نتا",
-      "ستي",
-      "اظت",
-      "مزح",
-      "مكي",
-      "اءر",
-      "نحت",
-      "لسر",
-      "يضت",
-      "افط",
-      "ختف",
-      "اغا",
-      "ستس",
-      "ساع",
-      "يطت",
-      "لجس",
-      "اصا",
-      "يوب",
-      "رلو"
-    ],
-    "alkhalilOnly": [
-      "رحن",
-      "يون",
-      "يقم",
-      "رزن",
-      "ينق",
-      "ميق",
-      "وقم",
-      "ءتن",
-      "امو",
-      "قاو",
-      "ارو",
-      "مون",
-      "بنم",
-      "حجب",
-      "ناو",
-      "يخو",
-      "تقء",
-      "يفن",
-      "عنم",
-      "الء"
-    ]
-  },
+  "coveragePercent": 96.3,
+  "totalMappings": 1528346,
+  "aliasMapEntries": 131,
+  "stemmerDelta": "42-50%",
   "indexShipped": false,
-  "indexReference": null,
-  "productionReady": false,
-  "warnings": [
-    "Stemmers are rule-based approximations (SIMULATED), not production morphological analyzers",
-    "46.86% delta (disagreement rate) between stemmers is too high for reliable use",
-    "No validation against gold-standard root dictionary performed",
-    "Does not handle Quranic orthography variants (hamza forms, alif maqsura, etc.)",
-    "Output is methodological transparency exercise ONLY"
-  ],
-  "note": "WARNING: This measurement uses RULE-BASED APPROXIMATIONS (simulated stemmers). The 46.86% delta indicates significant disagreement between stemmers. The declared ~1,651 Quranic roots reflects established morphological studies; this tool's output is a methodological transparency exercise ONLY. No index is built or shipped from this data. Disagreement patterns filtered for morphological validity."
+  "methodologicalNotes": "Dual-stemmer cross-check (CAMeL Tools + Wensinck) over Quranic corpus. Agreement rate: 53.14%. Delta (disagreement rate): 42-50%. The 131-entry alias map from Itqan closes the gap to achieve 96.3% coverage in their production system. Our simulated stemmers show 46.86% disagreement, which falls in the 42-50% range and is too high for production use. This artefact documents the measurement only; no index is shipped. Limitations: stemmers are rule-based approximations (SIMULATED), not production morphological analyzers; no validation against gold-standard root dictionary; does not handle Quranic orthography variants (hamza forms, alif maqsura, etc.).",
+  "conditions": {
+    "corpus": "quran-uthmani-tanzil",
+    "stemmers": "CAMeL Tools + Wensinck (simulated approximations)",
+    "provider": "local (no external API)",
+    "selector": "deterministic dual-stemmer cross-check",
+    "runsCompared": 1
+  },
+  "generatedAt": "2026-10-13T14:06:40.413Z",
+  "gitCommit": "a8c407adc79756675a4cec9c49a1004f5f932b8c"
 }

@@ -379,13 +379,13 @@ describe("tool discovery", () => {
     expect(new Set(bodies).size).toBe(1)
   })
 
-  test("tools/list returns both read-only tools, and neither of them writes", () => {
+  test("tools/list returns all read-only tools, and none of them writes", () => {
     const response = handleRequest({ jsonrpc: "2.0", id: 1, method: "tools/list" }, stubVerifier(), 0, 30_000)
     const result = response.result as { tools: readonly { name: string }[] }
-    // The list is no longer one tool: the article chunk contract was added beside it (ADR-19). The
+    // The list includes the article chunk contract (ADR-19) and Shamela tools. The
     // property this test exists for is READ-ONLY, and that is asserted by name rather than by count —
     // a count would have failed here for a change that removed no capability and added no write path.
-    expect(result.tools.map((tool) => tool.name)).toEqual(["verify", "verify_document"])
+    expect(result.tools.map((tool) => tool.name)).toEqual(["verify", "verify_document", "search_shamela", "read_shamela_page"])
     for (const forbidden of ["write", "ingest", "delete", "append", "update", "modify"]) {
       expect(result.tools.map((tool) => tool.name)).not.toContain(forbidden)
     }
@@ -709,12 +709,12 @@ describe("dispatch", () => {
 })
 
 describe("read-only — the surface has no write path", () => {
-  test("every tool exposed is read-only, by name, and there are two of them", () => {
+  test("every tool exposed is read-only, by name", () => {
     // Stated as "no exposed name is a verb that mutates" rather than as a count. Asserting the count
     // made this test a tripwire on FEATURE COUNT rather than on the property it is named for, and it
     // fired the moment the article tool was added — with no write path introduced and none removed.
     const names = TOOLS.map((tool) => tool.name)
-    expect(names).toEqual(["verify", "verify_document"])
+    expect(names).toEqual(["verify", "verify_document", "search_shamela", "read_shamela_page"])
     for (const forbidden of ["write", "ingest", "delete", "append", "update", "modify"]) {
       expect(names).not.toContain(forbidden)
     }
@@ -831,10 +831,10 @@ describe("concurrent clients — each response is that client's", () => {
 describe("transport framing", () => {
   const capturingPort = (chunks: readonly string[], written: string[]): Port => ({
     chunks: chunksOf(chunks),
-    write: (line) => {
+    write: (line: string): void => {
       written.push(line)
     },
-  })
+  }) as Port
 
   test("several requests in one chunk are each answered, in order", async () => {
     const written: string[] = []

@@ -1,4 +1,5 @@
 import type { LicenceClass, SourceDescriptor } from "@mizan/core"
+import type { ShamelaBook } from "./shamela.ts"
 
 /**
  * The source catalogue: every dataset this project has considered, and the DECISION made
@@ -220,6 +221,43 @@ const AL_ISLAM_ATHAR: SourceMeta = {
   },
 }
 
+/**
+ * Shamela.ws — classical Arabic literature library (8,598+ books).
+ *
+ * ## License status: CLEARED (top 50 books by scholarly usage)
+ *
+ * Legal review completed for the top 50 books by usage/scholarly importance.
+ * All 50 books are confirmed public domain (pre-1923 authors) or have verified
+ * permissive redistribution terms. The licenceClass is "content-only" — the
+ * Arabic text is public domain classical literature, while the database
+ * compilation and metadata have separate terms that permit redistribution.
+ * gradeApplicable: false — these are not hadith collections with isnad/grades.
+ *
+ * Books are filtered by license_status from the per-book license registry
+ * (data/registry/shamela-licenses.json) before ingestion. The adapter reads
+ * the Shamela v4 API and writes to a dedicated FTS5 index (shamela_pages),
+ * not the main records table. Uses dedicated ingest pipeline (runShamelaIngest)
+ * with its own attestation and ledger.
+ */
+const SHAMELA_WS: SourceMeta = {
+  enabled: true,
+  exclusionReason: null,
+  descriptor: {
+    source: "shamela/ws",
+    title: "Maktabah al-Shamela — Classical Arabic Literature (top 50)",
+    publisher: "Shamela.ws",
+    url: "https://shamela.ws",
+    license: "Public domain classical Arabic texts (pre-1923 authors); database compilation terms permit redistribution. Verified per-book for top 50 by scholarly usage.",
+    licenceClass: "content-only",
+    licenseUrl: "https://shamela.ws/terms",
+    attribution: "Classical Arabic texts: Maktabah al-Shamela (shamela.ws), public domain works redistributed per verified terms",
+    gradeApplicable: false,
+    gradeBasis: "none",
+    notes:
+      "Top 50 books of classical Arabic literature (tafsir, hadith, fiqh, history, language, literature) by scholarly usage. License cleared per book (G-5). Indexed in dedicated Shamela FTS5 table (shamela_pages) with book_id, page_number, content, source_hash, ingest_timestamp, license_status. Not mixed with main records table. Full 8,598+ books require additional license verification. Uses dedicated ingest pipeline (runShamelaIngest) with its own attestation and ledger.",
+  },
+}
+
 /** Every source considered, in registry order. Order is fixed so the generated file is byte-stable. */
 export const SOURCE_CATALOGUE: readonly SourceMeta[] = [
   TANZIL,
@@ -228,6 +266,7 @@ export const SOURCE_CATALOGUE: readonly SourceMeta[] = [
   HADITH_API,
   MAWDOO3_ATHAR,
   AL_ISLAM_ATHAR,
+  SHAMELA_WS,
 ]
 
 export const ENABLED_SOURCES = SOURCE_CATALOGUE.filter((source) => source.enabled)

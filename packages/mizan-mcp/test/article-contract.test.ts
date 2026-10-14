@@ -398,7 +398,7 @@ describe("a corpus problem keeps the vocabulary the other tool uses", () => {
 
 describe("the tool is published and discoverable", () => {
   test("TOOLS carries both tools and the article one is declared", () => {
-    expect(TOOLS.map((tool) => tool.name)).toEqual(["verify", "verify_document"])
+    expect(TOOLS.map((tool) => tool.name)).toEqual(["verify", "verify_document", "search_shamela", "read_shamela_page"])
   })
 
   test("its input schema requires the document, because the digest cannot be client-supplied", () => {

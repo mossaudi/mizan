@@ -1,8 +1,13 @@
 import type { Database } from "bun:sqlite"
 import type { Suggestion, Verdict } from "@mizan/core"
+import { decodeOrFail, decodeSync } from "@mizan/core"
+import { RankedChunk } from "@mizan/retrieval"
 import { MAX_TOP_K } from "@mizan/suggest"
 import { MAX_SPANS_PER_CHUNK } from "@mizan/verify"
 import { suggestionFor, type NearbyText } from "./suggestions.ts"
+import { searchShamela } from "@mizan/retrieval"
+import { fetchShamelaRecords, type ShamelaRecord } from "@mizan/corpus"
+import { sharedRunOf, runClearsFloor } from "@mizan/verify"
 
 /**
  * Article-scale closest-in-words suggestions: one pass per NON-VERIFIED span, budgeted, display-only.
@@ -130,15 +135,23 @@ export const articleSuggestionsFor = (
  */
 const passFor = (db: Database, target: ArticleSuggestionTarget): ArticleSuggestionResult => {
   try {
-    const block = suggestionFor(db, target.quote, null)
-    if (block === null) {
+    // Search main corpus (Quran + Hadith)
+    const mainBlock = suggestionFor(db, target.quote, null)
+    
+    // Search Shamela corpus
+    const shamelaBlock = suggestionForShamela(db, target.quote)
+
+    // Combine results: prefer main corpus, fall back to Shamela
+    const combinedBlock = combineSuggestionBlocks(mainBlock, shamelaBlock, target.quote)
+    
+    if (combinedBlock === null) {
       return {
         segmentIndex: target.segmentIndex,
         state: "unavailable" as const,
         reason: "there is no quoted span to search with, so no candidate list was produced",
       }
     }
-    return { segmentIndex: target.segmentIndex, state: "searched" as const, suggestion: block.suggestion, texts: block.texts }
+    return { segmentIndex: target.segmentIndex, state: "searched" as const, suggestion: combinedBlock.suggestion, texts: combinedBlock.texts }
   } catch (cause) {
     const name = cause instanceof Error ? cause.name : "unknown failure"
     return {
@@ -146,6 +159,138 @@ const passFor = (db: Database, target: ArticleSuggestionTarget): ArticleSuggesti
       state: "unavailable" as const,
       reason: `the suggestion pass failed unexpectedly (${name})`,
     }
+  }
+}
+
+/** Shamela-specific suggestion search using trigram ranking. */
+const suggestionForShamela = (db: Database, quote: string): { suggestion: Suggestion; texts: readonly NearbyText[] } | null => {
+  if (quote.trim().length === 0) return null
+
+  try {
+    const results = searchShamela(db, { text: quote, limit: MAX_TOP_K })
+    if (!results.ok || results.value.chunks.length === 0) return null
+
+    // Validate search results through schema (AGENTS.md §1)
+    const validatedChunks: RankedChunk[] = []
+    for (const chunk of results.value.chunks) {
+      const decoded = decodeOrFail(decodeSync(RankedChunk), chunk, "RankedChunk")
+      if (!decoded.ok) continue // Skip invalid chunks
+      validatedChunks.push(decoded.value)
+    }
+
+    if (validatedChunks.length === 0) return null
+
+    // Fetch Shamela records to compute actual sharedRunChars
+    const recordIds = validatedChunks.map((c) => c.id)
+    const recordsResult = fetchShamelaRecords(db, recordIds)
+    if (!recordsResult.ok) return null
+
+    const byId = new Map(recordsResult.value.map((r) => [r.id, r]))
+
+    const candidates: Array<{
+      rank: number
+      recordId: string
+      collection: string
+      number: string | null
+      sourceUrl: string
+      attribution: string
+      license: string
+      grade: string | null
+      gradeApplicable: boolean
+      gradeSource: string
+      gradeBasis: "none"
+      sharedRunChars: number
+    }> = []
+
+    for (const chunk of validatedChunks) {
+      const record = byId.get(chunk.id)
+      if (!record) continue
+
+      const sharedRun = sharedRunOf(quote, record.textMatch)
+      if (!runClearsFloor(sharedRun)) continue
+
+      candidates.push({
+        rank: candidates.length + 1,
+        recordId: chunk.id,
+        collection: chunk.collection,
+        number: chunk.number,
+        sourceUrl: chunk.sourceUrl,
+        attribution: chunk.attribution,
+        license: chunk.license,
+        grade: chunk.grade,
+        gradeApplicable: chunk.gradeApplicable,
+        gradeSource: chunk.gradeSource,
+        gradeBasis: "none" as const,
+        sharedRunChars: sharedRun.sharedRunChars,
+      })
+    }
+
+    if (candidates.length === 0) {
+      return {
+        suggestion: {
+          state: "no_candidates",
+          considered: results.value.count,
+          scope: { kind: "collection", collection: "shamela" },
+          reason: "nothing ranked was close enough to show",
+        },
+        texts: [],
+      }
+    }
+
+    const texts: NearbyText[] = candidates.map((c) => {
+      const record = byId.get(c.recordId)!
+      return { recordId: c.recordId, textDisplay: record.textDisplay, textMatch: record.textMatch }
+    })
+
+    return {
+      suggestion: {
+        state: "candidates",
+        considered: results.value.count,
+        scope: { kind: "collection", collection: "shamela" },
+        quoteChars: candidates[0]?.sharedRunChars ?? quote.length,
+        candidates,
+      },
+      texts,
+    }
+  } catch {
+    return null
+  }
+}
+
+// Combine main corpus and Shamela suggestion blocks.
+const combineSuggestionBlocks = (
+  main: { suggestion: Suggestion; texts: readonly NearbyText[] } | null,
+  shamela: { suggestion: Suggestion; texts: readonly NearbyText[] } | null,
+  quote: string
+): { suggestion: Suggestion; texts: readonly NearbyText[] } | null => {
+  if (main === null && shamela === null) return null
+  if (main === null) return shamela
+  if (shamela === null) return main
+
+  // Both have candidates - merge them, preferring main corpus
+  const mainCandidates = main.suggestion.state === "candidates" ? main.suggestion.candidates : []
+  const shamelaCandidates = shamela.suggestion.state === "candidates" ? shamela.suggestion.candidates : []
+
+  if (mainCandidates.length === 0 && shamelaCandidates.length === 0) {
+    return main // Both have no candidates
+  }
+
+  // Combine candidates, main first
+  const combinedCandidates = [...mainCandidates, ...shamelaCandidates].slice(0, MAX_TOP_K)
+
+  // Sum considered counts only for candidate states
+  const mainConsidered = main.suggestion.state === "candidates" ? main.suggestion.considered : 0
+  const shamelaConsidered = shamela.suggestion.state === "candidates" ? shamela.suggestion.considered : 0
+
+  return {
+    suggestion: {
+      state: "candidates",
+      considered: mainConsidered + shamelaConsidered,
+      scope: { kind: "snapshot", widenedFrom: "quran+hadith" },
+      quoteChars: quote.length,
+      candidates: combinedCandidates,
+    },
+    texts: [...main.texts, ...shamela.texts],
   }
 }
 

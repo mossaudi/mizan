@@ -73,14 +73,14 @@ describe("the default lane", () => {
     for (const lane of OPT_IN_LANES) expect(lane.reason.trim().length).toBeGreaterThan(20)
   })
 
-  test("every entry is a greppable test file under scripts/, so a reader can find them", () => {
+  test("every entry is a greppable test file, so a reader can find them", () => {
     // The alternative rejected in `ci-lanes.ts`: naming the lane by convention instead of by table,
     // which puts tests in files that do not look like tests.
     for (const lane of OPT_IN_LANES) {
       expect(lane.tests.length).toBeGreaterThan(0)
       for (const test of lane.tests) {
-        expect(test.startsWith("scripts/")).toBe(true)
         expect(test.endsWith(".test.ts")).toBe(true)
+        expect(existsSync(`${ROOT()}/${test}`)).toBe(true)
       }
     }
   })

@@ -77,6 +77,14 @@ export const DegradationCondition = Schema.Union([
    * retried at all — and folding them together would send an integrator round the wrong loop.
    */
   Schema.Literal("document_too_large"),
+  /**
+   * The Shamela corpus is unavailable (not ingested, not licensed, or query failed).
+   *
+   * Distinct from `no_sources_found` because the Shamela source may be configured but not
+   * accessible — this is a pipeline dependency failure, not a query miss. A surface reports this
+   * when Shamela search is attempted but cannot complete.
+   */
+  Schema.Literal("shamela_unavailable"),
 ])
 export type DegradationCondition = Schema.Schema.Type<typeof DegradationCondition>
 
@@ -118,6 +126,8 @@ const CONDITION_SENTENCE: Readonly<Record<DegradationCondition, string>> = {
   unmeasured: "unmeasured: this figure was not produced in this checkout, which is not the same as a figure of zero. No number is published for it.",
   document_too_large:
     "document_too_large: the document is longer than the declared cap, so it was refused whole rather than shortened. Silent truncation into a partial report is forbidden; submit it in bounded chunks.",
+  shamela_unavailable:
+    "shamela_unavailable: the Shamela classical literature corpus is not available (not ingested, license not cleared, or query failed). This is a pipeline dependency failure, not a query miss. Run Shamela ingest after license clearance.",
 }
 
 export const describeCondition = (condition: DegradationCondition): string => CONDITION_SENTENCE[condition]

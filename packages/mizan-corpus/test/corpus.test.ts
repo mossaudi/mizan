@@ -764,6 +764,7 @@ describe("the source catalogue is a set of decisions, not a list of URLs", () =>
     expect(SOURCE_CATALOGUE.filter((source) => source.enabled).map((source) => source.descriptor.source)).toEqual([
       "tanzil/quran-uthmani",
       "quranlab/hadith",
+      "shamela/ws",
     ])
   })
 })

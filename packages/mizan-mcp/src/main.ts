@@ -2,6 +2,7 @@ import { join, resolve } from "node:path"
 import { isErr } from "@mizan/core"
 import { createServer } from "./server.ts"
 import { describeCorpusProblem, openCorpusVerifier, refusingVerifier, type Verifier } from "./verifier.ts"
+import type { Database } from "bun:sqlite"
 
 /**
  * MCP server entry point.
@@ -68,8 +69,8 @@ export const defaultAttestationPath = (): string =>
  * the `Verifier` and whether there is a handle to close — and a second copy of the transport's exit code
  * would be a second thing to get wrong.
  */
-const serveSession = async (verifier: Verifier, release: () => void): Promise<number> => {
-  const server = createServer(verifier)
+const serveSession = async (verifier: Verifier, db: Database | null, release: () => void): Promise<number> => {
+  const server = createServer(verifier, db)
   try {
     await server.start()
     return 0
@@ -93,9 +94,9 @@ export const main = async (): Promise<number> => {
     // are named here, once, in full, and nowhere else.
     console.error(`mcp server looked for the corpus at: ${corpusPath}`)
     console.error(`mcp server looked for the attestation at: ${attestationPath}`)
-    return serveSession(refusingVerifier(opened.error), () => undefined)
+    return serveSession(refusingVerifier(opened.error), null, () => undefined)
   }
-  return serveSession(opened.value.verifier, () => opened.value.db.close())
+  return serveSession(opened.value.verifier, opened.value.db, () => opened.value.db.close())
 }
 
 if (import.meta.main) {

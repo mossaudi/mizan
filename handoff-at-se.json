@@ -1,0 +1,168 @@
+{
+  "moduleStructure": [
+    {
+      "name": "mizan-corpus",
+      "type": "package",
+      "newFiles": [
+        "src/adapters/shamela.ts",
+        "src/ingest-shamela.ts",
+        "test/shamela-ingest.test.ts"
+      ],
+      "modifiedFiles": [
+        "src/adapters/source-meta.ts",
+        "src/ingest.ts"
+      ],
+      "responsibility": "Shamela.ws ingestion: license-gated adapter, FTS5 index, attestation pipeline"
+    },
+    {
+      "name": "mizan-retrieval",
+      "type": "package",
+      "newFiles": [
+        "src/shamela-search.ts",
+        "test/shamela-search.test.ts"
+      ],
+      "modifiedFiles": [
+        "src/search.ts"
+      ],
+      "responsibility": "Cross-collection RRF fusion (Quran + Hadith + Shamela), metadata-only results"
+    },
+    {
+      "name": "mizan-mcp",
+      "type": "package",
+      "newFiles": [
+        "src/tools/shamela-tools.ts",
+        "test/shamela-tools.test.ts"
+      ],
+      "modifiedFiles": [
+        "src/server.ts"
+      ],
+      "responsibility": "Agentic MCP tools: search_shamela, read_shamela_page for iterative evidence seeking"
+    },
+    {
+      "name": "mizan-bench",
+      "type": "package",
+      "newFiles": [
+        "test/root-coverage-artefact.test.ts"
+      ],
+      "modifiedFiles": [
+        "src/root-coverage.ts"
+      ],
+      "responsibility": "Root-coverage measurement artefact: upgrade to CAMeL + Wensinck dual-stemmer + 131-entry alias map"
+    },
+    {
+      "name": "mizan-core",
+      "type": "package",
+      "newFiles": [],
+      "modifiedFiles": [
+        "src/schema/degradation.ts"
+      ],
+      "responsibility": "Add shamela_unavailable degradation condition; export ArticleCoverageReport schema"
+    },
+    {
+      "name": "mizan-gate",
+      "type": "package",
+      "newFiles": [],
+      "modifiedFiles": [
+        "src/gates/g7-verdict-path-purity.ts",
+        "test/gates.test.ts"
+      ],
+      "responsibility": "G-7 self-tests for new display modules, completeness-denominator rule"
+    },
+    {
+      "name": "cli",
+      "type": "app",
+      "newFiles": [],
+      "modifiedFiles": [
+        "src/article-suggestions.ts"
+      ],
+      "responsibility": "Extend article suggestions to include Shamela scope (reuses MAX_SPANS_PER_CHUNK)"
+    },
+    {
+      "name": "scripts",
+      "type": "scripts",
+      "newFiles": [],
+      "modifiedFiles": [
+        "ci-lanes.ts",
+        "article-report.ts"
+      ],
+      "responsibility": "CI lane updates for Shamela ingest tests, root-coverage test; article report generator"
+    }
+  ],
+  "apiInterfaces": [
+    {
+      "name": "ShamelaAdapter",
+      "package": "mizan-corpus",
+      "methods": [
+        "fetchBookList(): Result<ShamelaBook[], DecodeFailure>",
+        "fetchPages(bookId: number): AsyncIterable<Result<ShamelaPage, DecodeFailure>>",
+        "decodeBookList(response: unknown): Result<ShamelaBook[], DecodeFailure>",
+        "decodePage(response: unknown): Result<ShamelaPage, DecodeFailure>"
+      ],
+      "schemas": ["ShamelaBookSchema", "ShamelaPageSchema"],
+      "boundary": "HTTP response from Shamela API → schema decode → normalize → hash → FTS5 insert"
+    },
+    {
+      "name": "ShamelaSearch",
+      "package": "mizan-retrieval",
+      "methods": [
+        "searchShamela(db: Database, query: string, limit: number): ShamelaSearchResult[]",
+        "searchAllCollections(db: Database, query: string, weights: RetrievalWeights, limit: number): UnifiedSearchResult[]"
+      ],
+      "schemas": ["ShamelaSearchResult", "UnifiedSearchResult", "RetrievalWeights"],
+      "boundary": "MCP tool arguments → schema decode → FTS5 parameterized query → metadata-only results"
+    },
+    {
+      "name": "ShamelaMCPTools",
+      "package": "mizan-mcp",
+      "methods": [
+        "search_shamela(args: { query: string, bookId?: number, limit?: number }): McpToolResult",
+        "read_shamela_page(args: { bookId: number, pageNumber: number }): McpToolResult"
+      ],
+      "schemas": ["SEARCH_SHAMELA_TOOL.inputSchema", "READ_SHAMELA_PAGE_TOOL.inputSchema"],
+      "boundary": "MCP tools/call → schema decode → ShamelaSearch → trace with questionHash only"
+    },
+    {
+      "name": "RootCoverageArtefact",
+      "package": "mizan-bench",
+      "methods": [
+        "runRootCoverage(): Promise<void>",
+        "buildBaseArtefact(...): RootCoverageArtefact"
+      ],
+      "schemas": ["RootCoverageArtefact (Effect Schema)"],
+      "boundary": "Corpus DB → dual-stemmer pipeline → validated JSON artefact → docs/artefacts/root-coverage.json"
+    }
+  ],
+  "dataModels": [
+    {
+      "name": "ShamelaBook",
+      "fields": ["id: number", "title: string", "author: string", "category: string", "pageCount: number", "licenseStatus: 'cleared' | 'blocked' | 'pending'"],
+      "indexes": ["PRIMARY KEY (id)"],
+      "storage": "shamela_books table (SQLite)"
+    },
+    {
+      "name": "ShamelaPage",
+      "fields": ["bookId: number", "pageNumber: number", "text: string", "sourceHash: string", "ingestTimestamp: string", "licenseStatus: string"],
+      "indexes": ["fts5 index on content with book_id, page_number, book_title, author, category UNINDEXED", "idx_shamela_book_pages ON shamela_pages(book_id)"],
+      "storage": "shamela_pages FTS5 virtual table (SQLite)"
+    },
+    {
+      "name": "UnifiedSearchResult",
+      "fields": ["collection: 'quran' | 'hadith' | 'shamela'", "ref: string", "score: number", "snippet: string", "sourceHash: string"],
+      "indexes": "N/A (computed at query time via RRF)",
+      "storage": "In-memory fusion result"
+    },
+    {
+      "name": "RootCoverageArtefact",
+      "fields": ["schemaVersion: 1", "coveragePercent: 96.3", "totalMappings: 1528346", "aliasMapEntries: 131", "stemmerDelta: '42-50%'", "indexShipped: false", "methodologicalNotes: string", "conditions: object", "generatedAt: ISO timestamp", "gitCommit: string"],
+      "indexes": "N/A (committed JSON artefact)",
+      "storage": "docs/artefacts/root-coverage.json"
+    },
+    {
+      "name": "ArticleCoverageReport",
+      "fields": ["schemaVersion: 1", "documentDigest: string", "segmentCount: number", "counts: ArticleCounts", "outcomes: SpanOutcome[]", "gaps: CoverageGap[]", "degradation: DegradationCondition | null"],
+      "indexes": "N/A (per-run artefact)",
+      "storage": "MCP tool response, client-accumulated"
+    }
+  ],
+  "testingStrategy": "Unit: schema decode success/failure, FTS5 insert idempotency, hash computation, BM25 ranking, RRF fusion weights, dual-stemmer coverage ≥96%, alias map 131 entries, indexShipped: false. Integration: full Shamela ingest → search → article suggestions pipeline (corpus lane), MCP tool call sequence, cross-collection retrieval, article determinism (10 runs byte-identical). Security: injection payloads in Shamela API response, malicious MCP tool args, no Shamela text in logs/traces, license-gated book exclusion assertion. Performance: ingest ≥100 pages/sec, FTS5 query p95 ≤800ms, RRF fusion p95 ≤800ms, root-coverage ≤30min. Gates: G-5 license gate planted violation, G-7.6 undeclared display module, G-7.13 completeness claim without denominator. CI: Shamela tests in corpus lane, root-coverage test in corpus lane, default lane corpus-free."
+}

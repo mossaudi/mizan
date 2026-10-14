@@ -55,7 +55,14 @@ export const OPT_IN_LANES: readonly OptInLane[] = [
   {
     id: "corpus",
     reason: `every test here measures ${CORPUS_RELATIVE}, which is gitignored and therefore absent from a clean clone — the same absence \`bun run ci\` has to survive for \`accept:customer\``,
-    tests: ["scripts/benchmark.corpus.test.ts", "scripts/article-determinism.corpus.test.ts"],
+    tests: [
+      "scripts/benchmark.corpus.test.ts",
+      "scripts/article-determinism.corpus.test.ts",
+      "packages/mizan-corpus/test/shamela-ingest.test.ts",
+      "packages/mizan-retrieval/test/shamela-search.test.ts",
+      "packages/mizan-mcp/test/shamela-tools.test.ts",
+      "packages/mizan-bench/test/root-coverage-artefact.test.ts",
+    ],
   },
   {
     id: "clean-clone",

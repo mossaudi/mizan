@@ -59,6 +59,7 @@ export {
 } from "./candidates.ts"
 
 export { CANDIDATE_COLUMNS, RECORD_COLUMNS, recordSelect, toRecord, type RawCandidateRow, type RawRow } from "./rows.ts"
+export { fetchShamelaRecords, type ShamelaRecord } from "./candidates.ts"
 
 /**
  * The query-path attestation checks. Exported next to `readSnapshotMeta` rather than from
@@ -72,6 +73,7 @@ export {
   attestSnapshotUnchanged,
   attestationUnreadable,
   describeAttestationProblem,
+  verifyShamelaAttestation,
   type AttestationProblem,
   type SnapshotIdentity,
 } from "./attest.ts"
@@ -99,6 +101,16 @@ export {
 } from "./ledger.ts"
 
 export { ADAPTERS, buildRegistryJsonl, runIngest, type IngestFailure, type IngestOptions, type IngestProgress, type IngestResult } from "./ingest.ts"
+export {
+  initShamelaTables,
+  runShamelaIngest,
+  searchShamelaPages,
+  type ShamelaIngestOptions,
+  type ShamelaIngestProgress,
+  type ShamelaIngestResult,
+  type ShamelaIngestFailure,
+  type ShamelaSearchResult,
+} from "./ingest-shamela.ts"
 
 export { auditCommittedCorpus, formatAudit, type AuditFinding, type CommittedCorpus } from "./audit.ts"
 
